@@ -19,6 +19,7 @@
 #include <linux/license.h>
 #include <linux/filter.h>
 #include <linux/version.h>
+#include <linux/kernel.h>
 
 DEFINE_PER_CPU(int, bpf_prog_active);
 
@@ -307,12 +308,6 @@ struct bpf_map *bpf_map_get_with_uref(u32 ufd)
 	return map;
 }
 
-/* helper to convert user pointers passed inside __aligned_u64 fields */
-static void __user *u64_to_ptr(__u64 val)
-{
-	return (void __user *) (unsigned long) val;
-}
-
 int __weak bpf_stackmap_copy(struct bpf_map *map, void *key, void *value)
 {
 	return -ENOTSUPP;
@@ -323,8 +318,8 @@ int __weak bpf_stackmap_copy(struct bpf_map *map, void *key, void *value)
 
 static int map_lookup_elem(union bpf_attr *attr)
 {
-	void __user *ukey = u64_to_ptr(attr->key);
-	void __user *uvalue = u64_to_ptr(attr->value);
+	void __user *ukey = u64_to_user_ptr(attr->key);
+	void __user *uvalue = u64_to_user_ptr(attr->value);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
 	void *key, *value, *ptr;
@@ -399,8 +394,8 @@ err_put:
 
 static int map_update_elem(union bpf_attr *attr)
 {
-	void __user *ukey = u64_to_ptr(attr->key);
-	void __user *uvalue = u64_to_ptr(attr->value);
+	void __user *ukey = u64_to_user_ptr(attr->key);
+	void __user *uvalue = u64_to_user_ptr(attr->value);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
 	void *key, *value;
@@ -479,7 +474,7 @@ err_put:
 
 static int map_delete_elem(union bpf_attr *attr)
 {
-	void __user *ukey = u64_to_ptr(attr->key);
+	void __user *ukey = u64_to_user_ptr(attr->key);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
 	struct fd f;
@@ -523,8 +518,8 @@ err_put:
 
 static int map_get_next_key(union bpf_attr *attr)
 {
-	void __user *ukey = u64_to_ptr(attr->key);
-	void __user *unext_key = u64_to_ptr(attr->next_key);
+	void __user *ukey = u64_to_user_ptr(attr->key);
+	void __user *unext_key = u64_to_user_ptr(attr->next_key);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
 	void *key, *next_key;
@@ -791,7 +786,7 @@ static int bpf_prog_load(union bpf_attr *attr)
 		return -EINVAL;
 
 	/* copy eBPF program license from user space */
-	if (strncpy_from_user(license, u64_to_ptr(attr->license),
+	if (strncpy_from_user(license, u64_to_user_ptr(attr->license),
 			      sizeof(license) - 1) < 0)
 		return -EFAULT;
 	license[sizeof(license) - 1] = 0;
@@ -827,7 +822,7 @@ static int bpf_prog_load(union bpf_attr *attr)
 	prog->len = attr->insn_cnt;
 
 	err = -EFAULT;
-	if (copy_from_user(prog->insns, u64_to_ptr(attr->insns),
+	if (copy_from_user(prog->insns, u64_to_user_ptr(attr->insns),
 			   prog->len * sizeof(struct bpf_insn)) != 0)
 		goto free_prog;
 
@@ -877,7 +872,7 @@ static int bpf_obj_pin(const union bpf_attr *attr)
 	if (CHECK_ATTR(BPF_OBJ))
 		return -EINVAL;
 
-	return bpf_obj_pin_user(attr->bpf_fd, u64_to_ptr(attr->pathname));
+	return bpf_obj_pin_user(attr->bpf_fd, u64_to_user_ptr(attr->pathname));
 }
 
 static int bpf_obj_get(const union bpf_attr *attr)
@@ -885,7 +880,7 @@ static int bpf_obj_get(const union bpf_attr *attr)
 	if (CHECK_ATTR(BPF_OBJ) || attr->bpf_fd != 0)
 		return -EINVAL;
 
-	return bpf_obj_get_user(u64_to_ptr(attr->pathname));
+	return bpf_obj_get_user(u64_to_user_ptr(attr->pathname));
 }
 
 #ifdef CONFIG_CGROUP_BPF
