@@ -153,7 +153,7 @@ int __cgroup_bpf_update(struct cgroup *cgrp, struct cgroup *parent,
 }
 
 /**
- * __cgroup_bpf_run_filter() - Run a program for packet filtering
+ * __cgroup_bpf_run_filter_skb() - Run a program for packet filtering
  * @sk: The socket sending or receiving traffic
  * @skb: The skb that is being sent or received
  * @type: The type of program to be exectuted
@@ -167,7 +167,7 @@ int __cgroup_bpf_update(struct cgroup *cgrp, struct cgroup *parent,
  * This function will return %-EPERM if any if an attached program was found
  * and if it returned != 1 during execution. In all other cases, 0 is returned.
  */
-int __cgroup_bpf_run_filter(struct sock *sk,
+int __cgroup_bpf_run_filter_skb(struct sock *sk,
 			    struct sk_buff *skb,
 			    enum bpf_attach_type type)
 {
@@ -202,4 +202,4 @@ int __cgroup_bpf_run_filter(struct sock *sk,
 
 	return ret;
 }
-EXPORT_SYMBOL(__cgroup_bpf_run_filter);
+EXPORT_SYMBOL(__cgroup_bpf_run_filter_skb);
