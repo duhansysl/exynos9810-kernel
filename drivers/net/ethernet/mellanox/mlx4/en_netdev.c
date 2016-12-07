@@ -2643,6 +2643,11 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	int err;
 	int i;
 
+	if (prog && prog->xdp_adjust_head) {
+		en_err(priv, "Does not support bpf_xdp_adjust_head()\n");
+		return -EOPNOTSUPP;
+	}
+
 	xdp_ring_num = prog ? ALIGN(priv->rx_ring_num, MLX4_EN_NUM_UP) : 0;
 
 	/* No need to reconfigure buffers when simply swapping the

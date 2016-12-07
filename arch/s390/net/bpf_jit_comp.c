@@ -1043,7 +1043,7 @@ static noinline int bpf_jit_insn(struct bpf_jit *jit, struct bpf_prog *fp, int i
 		}
 		/* lgr %b0,%r2: load return value into %b0 */
 		EMIT4(0xb9040000, BPF_REG_0, REG_2);
-		if (bpf_helper_changes_skb_data((void *)func)) {
+		if (bpf_helper_changes_pkt_data((void *)func)) {
 			jit->seen |= SEEN_SKB_CHANGE;
 			/* lg %b1,ST_OFF_SKBP(%r15) */
 			EMIT6_DISP_LH(0xe3000000, 0x0004, BPF_REG_1, REG_0,

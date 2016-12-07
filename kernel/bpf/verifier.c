@@ -1280,7 +1280,7 @@ static int check_call(struct bpf_verifier_env *env, int func_id, int insn_idx)
 		return -EINVAL;
 	}
 
-	changes_data = bpf_helper_changes_skb_data(fn->func);
+	changes_data = bpf_helper_changes_pkt_data(fn->func);
 
 	memset(&meta, 0, sizeof(meta));
 	meta.pkt_access = fn->pkt_access;
@@ -3521,6 +3521,8 @@ static int fixup_bpf_calls(struct bpf_verifier_env *env)
 			prog->dst_needed = 1;
 		if (insn->imm == BPF_FUNC_get_prandom_u32)
 			bpf_user_rnd_init_once();
+		if (insn->imm == BPF_FUNC_xdp_adjust_head)
+			prog->xdp_adjust_head = 1;
 		if (insn->imm == BPF_FUNC_tail_call) {
 			/* mark bpf_tail_call as different opcode to avoid
 			 * conditional branch in the interpeter for every normal
