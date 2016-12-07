@@ -1207,7 +1207,7 @@ void __weak bpf_jit_compile(struct bpf_prog *prog)
 {
 }
 
-bool __weak bpf_helper_changes_skb_data(void *func)
+bool __weak bpf_helper_changes_pkt_data(void *func)
 {
 	return false;
 }
