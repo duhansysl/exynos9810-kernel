@@ -3600,9 +3600,6 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr)
 	struct bpf_verifier_env *env;
 	int ret = -EINVAL;
 
-	if ((*prog)->len <= 0 || (*prog)->len > BPF_MAXINSNS)
-		return -E2BIG;
-
 	/* 'struct bpf_verifier_env' can be global, but since it's not small,
 	 * allocate/free it every time bpf_check() is called
 	 */
