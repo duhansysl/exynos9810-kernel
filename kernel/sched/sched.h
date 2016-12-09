@@ -1881,8 +1881,9 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 
 #ifdef CONFIG_SCHED_WALT
 	if (!walt_disabled && sysctl_sched_use_walt_cpu_util) {
-		util = cpu_rq(cpu)->prev_runnable_sum << SCHED_CAPACITY_SHIFT;
+		util = cpu_rq(cpu)->cumulative_runnable_avg << SCHED_CAPACITY_SHIFT;
 		util = div_u64(util, walt_ravg_window);
+		goto util_walt;
 	}
 #endif
 	util = cfs_rq->avg.util_avg;
@@ -1891,7 +1892,7 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 		util = max_t(unsigned long, util, READ_ONCE(cfs_rq->avg.util_est.enqueued));
 	
 	util += cpu_rq(cpu)->rt.avg.util_avg;
-	
+util_walt:
 	delta += util;
 	if (delta < 0)
 		return 0;
@@ -1903,6 +1904,30 @@ static inline unsigned long cpu_util(int cpu)
 {
 	return __cpu_util(cpu, 0);
 }
+
+static inline unsigned long cpu_util_freq(int cpu)
+{
+	unsigned long util = cpu_rq(cpu)->cfs.avg.util_avg;
+	unsigned long capacity = capacity_orig_of(cpu);
+
+#ifdef CONFIG_SCHED_WALT
+	if (!walt_disabled && sysctl_sched_use_walt_cpu_util) {
+		util = cpu_rq(cpu)->prev_runnable_sum << SCHED_CAPACITY_SHIFT;
+		do_div(util, walt_ravg_window);
+		goto util_walt;
+	}
+#endif
+
+	if (sched_feat(UTIL_EST))
+		util = max_t(unsigned long, util, 
+				READ_ONCE(cpu_rq(cpu)->cfs.avg.util_est.enqueued));
+	
+	util += cpu_rq(cpu)->rt.avg.util_avg;
+util_walt:
+
+	return (util >= capacity) ? capacity : util;
+}
+
 #endif
 
 static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
