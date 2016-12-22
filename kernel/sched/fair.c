@@ -9202,11 +9202,11 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 		if (!nr_running && idle_cpu(i))
 			sgs->idle_cpus++;
 
-		if (cpu_overutilized(i)) {
+		if (cpu_overutilized(i))
 			*overutilized = true;
-			if (!sgs->group_misfit_task && rq->misfit_task)
-				sgs->group_misfit_task = capacity_of(i);
-		}
+
+		if (!sgs->group_misfit_task && rq->misfit_task)
+			sgs->group_misfit_task = capacity_of(i);
 	}
 
 	/* Adjust by relative CPU capacity of the group */
