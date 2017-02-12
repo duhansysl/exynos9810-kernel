@@ -1501,7 +1501,7 @@ static void ontime_update_next_balance(int cpu, struct ontime_avg *oa)
 #define cap_scale(v, s) ((v)*(s) >> SCHED_CAPACITY_SHIFT)
 
 u64 decay_load(u64 val, u64 n);
-u32 __compute_runnable_contrib(u64 n);
+u32 __accumulate_sum(u64 periods, u32 period_contrib, u32 remainder);
 
 /*
  * ontime_update_load_avg : load tracking for ontime-migration
@@ -1545,7 +1545,7 @@ void ontime_update_load_avg(int cpu, struct sched_avg *sa,
 
 		/* New load is decayed by the elapsed period and accumulated */
 		if (weight) {
-			contrib = __compute_runnable_contrib(periods);
+			contrib = __accumulate_sum(periods, period_contrib, delta);
 			contrib = cap_scale(contrib, scale_freq);
 			oa->load_sum += contrib * scale_cpu;
 		}
