@@ -1185,7 +1185,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 
 	if (image) {
 		bpf_flush_icache(header, image + proglen);
-		set_memory_ro((unsigned long)header, header->pages);
+		bpf_jit_binary_lock_ro(header);
 		prog->bpf_func = (void *)image;
 		prog->jited = 1;
 		prog->jited_len = proglen;
