@@ -1062,7 +1062,7 @@ static void htab_map_free(struct bpf_map *map)
 	kfree(htab);
 }
 
-static const struct bpf_map_ops htab_ops = {
+const struct bpf_map_ops htab_map_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
 	.map_get_next_key = htab_map_get_next_key,
@@ -1071,23 +1071,13 @@ static const struct bpf_map_ops htab_ops = {
 	.map_delete_elem = htab_map_delete_elem,
 };
 
-static struct bpf_map_type_list htab_type __ro_after_init = {
-	.ops = &htab_ops,
-	.type = BPF_MAP_TYPE_HASH,
-};
-
-static const struct bpf_map_ops htab_lru_ops = {
+const struct bpf_map_ops htab_lru_map_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
 	.map_get_next_key = htab_map_get_next_key,
 	.map_lookup_elem = htab_lru_map_lookup_elem,
 	.map_update_elem = htab_lru_map_update_elem,
 	.map_delete_elem = htab_lru_map_delete_elem,
-};
-
-static struct bpf_map_type_list htab_lru_type __ro_after_init = {
-	.ops = &htab_lru_ops,
-	.type = BPF_MAP_TYPE_LRU_HASH,
 };
 
 /* Called from eBPF program */
@@ -1163,7 +1153,7 @@ int bpf_percpu_hash_update(struct bpf_map *map, void *key, void *value,
 	return ret;
 }
 
-static const struct bpf_map_ops htab_percpu_ops = {
+const struct bpf_map_ops htab_percpu_map_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
 	.map_get_next_key = htab_map_get_next_key,
@@ -1172,23 +1162,13 @@ static const struct bpf_map_ops htab_percpu_ops = {
 	.map_delete_elem = htab_map_delete_elem,
 };
 
-static struct bpf_map_type_list htab_percpu_type __ro_after_init = {
-	.ops = &htab_percpu_ops,
-	.type = BPF_MAP_TYPE_PERCPU_HASH,
-};
-
-static const struct bpf_map_ops htab_lru_percpu_ops = {
+const struct bpf_map_ops htab_lru_percpu_map_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
 	.map_get_next_key = htab_map_get_next_key,
 	.map_lookup_elem = htab_lru_percpu_map_lookup_elem,
 	.map_update_elem = htab_lru_percpu_map_update_elem,
 	.map_delete_elem = htab_lru_map_delete_elem,
-};
-
-static struct bpf_map_type_list htab_lru_percpu_type __ro_after_init = {
-	.ops = &htab_lru_percpu_ops,
-	.type = BPF_MAP_TYPE_LRU_PERCPU_HASH,
 };
 
 static struct bpf_map *fd_htab_map_alloc(union bpf_attr *attr)
@@ -1281,7 +1261,7 @@ static void htab_of_map_free(struct bpf_map *map)
 	fd_htab_map_free(map);
 }
 
-static const struct bpf_map_ops htab_of_map_ops = {
+const struct bpf_map_ops htab_of_maps_map_ops = {
 	.map_alloc = htab_of_map_alloc,
 	.map_free = htab_of_map_free,
 	.map_get_next_key = htab_map_get_next_key,
@@ -1290,19 +1270,3 @@ static const struct bpf_map_ops htab_of_map_ops = {
 	.map_fd_get_ptr = bpf_map_fd_get_ptr,
 	.map_fd_put_ptr = bpf_map_fd_put_ptr,
 };
-
-static struct bpf_map_type_list htab_of_map_type __ro_after_init = {
-	.ops = &htab_of_map_ops,
-	.type = BPF_MAP_TYPE_HASH_OF_MAPS,
-};
-
-static int __init register_htab_map(void)
-{
-	bpf_register_map_type(&htab_type);
-	bpf_register_map_type(&htab_percpu_type);
-	bpf_register_map_type(&htab_lru_type);
-	bpf_register_map_type(&htab_lru_percpu_type);
-	bpf_register_map_type(&htab_of_map_type);
-	return 0;
-}
-late_initcall(register_htab_map);
