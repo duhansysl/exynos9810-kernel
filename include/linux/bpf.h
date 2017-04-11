@@ -54,12 +54,6 @@ struct bpf_map {
 #endif
 };
 
-struct bpf_map_type_list {
-	struct list_head list_node;
-	const struct bpf_map_ops *ops;
-	enum bpf_map_type type;
-};
-
 /* function argument constraints */
 enum bpf_arg_type {
 	ARG_DONTCARE = 0,	/* unused argument in helper function */
@@ -287,10 +281,11 @@ DECLARE_PER_CPU(int, bpf_prog_active);
 
 #define BPF_PROG_TYPE(_id, _ops) \
 	extern const struct bpf_verifier_ops _ops;
+#define BPF_MAP_TYPE(_id, _ops) \
+	extern const struct bpf_map_ops _ops;
 #include <linux/bpf_types.h>
 #undef BPF_PROG_TYPE
-
-void bpf_register_map_type(struct bpf_map_type_list *tl);
+#undef BPF_MAP_TYPE
 
 extern const struct file_operations bpf_map_fops;
 extern const struct file_operations bpf_prog_fops;
