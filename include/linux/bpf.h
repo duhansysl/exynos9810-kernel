@@ -172,12 +172,6 @@ struct bpf_verifier_ops {
 				  struct bpf_prog *prog);
 };
 
-struct bpf_prog_type_list {
-	struct list_head list_node;
-	const struct bpf_verifier_ops *ops;
-	enum bpf_prog_type type;
-};
-
 struct bpf_prog_aux {
 	atomic_t refcnt;
 	u32 used_map_cnt;
@@ -291,7 +285,11 @@ _out:							\
 #ifdef CONFIG_BPF_SYSCALL
 DECLARE_PER_CPU(int, bpf_prog_active);
 
-void bpf_register_prog_type(struct bpf_prog_type_list *tl);
+#define BPF_PROG_TYPE(_id, _ops) \
+	extern const struct bpf_verifier_ops _ops;
+#include <linux/bpf_types.h>
+#undef BPF_PROG_TYPE
+
 void bpf_register_map_type(struct bpf_map_type_list *tl);
 
 extern const struct file_operations bpf_map_fops;
@@ -363,10 +361,6 @@ static inline bool unprivileged_ebpf_enabled(void)
 	return !sysctl_unprivileged_bpf_disabled;
 }
 #else
-static inline void bpf_register_prog_type(struct bpf_prog_type_list *tl)
-{
-}
-
 static inline struct bpf_prog *bpf_prog_get(u32 ufd)
 {
 	return ERR_PTR(-EOPNOTSUPP);
