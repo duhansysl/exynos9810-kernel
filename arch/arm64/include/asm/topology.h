@@ -1,7 +1,7 @@
 #ifndef __ASM_TOPOLOGY_H
 #define __ASM_TOPOLOGY_H
 
-
+#include <linux/arch_topology.h>
 #include <linux/cpumask.h>
 
 struct cpu_topology {
