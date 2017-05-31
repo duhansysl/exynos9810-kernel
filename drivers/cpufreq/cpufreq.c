@@ -318,7 +318,7 @@ static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
  *               FREQUENCY INVARIANT CPU CAPACITY                    *
  *********************************************************************/
 
-static DEFINE_PER_CPU(unsigned long, freq_scale) = SCHED_CAPACITY_SCALE;
+static DEFINE_PER_CPU(unsigned long, cpu_freq_scale) = SCHED_CAPACITY_SCALE;
 static DEFINE_PER_CPU(unsigned long, max_freq_scale) = SCHED_CAPACITY_SCALE;
 
 static void
@@ -333,7 +333,7 @@ scale_freq_capacity(struct cpufreq_policy *policy, struct cpufreq_freqs *freqs)
 		 cpumask_pr_args(policy->cpus), cur, policy->max, scale);
 
 	for_each_cpu(cpu, policy->related_cpus)
-		per_cpu(freq_scale, cpu) = scale;
+		per_cpu(cpu_freq_scale, cpu) = scale;
 
 	if (freqs)
 		return;
@@ -350,7 +350,7 @@ scale_freq_capacity(struct cpufreq_policy *policy, struct cpufreq_freqs *freqs)
 
 unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu)
 {
-	return per_cpu(freq_scale, cpu);
+	return per_cpu(cpu_freq_scale, cpu);
 }
 
 unsigned long cpufreq_scale_max_freq_capacity(int cpu)
