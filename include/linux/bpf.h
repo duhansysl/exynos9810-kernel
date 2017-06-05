@@ -47,6 +47,7 @@ struct bpf_map {
 	u32 max_entries;
 	u32 map_flags;
 	u32 pages;
+	u32 id;
 	int numa_node;
 	bool unpriv_array;
 	struct user_struct *user;
