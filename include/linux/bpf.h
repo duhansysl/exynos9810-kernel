@@ -17,6 +17,7 @@
 #include <linux/numa.h>
 
 struct perf_event;
+struct bpf_prog;
 struct bpf_map;
 
 /* map is generic key/value storage optionally accesible by eBPF programs */
@@ -37,6 +38,8 @@ struct bpf_map_ops {
 				int fd);
 	void (*map_fd_put_ptr)(void *ptr);
 	u32 (*map_gen_lookup)(struct bpf_map *map, struct bpf_insn *insn_buf);
+	int (*map_attach)(struct bpf_map *map,
+			  struct bpf_prog *p1, struct bpf_prog *p2);
 };
 
 struct bpf_map {
@@ -152,8 +155,6 @@ enum bpf_reg_type {
 	 */
 	PTR_TO_MAP_VALUE_ADJ,
 };
-
-struct bpf_prog;
 
 /* The information passed from prog-specific *_is_valid_access
  * back to the verifier.
@@ -390,6 +391,7 @@ static inline bool unprivileged_ebpf_enabled(void)
 
 /* Map specifics */
 struct net_device  *__dev_map_lookup_elem(struct bpf_map *map, u32 key);
+struct sock  *__sock_map_lookup_elem(struct bpf_map *map, u32 key);
 void __dev_map_insert_ctx(struct bpf_map *map, u32 index);
 void __dev_map_flush(struct bpf_map *map);
 
@@ -497,6 +499,7 @@ extern const struct bpf_func_proto bpf_get_current_comm_proto;
 extern const struct bpf_func_proto bpf_skb_vlan_push_proto;
 extern const struct bpf_func_proto bpf_skb_vlan_pop_proto;
 extern const struct bpf_func_proto bpf_get_stackid_proto;
+extern const struct bpf_func_proto bpf_sock_map_update_proto;
 
 /* Shared helpers among cBPF and eBPF. */
 void bpf_user_rnd_init_once(void);
