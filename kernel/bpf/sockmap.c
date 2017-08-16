@@ -201,6 +201,9 @@ static void smap_state_change(struct sock *sk)
 		write_unlock_bh(&sk->sk_callback_lock);
 		break;
 	default:
+		psock = smap_psock_sk(sk);
+		if (unlikely(!psock))
+			break;
 		smap_report_sk_error(psock, EPIPE);
 		break;
 	}
