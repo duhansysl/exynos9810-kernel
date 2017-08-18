@@ -43,6 +43,7 @@ struct bpf_map {
 	u32 max_entries;
 	u32 map_flags;
 	u32 pages;
+	int numa_node;
 	bool unpriv_array;
 	struct user_struct *user;
 	const struct bpf_map_ops *ops;
@@ -304,7 +305,7 @@ struct bpf_map * __must_check bpf_map_inc(struct bpf_map *map, bool uref);
 void bpf_map_put_with_uref(struct bpf_map *map);
 void bpf_map_put(struct bpf_map *map);
 int bpf_map_precharge_memlock(u32 pages);
-void *bpf_map_area_alloc(size_t size);
+void *bpf_map_area_alloc(size_t size, int numa_node);
 void bpf_map_area_free(void *base);
 
 extern int sysctl_unprivileged_bpf_disabled;
@@ -355,6 +356,14 @@ static inline bool unprivileged_ebpf_enabled(void)
 {
 	return !sysctl_unprivileged_bpf_disabled;
 }
+
+/* Return map's numa specified by userspace */
+static inline int bpf_map_attr_numa_node(const union bpf_attr *attr)
+{
+	return (attr->map_flags & BPF_F_NUMA_NODE) ?
+		attr->numa_node : NUMA_NO_NODE;
+}
+
 #else
 static inline struct bpf_prog *bpf_prog_get(u32 ufd)
 {
