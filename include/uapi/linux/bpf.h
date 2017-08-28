@@ -137,9 +137,6 @@ enum bpf_attach_type {
 
 #define MAX_BPF_ATTACH_TYPE __MAX_BPF_ATTACH_TYPE
 
-/* If BPF_SOCKMAP_STRPARSER is used sockmap will use strparser on receive */
-#define BPF_SOCKMAP_STRPARSER	(1U << 0)
-
 /* cgroup-bpf attach flags used in BPF_PROG_ATTACH command
  *
  * NONE(default): No further bpf programs allowed in the subtree.
