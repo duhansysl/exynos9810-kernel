@@ -1127,6 +1127,7 @@ struct energy_env {
 	int			util_delta;
 	int			src_cpu;
 	int			dst_cpu;
+	int			trg_cpu;
 	int			energy;
 	int			payoff;
 	struct task_struct	*task;
