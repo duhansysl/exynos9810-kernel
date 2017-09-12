@@ -1608,7 +1608,7 @@ pure_initcall(init_ontime);
 /**********************************************************************
  * cpu selection                                                      *
  **********************************************************************/
-unsigned long boosted_task_util(struct task_struct *task);
+unsigned long boosted_task_util(struct task_struct *p);
 int energy_diff(struct energy_env *eenv);
 
 static inline int find_best_target(struct sched_domain *sd, struct task_struct *p)
@@ -1710,7 +1710,7 @@ static inline int find_best_target(struct sched_domain *sd, struct task_struct *
 				.util_delta     = task_util(p),
 				.src_cpu        = task_cpu(p),
 				.dst_cpu        = i,
-				.task           = p,
+				.p              = p,
 			};
 
 			if (eenv.src_cpu == eenv.dst_cpu)
@@ -1761,7 +1761,7 @@ static int select_energy_cpu(struct sched_domain *sd, struct task_struct *p,
 			.util_delta     = task_util(p),
 			.src_cpu        = prev_cpu,
 			.dst_cpu        = target_cpu,
-			.task           = p,
+			.p              = p,
 		};
 
 		/* Not enough spare capacity on previous cpu */

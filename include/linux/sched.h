@@ -1130,7 +1130,7 @@ struct energy_env {
 	int			trg_cpu;
 	int			energy;
 	int			payoff;
-	struct task_struct	*task;
+	struct task_struct	*p;
 	struct {
 		int before;
 		int after;
