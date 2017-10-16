@@ -144,7 +144,10 @@ int bpf_prog_offload_compile(struct bpf_prog *prog)
 	return bpf_prog_offload_translate(prog);
 }
 
-const struct bpf_verifier_ops bpf_offload_prog_ops = {
+const struct bpf_verifier_ops bpf_offload_verifier_ops = {
+};
+
+const struct bpf_prog_ops bpf_offload_prog_ops = {
 };
 
 static int bpf_offload_notification(struct notifier_block *notifier,
