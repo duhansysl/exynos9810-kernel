@@ -756,28 +756,15 @@ static const struct bpf_prog_ops * const bpf_prog_types[] = {
 #undef BPF_MAP_TYPE
 };
 
-static const struct bpf_verifier_ops * const bpf_verifier_ops[] = {
-#define BPF_PROG_TYPE(_id, _name) \
-	[_id] = & _name ## _verifier_ops,
-#define BPF_MAP_TYPE(_id, _ops)
-#define BPF_MAP_TYPE(_id, _ops)
-#include <linux/bpf_types.h>
-#undef BPF_PROG_TYPE
-#undef BPF_MAP_TYPE
-};
-
 static int find_prog_type(enum bpf_prog_type type, struct bpf_prog *prog)
 {
 	if (type >= ARRAY_SIZE(bpf_prog_types) || !bpf_prog_types[type])
 		return -EINVAL;
 
-	if (!bpf_prog_is_dev_bound(prog->aux)) {
+	if (!bpf_prog_is_dev_bound(prog->aux))
 		prog->aux->ops = bpf_prog_types[type];
-		prog->aux->vops = bpf_verifier_ops[type];
-	} else {
+	else
 		prog->aux->ops = &bpf_offload_prog_ops;
-		prog->aux->vops = &bpf_offload_verifier_ops;
-	}
 	prog->type = type;
 	return 0;
 }
