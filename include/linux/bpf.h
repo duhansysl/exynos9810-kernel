@@ -15,6 +15,7 @@
 #include <linux/err.h>
 #include <linux/rbtree_latch.h>
 #include <linux/numa.h>
+#include <linux/wait.h>
 
 struct perf_event;
 struct bpf_prog;
@@ -190,6 +191,16 @@ struct bpf_verifier_ops {
 			union bpf_attr __user *uattr);
 };
 
+struct bpf_dev_offload {
+	struct bpf_prog		*prog;
+	struct net_device	*netdev;
+	void			*dev_priv;
+	struct list_head	offloads;
+	bool			dev_state;
+	bool			verifier_running;
+	wait_queue_head_t	verifier_done;
+};
+
 struct bpf_prog_aux {
 	atomic_t refcnt;
 	u32 used_map_cnt;
@@ -204,6 +215,7 @@ struct bpf_prog_aux {
 	struct user_struct *user;
 	u64 load_time; /* ns since boottime */
 	char name[BPF_OBJ_NAME_LEN];
+	struct bpf_dev_offload *offload;
 #ifdef CONFIG_SECURITY
 	void *security;
 #endif
@@ -322,6 +334,7 @@ DECLARE_PER_CPU(int, bpf_prog_active);
 #undef BPF_PROG_TYPE
 #undef BPF_MAP_TYPE
 
+extern const struct bpf_verifier_ops bpf_offload_prog_ops;
 extern const struct file_operations bpf_map_fops;
 extern const struct file_operations bpf_prog_fops;
 
@@ -487,6 +500,29 @@ static inline void __dev_map_flush(struct bpf_map *map)
 {
 }
 #endif /* CONFIG_BPF_SYSCALL */
+
+int bpf_prog_offload_compile(struct bpf_prog *prog);
+void bpf_prog_offload_destroy(struct bpf_prog *prog);
+
+#if defined(CONFIG_NET) && defined(CONFIG_BPF_SYSCALL)
+int bpf_prog_offload_init(struct bpf_prog *prog, union bpf_attr *attr);
+
+static inline bool bpf_prog_is_dev_bound(struct bpf_prog_aux *aux)
+{
+	return aux->offload;
+}
+#else
+static inline int bpf_prog_offload_init(struct bpf_prog *prog,
+					union bpf_attr *attr)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline bool bpf_prog_is_dev_bound(struct bpf_prog_aux *aux)
+{
+	return false;
+}
+#endif /* CONFIG_NET && CONFIG_BPF_SYSCALL */
 
 /* verifier prototypes for helper functions called from eBPF programs */
 extern const struct bpf_func_proto bpf_map_lookup_elem_proto;
