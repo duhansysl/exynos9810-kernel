@@ -3189,7 +3189,7 @@ static bool mlx5e_xdp_attached(struct net_device *dev)
 	return !!priv->xdp_prog;
 }
 
-static int mlx5e_xdp(struct net_device *dev, struct netdev_xdp *xdp)
+static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *bpf)
 {
 	switch (xdp->command) {
 	case XDP_SETUP_PROG:
@@ -3235,7 +3235,7 @@ static const struct net_device_ops mlx5e_netdev_ops_basic = {
 	.ndo_rx_flow_steer	 = mlx5e_rx_flow_steer,
 #endif
 	.ndo_tx_timeout          = mlx5e_tx_timeout,
-	.ndo_xdp		 = mlx5e_xdp,
+	.ndo_bpf		 = mlx5e_xdp,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller     = mlx5e_netpoll,
 #endif
@@ -3270,7 +3270,7 @@ static const struct net_device_ops mlx5e_netdev_ops_sriov = {
 	.ndo_set_vf_link_state   = mlx5e_set_vf_link_state,
 	.ndo_get_vf_stats        = mlx5e_get_vf_stats,
 	.ndo_tx_timeout          = mlx5e_tx_timeout,
-	.ndo_xdp		 = mlx5e_xdp,
+	.ndo_bpf		 = mlx5e_xdp,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller     = mlx5e_netpoll,
 #endif
