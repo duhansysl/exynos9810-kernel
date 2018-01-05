@@ -54,6 +54,7 @@
 #include <linux/migrate.h>
 #include <linux/wait.h>
 #include <linux/pagemap.h>
+#include <linux/fs.h>
 #include <linux/swap.h>
 #include <linux/jiffies.h>
 
