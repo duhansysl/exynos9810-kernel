@@ -262,6 +262,12 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 	max_cap = arch_scale_cpu_capacity(NULL, cpu);
 
 	*util = boosted_cpu_util(cpu);
+	
+	if (sched_feat(UTIL_EST)) {
+		*util = max_t(unsigned long, *util,
+			     READ_ONCE(cpu_rq(cpu)->cfs.avg.util_est.enqueued));
+	}
+	
 	if (sched_rt_remove_ratio_for_freq)
 		*util -= ((rt_avg * sched_rt_remove_ratio_for_freq) / 100);
 	if (likely(use_pelt()))
