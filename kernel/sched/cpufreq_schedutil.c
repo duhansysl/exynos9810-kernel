@@ -161,7 +161,7 @@ static int sugov_select_scaling_cpu(void)
 			return cpu;
 	}
 
-	return cpumask_weight(&mask) - 1;
+	return cpumask_any(&mask);
 }
 
 static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
