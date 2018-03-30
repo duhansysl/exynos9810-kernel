@@ -94,15 +94,23 @@ int __cgroup_bpf_run_filter_sock_ops(struct sock *sk,
 	__ret;								       \
 })
 
-#define BPF_CGROUP_RUN_PROG_INET_SOCK(sk)				       \
+#define BPF_CGROUP_RUN_SK_PROG(sk, type)				       \
 ({									       \
 	int __ret = 0;							       \
 	if (cgroup_bpf_enabled && sk) {					       \
-		__ret = __cgroup_bpf_run_filter_sk(sk,			       \
-						 BPF_CGROUP_INET_SOCK_CREATE); \
+		__ret = __cgroup_bpf_run_filter_sk(sk, type);		       \
 	}								       \
 	__ret;								       \
 })
+
+#define BPF_CGROUP_RUN_PROG_INET_SOCK(sk)				       \
+	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET_SOCK_CREATE)
+
+#define BPF_CGROUP_RUN_PROG_INET4_POST_BIND(sk)				       \
+	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET4_POST_BIND)
+
+#define BPF_CGROUP_RUN_PROG_INET6_POST_BIND(sk)				       \
+	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET6_POST_BIND)
 
 #define BPF_CGROUP_RUN_SA_PROG(sk, uaddr, type)				       \
 ({									       \
@@ -168,6 +176,8 @@ static inline int cgroup_bpf_inherit(struct cgroup *cgrp) { return 0; }
 #define BPF_CGROUP_RUN_PROG_INET_SOCK(sk) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_INET4_BIND(sk, uaddr) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_INET6_BIND(sk, uaddr) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_INET4_POST_BIND(sk) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_INET6_POST_BIND(sk) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_INET4_CONNECT(sk, uaddr) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_INET4_CONNECT_LOCK(sk, uaddr) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_INET6_CONNECT(sk, uaddr) ({ 0; })
