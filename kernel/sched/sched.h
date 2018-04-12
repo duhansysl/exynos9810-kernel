@@ -1895,7 +1895,9 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 		util = max_t(unsigned long, util, READ_ONCE(cfs_rq->avg.util_est.enqueued));
 	
 	util += cpu_rq(cpu)->rt.avg.util_avg;
+#ifdef CONFIG_SCHED_WALT
 util_walt:
+#endif
 	delta += util;
 	if (delta < 0)
 		return 0;
@@ -1926,7 +1928,9 @@ static inline unsigned long cpu_util_freq(int cpu)
 				READ_ONCE(cpu_rq(cpu)->cfs.avg.util_est.enqueued));
 	
 	util += cpu_rq(cpu)->rt.avg.util_avg;
+#ifdef CONFIG_SCHED_WALT
 util_walt:
+#endif
 
 	return (util >= capacity) ? capacity : util;
 }
