@@ -771,7 +771,8 @@ void init_entity_runnable_average(struct sched_entity *se)
 	sa->util_sum = 0;
 	/* when this task enqueue'ed, it will contribute to its cfs_rq's load_avg */
 
-	ontime_new_entity_load(current, se);
+	if (sched_feat(EXYNOS_HMP_OM))
+		ontime_new_entity_load(current, se);
 }
 
 static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
@@ -3403,7 +3404,8 @@ static inline void update_load_avg(struct sched_entity *se, int flags)
 		ptr = (void *)&(task_of(se)->ravg);
 #endif
 		trace_sched_load_avg_task(task_of(se), &se->avg, ptr);
-		ontime_trace_task_info(task_of(se));
+		if (sched_feat(EXYNOS_HMP_OM))
+			ontime_trace_task_info(task_of(se));
 	}
 }
 
@@ -8234,7 +8236,7 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 #ifdef CONFIG_CGROUP_SCHEDTUNE
 	if (smaller_cpu_capacity(env->dst_cpu, env->src_cpu) &&
 	    (schedtune_prefer_perf(p) ||
-	     !ontime_can_migration(p, env->dst_cpu)))
+	     (sched_feat(EXYNOS_HMP_OM) && !ontime_can_migration(p, env->dst_cpu))))
 		return 0;
 #endif
 
@@ -10712,7 +10714,8 @@ static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
 	nohz_idle_balance(this_rq, idle);
 	rebalance_domains(this_rq, idle);
 
-	ontime_migration();
+	if (sched_feat(EXYNOS_HMP_OM))
+		ontime_migration();
 	schedtune_group_util_update();
 }
 
