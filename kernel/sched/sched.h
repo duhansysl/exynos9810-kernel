@@ -1204,7 +1204,7 @@ void unregister_sched_domain_sysctl(void);
 static inline void register_sched_domain_sysctl(void)
 {
 }
-static inline void dirty_sched_domain_sysctl(void)
+static inline void dirty_sched_domain_sysctl(int cpu)
 {
 }
 static inline void unregister_sched_domain_sysctl(void)
