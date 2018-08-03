@@ -227,7 +227,6 @@ config CPU_FREQ_GOV_SCHEDUTIL
 	depends on CPU_FREQ && SMP
 	select CPU_FREQ_GOV_ATTR_SET
 	select IRQ_WORK
-	select FREQVAR_TUNE
 	help
 	  This governor makes decisions based on the utilization data provided
 	  by the scheduler.  It sets the CPU frequency to be proportional to
