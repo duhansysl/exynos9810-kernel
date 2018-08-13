@@ -33,7 +33,7 @@ void __delay(unsigned long cycles)
 }
 EXPORT_SYMBOL(__delay);
 
-inline void __const_udelay(unsigned long xloops)
+ void __const_udelay(unsigned long xloops)
 {
 	unsigned long loops;
 
