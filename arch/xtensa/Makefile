@@ -48,7 +48,7 @@ KBUILD_CFLAGS += -pipe -mlongcalls
 KBUILD_CFLAGS += $(call cc-option,-mforce-no-pic,)
 
 ifneq ($(CONFIG_LD_NO_RELAX),)
-LDFLAGS := --no-relax
+KBUILD_LDFLAGS := --no-relax
 endif
 
 ifeq ($(shell echo __XTENSA_EB__ | $(CC) -E - | grep -v "\#"),1)
