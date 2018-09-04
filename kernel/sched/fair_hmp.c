@@ -700,8 +700,18 @@ static unsigned long task_h_load(struct task_struct *p);
  * Note: The tables runnable_avg_yN_inv and runnable_avg_yN_sum are
  * dependent on this value.
  */
+#ifdef CONFIG_PELT_HALFLIFE_32
 #define LOAD_AVG_PERIOD 32
 #define LOAD_AVG_MAX 47742 /* maximum possible load avg */
+#endif
+#ifdef CONFIG_PELT_HALFLIFE_16
+#define LOAD_AVG_PERIOD 16
+#define LOAD_AVG_MAX 24152
+#endif
+#ifdef CONFIG_PELT_HALFLIFE_8
+#define LOAD_AVG_PERIOD 8
+#define LOAD_AVG_MAX 12337
+#endif
 #define LOAD_AVG_MAX_N 345 /* number of full periods to produce LOAD_AVG_MAX */
 
 /* Give new sched_entity start runnable values to heavy its load in infant time */

@@ -256,7 +256,15 @@ int alloc_rt_sched_group(struct task_group *tg, struct task_group *parent)
 #ifdef CONFIG_SMP
 
 #define entity_is_task(se)	(!se->my_q)
+#ifdef CONFIG_PELT_HALFLIFE_32
 #define LOAD_AVG_MAX		47742
+#endif
+#ifdef CONFIG_PELT_HALFLIFE_16
+#define LOAD_AVG_MAX		24152
+#endif
+#ifdef CONFIG_PELT_HALFLIFE_8
+#define LOAD_AVG_MAX		12337
+#endif
 #define cap_scale(v, s) ((v)*(s) >> SCHED_CAPACITY_SHIFT)
 
 u64 decay_load(u64 val, u64 n);
