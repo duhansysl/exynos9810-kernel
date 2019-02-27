@@ -10,6 +10,8 @@ struct cgroup;
 struct sk_buff;
 struct bpf_sock_ops_kern;
 
+struct ctl_table;
+struct ctl_table_header;
 #ifdef CONFIG_CGROUP_BPF
 
 extern struct static_key_false cgroup_bpf_enabled_key;
@@ -73,6 +75,10 @@ int __cgroup_bpf_run_filter_sock_ops(struct sock *sk,
 
 int __cgroup_bpf_check_dev_permission(short dev_type, u32 major, u32 minor,
 					short access, enum bpf_attach_type type);
+
+int __cgroup_bpf_run_filter_sysctl(struct ctl_table_header *head,
+				   struct ctl_table *table, int write,
+				   enum bpf_attach_type type);
 
 /* Wrappers for __cgroup_bpf_run_filter_skb() guarded by cgroup_bpf_enabled. */
 #define BPF_CGROUP_RUN_PROG_INET_INGRESS(sk, skb)			      \
@@ -178,6 +184,16 @@ int __cgroup_bpf_check_dev_permission(short dev_type, u32 major, u32 minor,
 									       \
        __ret;								       \
 })
+
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write)			       \
+({									       \
+	int __ret = 0;							       \
+	if (cgroup_bpf_enabled)						       \
+		__ret = __cgroup_bpf_run_filter_sysctl(head, table, write,     \
+						       BPF_CGROUP_SYSCTL);     \
+	__ret;								       \
+})
+
 #else
 
 struct cgroup_bpf {};
@@ -198,6 +214,7 @@ static inline int cgroup_bpf_inherit(struct cgroup *cgrp) { return 0; }
 #define BPF_CGROUP_RUN_PROG_INET6_CONNECT_LOCK(sk, uaddr) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_SOCK_OPS(sock_ops) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type,major,minor,access) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write) ({ 0; })
 
 #endif /* CONFIG_CGROUP_BPF */
 
