@@ -53,10 +53,9 @@ static void cmd_exit_work(struct work_struct *work)
 
 void sec_cmd_set_default_result(struct sec_cmd_data *data)
 {
-	char delim = ':';
 	memset(data->cmd_result, 0x00, SEC_CMD_RESULT_STR_LEN);
 	memcpy(data->cmd_result, data->cmd, SEC_CMD_STR_LEN);
-	strncat(data->cmd_result, &delim, 1);
+	strcat(data->cmd_result, ":");
 }
 
 void sec_cmd_set_cmd_result_all(struct sec_cmd_data *data, char *buff, int len, char *item)
