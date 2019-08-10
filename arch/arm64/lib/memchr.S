@@ -2,7 +2,7 @@
  * Based on arch/arm/lib/memchr.S
  *
  * Copyright (C) 1995-2000 Russell King
- * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2014 ARM Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,25 +20,130 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
+/* Arguments and results.  */
+#define srcin		x0
+#define chrin		w1
+#define cntin		x2
+
+#define result		x0
+
+#define src		x3
+#define	tmp		x4
+#define wtmp2		w5
+#define synd		x6
+#define soff		x9
+#define cntrem		x10
+
+#define vrepchr		v0
+#define vdata1		v1
+#define vdata2		v2
+#define vhas_chr1	v3
+#define vhas_chr2	v4
+#define vrepmask	v5
+#define vend		v6
+
 /*
- * Find a character in an area of memory.
+ * Core algorithm:
  *
- * Parameters:
- *	x0 - buf
- *	x1 - c
- *	x2 - n
- * Returns:
- *	x0 - address of first occurrence of 'c' or 0
+ * For each 32-byte chunk we calculate a 64-bit syndrome value, with two bits
+ * per byte. For each tuple, bit 0 is set if the relevant byte matched the
+ * requested character and bit 1 is not used (faster than using a 32bit
+ * syndrome). Since the bits in the syndrome reflect exactly the order in which
+ * things occur in the original string, counting trailing zeros allows to
+ * identify exactly which byte has matched.
  */
 ENTRY(memchr)
-	and	w1, w1, #0xff
-1:	subs	x2, x2, #1
-	b.mi	2f
-	ldrb	w3, [x0], #1
-	cmp	w3, w1
-	b.ne	1b
-	sub	x0, x0, #1
+	/* Do not dereference srcin if no bytes to compare.  */
+	cbz	cntin, .Lzero_length
+	/*
+	 * Magic constant 0x40100401 allows us to identify which lane matches
+	 * the requested byte.
+	 */
+	mov	wtmp2, #0x0401
+	movk	wtmp2, #0x4010, lsl #16
+	dup	vrepchr.16b, chrin
+	/* Work with aligned 32-byte chunks */
+	bic	src, srcin, #31
+	dup	vrepmask.4s, wtmp2
+	ands	soff, srcin, #31
+	and	cntrem, cntin, #31
+	b.eq	.Lloop
+
+	/*
+	 * Input string is not 32-byte aligned. We calculate the syndrome
+	 * value for the aligned 32 bytes block containing the first bytes
+	 * and mask the irrelevant part.
+	 */
+
+	ld1	{vdata1.16b, vdata2.16b}, [src], #32
+	sub	tmp, soff, #32
+	adds	cntin, cntin, tmp
+	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
+	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
+	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
+	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
+	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
+	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
+	mov	synd, vend.2d[0]
+	/* Clear the soff*2 lower bits */
+	lsl	tmp, soff, #1
+	lsr	synd, synd, tmp
+	lsl	synd, synd, tmp
+	/* The first block can also be the last */
+	b.ls	.Lmasklast
+	/* Have we found something already? */
+	cbnz	synd, .Ltail
+
+.Lloop:
+	ld1	{vdata1.16b, vdata2.16b}, [src], #32
+	subs	cntin, cntin, #32
+	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
+	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
+	/* If we're out of data we finish regardless of the result */
+	b.ls	.Lend
+	/* Use a fast check for the termination condition */
+	orr	vend.16b, vhas_chr1.16b, vhas_chr2.16b
+	addp	vend.2d, vend.2d, vend.2d
+	mov	synd, vend.2d[0]
+	/* We're not out of data, loop if we haven't found the character */
+	cbz	synd, .Lloop
+
+.Lend:
+	/* Termination condition found, let's calculate the syndrome value */
+	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
+	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
+	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
+	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
+	mov	synd, vend.2d[0]
+	/* Only do the clear for the last possible block */
+	b.hi	.Ltail
+
+.Lmasklast:
+	/* Clear the (32 - ((cntrem + soff) % 32)) * 2 upper bits */
+	add	tmp, cntrem, soff
+	and	tmp, tmp, #31
+	sub	tmp, tmp, #32
+	neg	tmp, tmp, lsl #1
+	lsl	synd, synd, tmp
+	lsr	synd, synd, tmp
+
+.Ltail:
+	/* Count the trailing zeros using bit reversing */
+	rbit	synd, synd
+	/* Compensate the last post-increment */
+	sub	src, src, #32
+	/* Check that we have found a character */
+	cmp	synd, #0
+	/* And count the leading zeros */
+	clz	synd, synd
+	/* Compute the potential result */
+	add	result, src, synd, lsr #1
+	/* Select result or NULL */
+	csel	result, xzr, result, eq
 	ret
-2:	mov	x0, #0
+
+.Lzero_length:
+	mov	result, #0
 	ret
+
 ENDPIPROC(memchr)
