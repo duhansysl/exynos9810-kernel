@@ -463,6 +463,10 @@ static void add_uid_io_stats(struct uid_entry *uid_entry,
 	if (slot != UID_STATE_DEAD_TASKS && (task->flags & PF_EXITING))
 		return;
 
+	/* avoid double accounting of dying threads */
+	if (slot != UID_STATE_DEAD_TASKS && (task->flags & PF_EXITING))
+		return;
+
 	io_slot->read_bytes += task->ioac.read_bytes;
 	io_slot->write_bytes += compute_write_bytes(task);
 	io_slot->rchar += task->ioac.rchar;
