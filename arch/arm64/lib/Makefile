@@ -5,6 +5,8 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
 		   strchr.o strrchr.o
 
 ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
+CFLAGS_xor-neon.o += $(DISABLE_LTO)
+CFLAGS_xor-neon.o += $(call cc-option, -fno-whole-program)
 obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
 CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
 CFLAGS_xor-neon.o		+= -ffreestanding
