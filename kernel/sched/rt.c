@@ -2097,20 +2097,6 @@ static void check_preempt_curr_rt(struct rq *rq, struct task_struct *p, int flag
 #endif
 }
 
-#ifdef CONFIG_SMP
-static void sched_rt_update_capacity_req(struct rq *rq)
-{
-	if (!sched_freq())
-		return;
-
-	set_rt_cpu_capacity(rq->cpu, 1, rq->rt.avg.util_avg);
-}
-#else
-static inline void sched_rt_update_capacity_req(struct rq *rq)
-{ }
-
-#endif
-
 static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
 						   struct rt_rq *rt_rq)
 {
@@ -2219,7 +2205,6 @@ pick_next_task_rt(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		 * This value will be the used as an estimation of the next
 		 * activity.
 		 */
-		sched_rt_update_capacity_req(rq);
 		return NULL;
 	}
 
@@ -3158,9 +3143,6 @@ static void task_tick_rt(struct rq *rq, struct task_struct *p, int queued)
 
 		update_rt_load_avg(now, rt_se, rt_rq, cpu_of(rq_of_rt_rq(rt_rq)));
 	}
-
-	if (rq->rt.rt_nr_running)
-		sched_rt_update_capacity_req(rq);
 
 	watchdog(rq, p);
 
