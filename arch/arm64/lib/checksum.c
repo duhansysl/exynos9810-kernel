@@ -45,7 +45,7 @@ static inline unsigned short from64to16(unsigned long x)
  * Do a 64-bit checksum on an arbitrary memory area.
  * Returns a 16bit checksum.
  */
-unsigned int do_csum(const unsigned char *buff, unsigned len)
+unsigned int _do_csum(const unsigned char *buff, unsigned len)
 {
 	unsigned odd, count;
 	unsigned long result = 0;
