@@ -235,7 +235,6 @@ int print_mcu_debug(char *pchRcvDataFrame, int *pDataIdx,
 		return iLength ? iLength : ERROR;
 	}
 
-	ssp_dbg("[SSP]: MSG From MCU - %s\n", &pchRcvDataFrame[*pDataIdx]);
 	*pDataIdx += iLength;
 	return 0;
 }
