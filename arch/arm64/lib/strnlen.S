@@ -78,7 +78,7 @@
 	mov	len, limit
 	ret
 
-def_fn strnlen
+ENTRY(strnlen)
 	cbz	limit, .Lhit_limit
 	mov	zeroones, #REP8_01
 	bic	src, srcin, #15

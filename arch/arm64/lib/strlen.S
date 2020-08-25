@@ -103,12 +103,13 @@
 	   whether the first fetch, which may be misaligned, crosses a page
 	   boundary.  */
 
-def_fn strlen p2align=6
+ENTRY(strlen)
 	and	tmp1, srcin, MIN_PAGE_SIZE - 1
 	mov	zeroones, REP8_01
 	cmp	tmp1, MIN_PAGE_SIZE - 16
 	b.gt	L(page_cross)
 	ldp	data1, data2, [srcin]
+.p2align 6
 #ifdef __AARCH64EB__
 	/* For big-endian, carry propagation (if the final byte in the
 	   string is 0x01) means we cannot use has_nul1/2 directly.

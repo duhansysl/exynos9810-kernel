@@ -67,13 +67,14 @@
 	.p2align 6
 
 	/* Start of performance-critical section  -- one 64B cache line.  */
-def_fn strcmp p2align=6
+ENTRY(strcmp)
 	eor	tmp1, src1, src2
 	mov	zeroones, #REP8_01
 	tst	tmp1, #7
 	b.ne	L(misaligned8)
 	ands	tmp1, src1, #7
 	b.ne	L(mutual_align)
+.p2align 6
 	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
 	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
 	   can be done in parallel across the entire word.  */
