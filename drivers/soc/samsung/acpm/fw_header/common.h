@@ -69,8 +69,13 @@ struct acpm_ops {
 	s32 (*external_plugin_func) (void *plugin, u32 pid,
 			u32 *arg0, u32 *arg1, u32 *arg2);
 	s32 (*speedy_init)(void);
+#ifdef CONFIG_MULTI_PMIC
+	s32 (*speedy_read)(u8 channel, u32 addr);
+	s32 (*speedy_write)(u8 channel, u32 addr, u32 data);
+#else
 	s32 (*speedy_read)(u32 addr);
 	s32 (*speedy_write)(u32 addr, u32 data);
+#endif
 	void (*udelay)(u32 udelay);
 	void (*intr_enable)(u32 pid, u32 intr);
 	void (*intr_disable)(u32 pid, u32 intr);
@@ -153,9 +158,7 @@ enum ret_type {
 #define __raw_readl(base)			(*(volatile int*)(base))
 
 #define ARRAY_SIZE(a)			(sizeof(a) / sizeof((a)[0]))
-#endif
 
-#ifndef CONFIG_EXYNOS_ACPM
 #define EBUSY			100
 #define EINVAL			101
 #endif

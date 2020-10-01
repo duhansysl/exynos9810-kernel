@@ -16,7 +16,7 @@
 
 extern struct device_node *acpm_mfd_node;
 
-int exynos_acpm_read_reg(u16 type, u8 reg, u8 *dest)
+int exynos_acpm_read_reg(u8 channel, u16 type, u8 reg, u8 *dest)
 {
 	unsigned int channel_num, size;
 	struct ipc_config config;
@@ -25,7 +25,8 @@ int exynos_acpm_read_reg(u16 type, u8 reg, u8 *dest)
 
 	if (!acpm_ipc_request_channel(acpm_mfd_node, NULL, &channel_num, &size)) {
 		config.cmd = command;
-		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG);
+		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG) |
+				set_protocol(channel, CHANNEL);
 		config.cmd[1] = set_protocol(FUNC_READ, FUNC);
 		config.response = true;
 		config.indirection = false;
@@ -59,7 +60,7 @@ int exynos_acpm_read_reg(u16 type, u8 reg, u8 *dest)
 	return ret;
 }
 
-int exynos_acpm_bulk_read(u16 type, u8 reg, int count, u8 *buf)
+int exynos_acpm_bulk_read(u8 channel, u16 type, u8 reg, int count, u8 *buf)
 {
 	unsigned int channel_num, size;
 	struct ipc_config config;
@@ -68,7 +69,8 @@ int exynos_acpm_bulk_read(u16 type, u8 reg, int count, u8 *buf)
 
 	if (!acpm_ipc_request_channel(acpm_mfd_node, NULL, &channel_num, &size)) {
 		config.cmd = command;
-		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG);
+		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG) |
+				set_protocol(channel, CHANNEL);
 		config.cmd[1] = set_protocol(FUNC_BULK_READ, FUNC) | set_protocol(count, CNT);
 		config.response = true;
 		config.indirection = false;
@@ -105,7 +107,7 @@ int exynos_acpm_bulk_read(u16 type, u8 reg, int count, u8 *buf)
 	return ret;
 }
 
-int exynos_acpm_write_reg(u16 type, u8 reg, u8 value)
+int exynos_acpm_write_reg(u8 channel, u16 type, u8 reg, u8 value)
 {
 	unsigned int channel_num, size;
 	struct ipc_config config;
@@ -114,7 +116,8 @@ int exynos_acpm_write_reg(u16 type, u8 reg, u8 value)
 
 	if (!acpm_ipc_request_channel(acpm_mfd_node, NULL, &channel_num, &size)) {
 		config.cmd = command;
-		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG);
+		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG) |
+				set_protocol(channel, CHANNEL);;
 		config.cmd[1] = set_protocol(FUNC_WRITE, FUNC) | set_protocol(value, WRITE_VAL);
 		config.response = true;
 		config.indirection = false;
@@ -146,7 +149,7 @@ int exynos_acpm_write_reg(u16 type, u8 reg, u8 value)
 	return ret;
 }
 
-int exynos_acpm_bulk_write(u16 type, u8 reg, int count, u8 *buf)
+int exynos_acpm_bulk_write(u8 channel, u16 type, u8 reg, int count, u8 *buf)
 {
 	unsigned int channel_num, size;
 	struct ipc_config config;
@@ -156,7 +159,8 @@ int exynos_acpm_bulk_write(u16 type, u8 reg, int count, u8 *buf)
 
 	if (!acpm_ipc_request_channel(acpm_mfd_node, NULL, &channel_num, &size)) {
 		config.cmd = command;
-		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG);
+		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG) |
+				set_protocol(channel, CHANNEL);
 		config.cmd[1] = set_protocol(FUNC_BULK_WRITE, FUNC) | set_protocol(count, CNT);
 		config.response = true;
 		config.indirection = false;
@@ -193,7 +197,7 @@ int exynos_acpm_bulk_write(u16 type, u8 reg, int count, u8 *buf)
 	return ret;
 }
 
-int exynos_acpm_update_reg(u16 type, u8 reg, u8 value, u8 mask)
+int exynos_acpm_update_reg(u8 channel, u16 type, u8 reg, u8 value, u8 mask)
 {
 	unsigned int channel_num, size;
 	struct ipc_config config;
@@ -202,7 +206,8 @@ int exynos_acpm_update_reg(u16 type, u8 reg, u8 value, u8 mask)
 
 	if (!acpm_ipc_request_channel(acpm_mfd_node, NULL, &channel_num, &size)) {
 		config.cmd = command;
-		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG);
+		config.cmd[0] = set_protocol(type, TYPE) | set_protocol(reg, REG) |
+				set_protocol(channel, CHANNEL);
 		config.cmd[1] = set_protocol(FUNC_UPDATE, FUNC)
 				| set_protocol(value, UPDATE_VAL)
 				| set_protocol(mask, UPDATE_MASK);

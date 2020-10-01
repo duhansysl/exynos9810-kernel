@@ -168,6 +168,7 @@ unsigned int cal_dfs_get_resume_freq(unsigned int id)
 int cal_pd_control(unsigned int id, int on)
 {
 	unsigned int index;
+	u8 channel = 1;
 	int ret;
 
 	if ((id & 0xFFFF0000) != BLKPWR_MAGIC)
@@ -177,12 +178,12 @@ int cal_pd_control(unsigned int id, int on)
 
 	if (on) {
 		if ((id & 0xffff) == 0x8)
-			exynos_acpm_update_reg(0x3, 0x2a, 0x3 << 6, 0x3 << 6);
+			exynos_acpm_update_reg(channel, 0x3, 0x2a, 0x3 << 6, 0x3 << 6);
 		ret = pmucal_local_enable(index);
 	} else {
 		ret = pmucal_local_disable(index);
 		if ((id & 0xffff) == 0x8)
-			exynos_acpm_update_reg(0x3, 0x2a, 0x0 << 6, 0x3 << 6);
+			exynos_acpm_update_reg(channel, 0x3, 0x2a, 0x0 << 6, 0x3 << 6);
 	}
 
 	return ret;

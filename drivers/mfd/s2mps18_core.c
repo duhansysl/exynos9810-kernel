@@ -52,10 +52,11 @@ static struct mfd_cell s2mps18_devs[] = {
 int s2mps18_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
 {
 	struct s2mps18_dev *s2mps18 = i2c_get_clientdata(i2c);
+	u8 channel = 1;
 	int ret;
 
 	mutex_lock(&s2mps18->i2c_lock);
-	ret = exynos_acpm_read_reg(i2c->addr, reg, dest);
+	ret = exynos_acpm_read_reg(channel, i2c->addr, reg, dest);
 	mutex_unlock(&s2mps18->i2c_lock);
 	if (ret) {
 		pr_err("[%s] acpm ipc fail!\n", __func__);
@@ -68,10 +69,11 @@ EXPORT_SYMBOL_GPL(s2mps18_read_reg);
 int s2mps18_bulk_read(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
 {
 	struct s2mps18_dev *s2mps18 = i2c_get_clientdata(i2c);
+	u8 channel = 1;
 	int ret;
 
 	mutex_lock(&s2mps18->i2c_lock);
-	ret = exynos_acpm_bulk_read(i2c->addr, reg, count, buf);
+	ret = exynos_acpm_bulk_read(channel, i2c->addr, reg, count, buf);
 	mutex_unlock(&s2mps18->i2c_lock);
 	if (ret) {
 		pr_err("[%s] acpm ipc fail!\n", __func__);
@@ -84,10 +86,11 @@ EXPORT_SYMBOL_GPL(s2mps18_bulk_read);
 int s2mps18_write_reg(struct i2c_client *i2c, u8 reg, u8 value)
 {
 	struct s2mps18_dev *s2mps18 = i2c_get_clientdata(i2c);
+	u8 channel = 1;
 	int ret;
 
 	mutex_lock(&s2mps18->i2c_lock);
-	ret = exynos_acpm_write_reg(i2c->addr, reg, value);
+	ret = exynos_acpm_write_reg(channel, i2c->addr, reg, value);
 	mutex_unlock(&s2mps18->i2c_lock);
 	if (ret) {
 		pr_err("[%s] acpm ipc fail!\n", __func__);
@@ -100,10 +103,11 @@ EXPORT_SYMBOL_GPL(s2mps18_write_reg);
 int s2mps18_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
 {
 	struct s2mps18_dev *s2mps18 = i2c_get_clientdata(i2c);
+	u8 channel = 1;
 	int ret;
 
 	mutex_lock(&s2mps18->i2c_lock);
-	ret = exynos_acpm_bulk_write(i2c->addr, reg, count, buf);
+	ret = exynos_acpm_bulk_write(channel, i2c->addr, reg, count, buf);
 	mutex_unlock(&s2mps18->i2c_lock);
 	if (ret) {
 		pr_err("[%s] acpm ipc fail!\n", __func__);
@@ -116,10 +120,11 @@ EXPORT_SYMBOL_GPL(s2mps18_bulk_write);
 int s2mps18_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
 {
 	struct s2mps18_dev *s2mps18 = i2c_get_clientdata(i2c);
+	u8 channel = 1;
 	int ret;
 
 	mutex_lock(&s2mps18->i2c_lock);
-	ret = exynos_acpm_update_reg(i2c->addr, reg, val, mask);
+	ret = exynos_acpm_update_reg(channel, i2c->addr, reg, val, mask);
 	mutex_unlock(&s2mps18->i2c_lock);
 	if (ret) {
 		pr_err("[%s] acpm ipc fail!\n", __func__);
