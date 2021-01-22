@@ -1975,10 +1975,9 @@ static void adjust_reg_min_max_vals(struct bpf_verifier_env *env,
 		 * unsigned shift, so make the appropriate casts.
 		 */
 		if (min_val < 0 || dst_reg->min_value < 0) {
-			dst_reg->min_value = BPF_REGISTER_MIN_RANGE;
+			reset_reg_range_values(regs, insn->dst_reg);
 		} else {
-			dst_reg->min_value =
-				(u64)(dst_reg->min_value) >> min_val;
+			dst_reg->min_value = (u64)(dst_reg->min_value) >> max_val;
 		}
 		if (min_val < 0) {
 			dst_reg->min_align = 1;
