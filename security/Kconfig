@@ -176,6 +176,16 @@ config HARDENED_USERCOPY_PAGESPAN
 	  however, several cases of this in the kernel that have not all
 	  been removed. This config is intended to be used only while
 	  trying to find such users.
+	  
+config FORTIFY_SOURCE
+	bool "Harden common str/mem functions against buffer overflows"
+	depends on ARCH_HAS_FORTIFY_SOURCE
+	# https://bugs.llvm.org/show_bug.cgi?id=50322
+	# https://bugs.llvm.org/show_bug.cgi?id=41459
+	depends on !CC_IS_CLANG
+	help
+	  Detect overflows of buffers in common string and memory functions
+	  where the compiler can determine and validate the buffer sizes.
 
 config NO_SDP_BASE
 	bool "disable SDP base"
