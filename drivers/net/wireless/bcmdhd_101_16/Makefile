@@ -415,7 +415,7 @@ DHDCFLAGS += -DWL_STA_ASSOC_RAND
 #Soft AP MAC randomization
 DHDCFLAGS += -DWL_SOFTAP_RAND
 #p2p MAC randomization
-#DHDCFLAGS += -DWL_P2P_RAND
+DHDCFLAGS += -DWL_P2P_RAND
 
 # Set initial country code to World Wide Safe
 DHDCFLAGS += -DCUSTOM_COUNTRY_CODE_XZ
