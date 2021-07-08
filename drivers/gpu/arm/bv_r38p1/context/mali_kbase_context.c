@@ -99,6 +99,7 @@ static int kbase_insert_kctx_to_process(struct kbase_context *kctx)
 		INIT_LIST_HEAD(&kprcs->kctx_list);
 		kprcs->dma_buf_root = RB_ROOT;
 		kprcs->total_gpu_pages = 0;
+		kprcs->dma_buf_pages = 0;
 
 		while (*new) {
 			struct kbase_process *prcs_node;

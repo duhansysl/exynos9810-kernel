@@ -180,11 +180,15 @@ void kbase_remove_dma_buf_usage(struct kbase_context *kctx,
 	WARN_ON(dev_mapping_removed && !prcs_mapping_removed);
 
 	spin_lock(&kbdev->gpu_mem_usage_lock);
-	if (dev_mapping_removed)
+	if (dev_mapping_removed) {
 		kbdev->total_gpu_pages -= alloc->nents;
+		kbdev->dma_buf_pages -= alloc->nents;
+	}
 
-	if (prcs_mapping_removed)
+	if (prcs_mapping_removed) {
 		kctx->kprcs->total_gpu_pages -= alloc->nents;
+		kctx->kprcs->dma_buf_pages -= alloc->nents;
+	}
 
 	if (dev_mapping_removed || prcs_mapping_removed)
 		kbase_trace_gpu_mem_usage(kbdev, kctx);
@@ -211,11 +215,15 @@ void kbase_add_dma_buf_usage(struct kbase_context *kctx,
 	WARN_ON(unique_dev_dmabuf && !unique_prcs_dmabuf);
 
 	spin_lock(&kbdev->gpu_mem_usage_lock);
-	if (unique_dev_dmabuf)
+	if (unique_dev_dmabuf) {
 		kbdev->total_gpu_pages += alloc->nents;
+		kbdev->dma_buf_pages += alloc->nents;
+	}
 
-	if (unique_prcs_dmabuf)
+	if (unique_prcs_dmabuf) {
 		kctx->kprcs->total_gpu_pages += alloc->nents;
+		kctx->kprcs->dma_buf_pages += alloc->nents;
+	}
 
 	if (unique_prcs_dmabuf || unique_dev_dmabuf)
 		kbase_trace_gpu_mem_usage(kbdev, kctx);
