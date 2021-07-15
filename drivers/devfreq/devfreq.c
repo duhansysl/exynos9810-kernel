@@ -1296,9 +1296,9 @@ static ssize_t time_in_state_show(struct device *dev,
 		return 0;
 
 	for (i = 0; i < max_state; i++) {
-		len += sprintf(buf + len, "%8lu",
+		len += sprintf(buf + len, "%ld ",
 				devfreq->profile->freq_table[i]);
-		len += sprintf(buf + len, "%10u\n",
+		len += sprintf(buf + len, "%u\n",
 			jiffies_to_msecs(devfreq->time_in_state[i]));
 	}
 	return len;
