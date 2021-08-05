@@ -440,7 +440,7 @@ static const struct attribute_group percent_margin_group = {
 
 static void fvmap_copy_from_sram(void __iomem *map_base, void __iomem *sram_base)
 {
-	struct fvmap_header *fvmap_header, *header;
+	volatile struct fvmap_header *fvmap_header, *header;
 	struct rate_volt_header *old, *new;
 	struct clocks *clks;
 	struct pll_header *plls;
