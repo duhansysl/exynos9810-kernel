@@ -116,6 +116,11 @@ else
 KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
 endif
 
+ifeq ($(CONFIG_AS_HAS_ARMV8_2), y)
+# make sure to pass the newest target architecture to -march.
+asm-arch := armv8.2-a
+endif
+
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 AS		+= -EB
