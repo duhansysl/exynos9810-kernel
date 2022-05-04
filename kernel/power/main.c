@@ -77,6 +77,9 @@ static ssize_t pm_async_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	unsigned long val;
 
+	if (IS_ENABLED(CONFIG_ANDROID))
+		return n;
+
 	if (kstrtoul(buf, 10, &val))
 		return -EINVAL;
 
