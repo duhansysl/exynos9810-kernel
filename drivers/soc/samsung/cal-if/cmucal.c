@@ -123,7 +123,7 @@ void *cmucal_get_node(unsigned int id)
 }
 EXPORT_SYMBOL_GPL(cmucal_get_node);
 
-void * __init cmucal_get_sfr_node(unsigned int id)
+void *cmucal_get_sfr_node(unsigned int id)
 {
 	unsigned int type = GET_TYPE(id);
 	unsigned short idx = GET_IDX(id);

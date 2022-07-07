@@ -4,7 +4,7 @@
 /*=================CMUCAL version: S5E9810================================*/
 
 /*====================The section of SFR Block instance===================*/
-struct sfr_block cmucal_sfr_block_list[] __initdata = {
+struct sfr_block cmucal_sfr_block_list[] = {
 	SFR_BLOCK(APM, 0x14000000, 0x8000),
 	SFR_BLOCK(AUD, 0x17c00000, 0x8000),
 	SFR_BLOCK(BUS1, 0x1a400000, 0x8000),
@@ -41,7 +41,7 @@ struct sfr_block cmucal_sfr_block_list[] __initdata = {
 unsigned int cmucal_sfr_block_size = 31;
 
 /*====================The section of SFR instance===================*/
-struct sfr cmucal_sfr_list[] __initdata = {
+struct sfr cmucal_sfr_list[] = {
 	SFR(PLL_CON0_MUX_CLKCMU_APM_BUS_USER, 0x0100, APM),
 	SFR(PLL_CON2_MUX_CLKCMU_APM_BUS_USER, 0x0108, APM),
 	SFR(CLKOUT_CON_BLK_APM_CMU_APM_CLKOUT0, 0x0810, APM),
@@ -1759,7 +1759,7 @@ unsigned int cmucal_sfr_size = 1710;
 unsigned int dbg_offset = 0x4000;
 
 /*====================The section of SFR Access instance===================*/
-struct sfr_access cmucal_sfr_access_list[] __initdata = {
+struct sfr_access cmucal_sfr_access_list[] = {
 	SFR_ACCESS(PLL_CON0_MUX_CLKCMU_APM_BUS_USER_BUSY, 7, 1, PLL_CON0_MUX_CLKCMU_APM_BUS_USER),
 	SFR_ACCESS(PLL_CON0_MUX_CLKCMU_APM_BUS_USER_MUX_SEL, 4, 1, PLL_CON0_MUX_CLKCMU_APM_BUS_USER),
 	SFR_ACCESS(PLL_CON2_MUX_CLKCMU_APM_BUS_USER_ENABLE_AUTOMATIC_CLKGATING, 28, 1, PLL_CON2_MUX_CLKCMU_APM_BUS_USER),

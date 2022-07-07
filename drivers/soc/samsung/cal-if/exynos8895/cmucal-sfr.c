@@ -4,7 +4,7 @@
 /*=================CMUCAL version: S5E8895================================*/
 
 /*====================The section of SFR Block instance===================*/
-struct sfr_block cmucal_sfr_block_list[] __initdata = {
+struct sfr_block cmucal_sfr_block_list[] = {
 	SFR_BLOCK(ABOX, 0x13e00000, 0x8000),
 	SFR_BLOCK(APM, 0x16400000, 0x8000),
 	SFR_BLOCK(BUS1, 0x15c00000, 0x8000),
@@ -43,7 +43,7 @@ struct sfr_block cmucal_sfr_block_list[] __initdata = {
 unsigned int cmucal_sfr_block_size = 33;
 
 /*====================The section of SFR instance===================*/
-struct sfr cmucal_sfr_list[] __initdata = {
+struct sfr cmucal_sfr_list[] = {
 	SFR(PLL_CON0_PLL_AUD, 0x0120, ABOX),
 	SFR(PLL_CON3_PLL_AUD, 0x012c, ABOX),
 	SFR(PLL_LOCKTIME_PLL_AUD, 0x0000, ABOX),
@@ -2126,7 +2126,7 @@ unsigned int cmucal_sfr_size = 2075;
 unsigned int dbg_offset = 0x4000;
 
 /*====================The section of SFR Access instance===================*/
-struct sfr_access cmucal_sfr_access_list[] __initdata = {
+struct sfr_access cmucal_sfr_access_list[] = {
 	SFR_ACCESS(PLL_CON0_PLL_AUD_DIV_P, 8, 6, PLL_CON0_PLL_AUD),
 	SFR_ACCESS(PLL_CON0_PLL_AUD_DIV_M, 16, 10, PLL_CON0_PLL_AUD),
 	SFR_ACCESS(PLL_CON0_PLL_AUD_DIV_S, 0, 3, PLL_CON0_PLL_AUD),
