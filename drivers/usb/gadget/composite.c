@@ -2047,6 +2047,8 @@ unknown:
 				if (interface >= MAX_CONFIG_INTERFACES ||
 				    !os_desc_cfg->interface[interface])
 					break;
+				if (interface >= os_desc_cfg->next_interface_id)
+					break;
 				buf[6] = w_index;
 				if (w_length == 0x0A) {
 					count = count_ext_prop(os_desc_cfg,

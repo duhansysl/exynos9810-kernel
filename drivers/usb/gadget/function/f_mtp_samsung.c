@@ -53,6 +53,7 @@
 #include <linux/kernel.h>
 #include <linux/file.h>
 #include <linux/configfs.h>
+#include <linux/reboot.h>
 #include "f_mtp.h"
 #include "configfs.h"
 
@@ -175,6 +176,20 @@ struct mtpg_dev {
 * the_mtpg variable be used between mtpg_open() and mtpg_function_bind() */
 static struct mtpg_dev    *the_mtpg;
 
+static int mtp_reboot_callback(struct notifier_block *nb,
+						unsigned long reason, void *arg)
+{
+	struct mtpg_dev *dev = the_mtpg;
+	printk(KERN_DEBUG "[%s]\tline = [%d]\n", __func__, __LINE__);
+	dev->cancel_io = 1;
+	wake_up(&dev->write_wq);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block mtp_reboot_notifier = {
+	.notifier_call = mtp_reboot_callback
+};
+
 /* Three full-speed and high-speed endpoint descriptors: bulk-in, bulk-out,
  * and interrupt-in. */
 
@@ -219,7 +234,7 @@ static struct usb_ss_ep_comp_descriptor mtpg_superspeed_bulk_comp_desc = {
 	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */
-	.bMaxBurst =         4,
+	.bMaxBurst =         15,
 	/* .bmAttributes =      0, */
 };
 
@@ -617,6 +632,7 @@ static int mtpg_open(struct inode *ip, struct file *fp)
 	}
 
 	fp->private_data = the_mtpg;
+	register_reboot_notifier(&mtp_reboot_notifier);
 
 	/* clear the error latch */
 
@@ -948,6 +964,11 @@ static void read_send_work(struct work_struct *work)
 		if (count == 0)
 			ZLP_flag = 0;
 
+		/* get an idle tx request to use */
+		req = 0;
+		ret = wait_event_interruptible(dev->write_wq,
+				((req = mtpg_req_get(dev, &dev->tx_idle))
+							|| dev->error || dev->cancel_io));
 		if (dev->cancel_io == 1) {
 			dev->cancel_io = 0; /*reported to user space*/
 			r = -EIO;
@@ -955,11 +976,6 @@ static void read_send_work(struct work_struct *work)
 						__func__, __LINE__, r);
 			break;
 		}
-		/* get an idle tx request to use */
-		req = 0;
-		ret = wait_event_interruptible(dev->write_wq,
-				((req = mtpg_req_get(dev, &dev->tx_idle))
-							|| dev->error));
 		if (ret < 0 || !req) {
 			r = ret;
 			printk(KERN_DEBUG "[%s]\t%d ret = %d\n",
@@ -1265,6 +1281,7 @@ static int mtpg_release_device(struct inode *ip, struct file *fp)
 	printk(KERN_DEBUG "[%s]\tline = [%d]\n", __func__, __LINE__);
 	if (the_mtpg != NULL)
 		_unlock(&the_mtpg->open_excl);
+	unregister_reboot_notifier(&mtp_reboot_notifier);
 	return 0;
 }
 
@@ -1342,8 +1359,13 @@ static void mtpg_complete_in(struct usb_ep *ep, struct usb_request *req)
 	DEBUG_MTPB("[%s]\t %d req->status is = %d\n",
 			__func__, __LINE__, req->status);
 
-	if (req->status != 0)
+	if (req->status != 0) {
 		dev->error = 1;
+		/* For SHUTDOWN case, */
+		/* USB function should stop all operations */
+		if (req->status == -ESHUTDOWN)
+			dev->cancel_io = 1;
+	}
 
 	mtpg_req_put(dev, &dev->tx_idle, req);
 	wake_up(&dev->write_wq);
@@ -1356,6 +1378,10 @@ static void mtpg_complete_out(struct usb_ep *ep, struct usb_request *req)
 	DEBUG_MTPB("[%s]\tline = [%d]req->status is = %d\n",
 				__func__, __LINE__, req->status);
 	if (req->status != 0) {
+		/* For SHUTDOWN case, */
+		/* USB function should stop all operations */
+		if (req->status == -ESHUTDOWN)
+			dev->cancel_io = 1;
 		dev->error = 1;
 
 		DEBUG_MTPB("[%s]\t%d dev->error is=%d for rx_idle\n",

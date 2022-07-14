@@ -616,7 +616,11 @@ static int ffs_ep0_release(struct inode *inode, struct file *file)
 {
 	struct ffs_data *ffs = file->private_data;
 
+#ifdef VERBOSE_DEBUG
 	ENTER();
+#else
+	pr_info("%s\n", __func__);
+#endif
 
 	ffs_data_closed(ffs);
 
@@ -3501,12 +3505,12 @@ static void ffs_func_unbind(struct usb_configuration *c,
 
 	/* cleanup after autoconfig */
 	spin_lock_irqsave(&func->ffs->eps_lock, flags);
-	while (count--) {
+	do {
 		if (ep->ep && ep->req)
 			usb_ep_free_request(ep->ep, ep->req);
 		ep->req = NULL;
 		++ep;
-	}
+	} while (--count);
 	spin_unlock_irqrestore(&func->ffs->eps_lock, flags);
 	kfree(func->eps);
 	func->eps = NULL;
