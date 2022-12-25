@@ -39,6 +39,10 @@ config ZRAM_MEMORY_TRACKING
 
 	  See Documentation/blockdev/zram.txt for more information.
 
+config ZRAM_DEFAULT_COMP_ALGORITHM
+	string "Default ZRAM algorithm"
+	default "lzo-rle"
+
 config ZRAM_LRU_WRITEBACK
 	bool
 	depends on ZRAM_WRITEBACK
