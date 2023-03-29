@@ -155,7 +155,7 @@ static int single_uid_time_in_state_show(struct seq_file *m, void *ptr)
 	}
 
 	for (i = 0; i < uid_entry->max_state; ++i) {
-		u64 time = cputime_to_clock_t(uid_entry->time_in_state[i]);
+		u64 time = nsec_to_clock_t(uid_entry->time_in_state[i]);
 		seq_write(m, &time, sizeof(time));
 	}
 
@@ -215,8 +215,7 @@ static int uid_time_in_state_seq_show(struct seq_file *m, void *v)
 			seq_putc(m, ':');
 		}
 		for (i = 0; i < uid_entry->max_state; ++i) {
-			u64 time =
-				cputime_to_clock_t(uid_entry->time_in_state[i]);
+			u64 time = nsec_to_clock_t(uid_entry->time_in_state[i]);
 			seq_put_decimal_ull(m, " ", time);
 		}
 		if (uid_entry->max_state)
@@ -242,7 +241,7 @@ static int concurrent_time_seq_show(struct seq_file *m, void *v,
 		seq_putc(m, ':');
 
 		for (i = 0; i < num_possible_cpus; ++i) {
-			u64 time = cputime_to_clock_t(atomic64_read(&times[i]));
+			u64 time = nsec_to_clock_t(atomic64_read(&times[i]));
 
 			seq_put_decimal_ull(m, " ", time);
 		}

@@ -39,7 +39,6 @@ config CPU_FREQ_STAT
 
 config CPU_FREQ_TIMES
        bool "CPU frequency time-in-state statistics"
-       default y
        help
          Export CPU time-in-state information through procfs.
 
