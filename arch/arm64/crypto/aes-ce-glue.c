@@ -48,16 +48,6 @@ extern void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
 extern void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[]);
 
 #ifdef CONFIG_CFI_CLANG
-static inline void __cfi_aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-{
-	aes_cipher_encrypt(tfm, dst, src);
-}
-
-static inline void __cfi_aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-{
-	aes_cipher_decrypt(tfm, dst, src);
-}
-
 #define aes_cipher_encrypt __cfi_aes_cipher_encrypt
 #define aes_cipher_decrypt __cfi_aes_cipher_decrypt
 #endif
