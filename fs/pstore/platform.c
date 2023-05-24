@@ -31,7 +31,7 @@
 #ifdef CONFIG_PSTORE_ZLIB_COMPRESS
 #include <linux/zlib.h>
 #endif
-#ifdef CONFIG_PSTORE_LZO_COMPRESS
+#if defined(CONFIG_PSTORE_LZO_COMPRESS) || defined(CONFIG_PSTORE_LZO_RLE_COMPRESS)
 #include <linux/lzo.h>
 #endif
 #ifdef CONFIG_PSTORE_LZ4_COMPRESS
@@ -337,6 +337,67 @@ static struct pstore_zbackend backend_lzo = {
 };
 #endif
 
+#ifdef CONFIG_PSTORE_LZO_RLE_COMPRESS
+static int compress_lzorle(const void *in, void *out, size_t inlen, size_t outlen)
+{
+	int ret;
+
+	ret = lzorle1x_1_compress(in, inlen, out, &outlen, workspace);
+	if (ret != LZO_E_OK) {
+		pr_err("lzorle_compress error, ret = %d!\n", ret);
+		return -EIO;
+	}
+
+	return outlen;
+}
+
+static int decompress_lzorle(void *in, void *out, size_t inlen, size_t outlen)
+{
+	int ret;
+
+	ret = lzo1x_decompress_safe(in, inlen, out, &outlen);
+	if (ret != LZO_E_OK) {
+		pr_err("lzorle_decompress error, ret = %d!\n", ret);
+		return -EIO;
+	}
+
+	return outlen;
+}
+
+static void allocate_lzorle(void)
+{
+	big_oops_buf_sz = lzo1x_worst_compress(psinfo->bufsize);
+	big_oops_buf = kmalloc(big_oops_buf_sz, GFP_KERNEL);
+	if (big_oops_buf) {
+		workspace = kmalloc(LZO1X_MEM_COMPRESS, GFP_KERNEL);
+		if (!workspace) {
+			pr_err("No memory for compression workspace; skipping compression\n");
+			kfree(big_oops_buf);
+			big_oops_buf = NULL;
+		}
+	} else {
+		pr_err("No memory for uncompressed data; skipping compression\n");
+		workspace = NULL;
+	}
+}
+
+static void free_lzorle(void)
+{
+	kfree(workspace);
+	kfree(big_oops_buf);
+	big_oops_buf = NULL;
+	big_oops_buf_sz = 0;
+}
+
+static struct pstore_zbackend backend_lzorle = {
+	.compress	= compress_lzorle,
+	.decompress	= decompress_lzorle,
+	.allocate	= allocate_lzorle,
+	.free		= free_lzorle,
+	.name		= "lzo-rle",
+};
+#endif
+
 #ifdef CONFIG_PSTORE_LZ4_COMPRESS
 static int compress_lz4(const void *in, void *out, size_t inlen, size_t outlen)
 {
@@ -403,6 +464,8 @@ static struct pstore_zbackend *zbackend =
 	&backend_zlib;
 #elif defined(CONFIG_PSTORE_LZO_COMPRESS)
 	&backend_lzo;
+#elif defined(CONFIG_PSTORE_LZO_RLE_COMPRESS)
+	&backend_lzorle;
 #elif defined(CONFIG_PSTORE_LZ4_COMPRESS)
 	&backend_lz4;
 #else

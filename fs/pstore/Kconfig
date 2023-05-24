@@ -33,6 +33,13 @@ config PSTORE_LZO_COMPRESS
         help
           This option enables LZO compression algorithm support.
 
+config PSTORE_LZO_RLE_COMPRESS
+        bool "LZO-RLE"
+        select LZO_COMPRESS
+        select LZO_DECOMPRESS
+        help
+          This option enables LZO-RLE compression algorithm support.
+
 config PSTORE_LZ4_COMPRESS
         bool "LZ4"
         select LZ4_COMPRESS
