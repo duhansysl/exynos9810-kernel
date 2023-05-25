@@ -628,7 +628,6 @@ static int fig0_ext2_decoder(u8 *fibBuffer, int figLength, int pd)
 		switch (pd) {
 		case 0:		/* 16-bit sid, used for programme services */
 			{
-				temp = temp;
 				/*sid = temp & 0xFFF; */
 				sid = temp;
 			}
