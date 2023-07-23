@@ -208,4 +208,14 @@ extern int fscrypt_get_encryption_kek(struct inode *inode,
 
 extern void __exit fscrypt_essiv_cleanup(void);
 
+static inline int __fscrypt_disk_encrypted(const struct inode *inode)
+{
+#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+#if IS_ENABLED(CONFIG_CRYPTO_DISKCIPHER)
+	if (inode && inode->i_crypt_info)
+		return S_ISREG(inode->i_mode) && (inode->i_crypt_info->ci_dtfm != NULL);
+#endif
+#endif
+	return 0;
+}
 #endif /* _FSCRYPT_PRIVATE_H */
