@@ -526,6 +526,13 @@ config THINLTO
 	help
 	  Use ThinLTO to speed up Link Time Optimization.
 
+config UNIFIEDLTO
+	bool "Use clang UnifiedLTO Bitcode Frontend (EXPERIMENTAL)"
+	depends on LTO_CLANG
+	default n
+	help
+	  Use UnifiedLTO Bitcode Frontend to optimize Link Time Optimization.
+
 choice
 	prompt "Link-Time Optimization (LTO) (EXPERIMENTAL)"
 	default LTO_NONE

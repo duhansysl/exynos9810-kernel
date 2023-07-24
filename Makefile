@@ -727,15 +727,18 @@ KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
 endif
 
 ifdef CONFIG_LTO_CLANG
+# Limit inlining across translation units to reduce binary size
+LD_FLAGS_LTO_CLANG := -mllvm -import-instr-limit=5
+
 ifdef CONFIG_THINLTO
 lto-clang-flags := -flto=thin
 else
 lto-clang-flags := -flto
 endif
-lto-clang-flags += -fvisibility=default $(call cc-option, -fsplit-lto-unit)
-
-# Limit inlining across translation units to reduce binary size
-LD_FLAGS_LTO_CLANG := -mllvm -import-instr-limit=5
+ifdef CONFIG_UNIFIEDLTO
+lto-clang-flags	+= -funified-lto
+endif
+lto-clang-flags += -fvisibility=default -fsplit-lto-unit
 
 KBUILD_LDFLAGS += $(LD_FLAGS_LTO_CLANG)
 KBUILD_LDFLAGS_MODULE += $(LD_FLAGS_LTO_CLANG)
