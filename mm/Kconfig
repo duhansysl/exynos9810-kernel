@@ -676,16 +676,6 @@ config FIX_INACTIVE_RATIO
 	depends on ZSWAP
 	default n
 
-config SWAP_ENABLE_READAHEAD
-	bool "Enable readahead on page swap in"
-	depends on SWAP
-	default y
-	help
-	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
-	  also paged in expecting those pages will be used in near future.
-	  This behaviour is good at disk-based system, but not on in-memory
-	  compression (e.g. zram).
-
 config MM_EVENT_STAT
 	bool "Track per-process MM event"
 	depends on MMU
@@ -804,6 +794,7 @@ config MAX_DIRTY_THRESH_PAGES
 config BALANCE_ANON_FILE_RECLAIM
 	bool "During reclaim treat anon and file backed pages equally"
 	depends on SWAP
+	default y
 	help
 	  When performing memory reclaim treat anonymous and file backed pages
 	  equally.
@@ -816,6 +807,16 @@ config KSWAPD_CPU
 	help
 	  Set kswapd cpu affinity by default. 0x3F means allowing CPU as 0 to 5.
 	  To disable this config, set this to 0.
+
+config SWAP_ENABLE_READAHEAD
+	bool "Enable readahead on page swap in"
+	depends on SWAP
+	default y
+	help
+	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
+	  also paged in expecting those pages will be used in near future.
+	  This behaviour is good at disk-based system, but not on in-memory
+	  compression (e.g. zram).
 
 config MMAP_READAROUND_LIMIT
 	int "Limit mmap readaround upperbound"

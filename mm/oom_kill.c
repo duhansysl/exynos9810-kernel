@@ -202,6 +202,13 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 		atomic_long_read(&p->mm->nr_ptes) + mm_nr_pmds(p->mm);
 	task_unlock(p);
 
+	/*
+	 * Root processes get 3% bonus, just like the __vm_enough_memory()
+	 * implementation used by LSMs.
+	 */
+	if (has_capability_noaudit(p, CAP_SYS_ADMIN))
+		points -= (points * 3) / 100;
+
 	/* Normalize to oom_score_adj units */
 	adj *= totalpages / 1000;
 	points += adj;
@@ -563,12 +570,11 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	}
 
 	/*
-	 * MMF_OOM_SKIP is set by exit_mmap when the OOM reaper can't
-	 * work on the mm anymore. The check for MMF_OOM_SKIP must run
-	 * under mmap_sem for reading because it serializes against the
-	 * down_write();up_write() cycle in exit_mmap().
+	 * increase mm_users only after we know we will reap something so
+	 * that the mmput_async is called only when we have reaped something
+	 * and delayed __mmput doesn't matter that much
 	 */
-	if (test_bit(MMF_OOM_SKIP, &mm->flags)) {
+	if (!mmget_not_zero(mm)) {
 		up_read(&mm->mmap_sem);
 		goto unlock_oom;
 	}
@@ -616,6 +622,12 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 			K(get_mm_counter(mm, MM_SHMEMPAGES)));
 	up_read(&mm->mmap_sem);
 
+	/*
+	 * Drop our reference but make sure the mmput slow path is called from a
+	 * different context because we shouldn't risk we get stuck there and
+	 * put the oom_reaper out of the way.
+	 */
+	mmput_async(mm);
 unlock_oom:
 	mutex_unlock(&oom_lock);
 	return ret;
@@ -1145,24 +1157,27 @@ bool out_of_memory(struct oom_control *oc)
 }
 
 /*
- * The pagefault handler calls here because some allocation has failed. We have
- * to take care of the memcg OOM here because this is the only safe context without
- * any locks held but let the oom killer triggered from the allocation context care
- * about the global OOM.
+ * The pagefault handler calls here because it is out of memory, so kill a
+ * memory-hogging task. If oom_lock is held by somebody else, a parallel oom
+ * killing is already in progress so do nothing.
  */
 void pagefault_out_of_memory(void)
 {
-	static DEFINE_RATELIMIT_STATE(pfoom_rs, DEFAULT_RATELIMIT_INTERVAL,
-				      DEFAULT_RATELIMIT_BURST);
+	struct oom_control oc = {
+		.zonelist = NULL,
+		.nodemask = NULL,
+		.memcg = NULL,
+		.gfp_mask = 0,
+		.order = 0,
+	};
 
 	if (mem_cgroup_oom_synchronize(true))
 		return;
 
-	if (fatal_signal_pending(current))
+	if (!mutex_trylock(&oom_lock))
 		return;
-
-	if (__ratelimit(&pfoom_rs))
-		pr_warn("Huh VM_FAULT_OOM leaked out to the #PF handler. Retrying PF\n");
+	out_of_memory(&oc);
+	mutex_unlock(&oom_lock);
 }
 
 void add_to_oom_reaper(struct task_struct *p)
