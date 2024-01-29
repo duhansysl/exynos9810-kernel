@@ -64,7 +64,7 @@ static struct mfd_cell max77705_devs[] = {
 #if defined(CONFIG_CHARGER_MAX77705)
 	{ .name = "max77705-charger", },
 #endif
-#if defined(CONFIG_MOTOR_DRV_MAX77705)
+#if defined(CONFIG_MOTOR_DRV_MAX77705) || defined(CONFIG_MAX77705_VIBRATOR)
 	{ .name = "max77705-haptic", },
 #endif /* CONFIG_MAX77705_HAPTIC */
 #if defined(CONFIG_LEDS_MAX77705_RGB)

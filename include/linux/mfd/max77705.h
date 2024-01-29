@@ -55,6 +55,34 @@ struct max77705_haptic_pdata {
 };
 #endif
 
+#if defined(CONFIG_MAX77705_VIBRATOR)
+struct max77705_vibrator_pdata {
+	int gpio;
+	char *regulator_name;
+	struct pwm_device *pwm;
+	unsigned int pwm_id;
+	const char *motor_type;
+
+	int freq;
+	/* for multi-frequency */
+	int freq_nums;
+	u32 *freq_array;
+	u32 *ratio_array; /* not used now */
+	int normal_ratio;
+	int overdrive_ratio;
+	int high_temp_ratio;
+	int high_temp_ref;
+	int fold_open_ratio;
+	int fold_close_ratio;
+#if defined(CONFIG_SEC_VIBRATOR)
+	bool calibration;
+	int steps;
+	int *intensities;
+	int *haptic_intensities;
+#endif
+};
+#endif
+
 struct max77705_regulator_data {
 	int id;
 	struct regulator_init_data *initdata;
@@ -73,6 +101,9 @@ struct max77705_platform_data {
 	struct max77705_regulator_data *regulators;
 #if defined(CONFIG_MOTOR_DRV_MAX77705)
 	struct max77705_haptic_pdata *haptic_data;
+#endif
+#if defined(CONFIG_MAX77705_VIBRATOR)
+	struct max77705_vibrator_pdata *vibrator_data;
 #endif
 	struct mfd_cell *sub_devices;
 	int num_subdevs;
