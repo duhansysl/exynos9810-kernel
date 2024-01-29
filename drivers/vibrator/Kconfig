@@ -1,0 +1,34 @@
+config MAX77705_VIBRATOR
+	tristate "Maxim MAX77705 vibrator"
+	default n
+	depends on MFD_MAX77705
+	help
+	  If you say yes here you will get support for the
+	  motor of Maxim MAX77705 PMIC.
+	  To enable this driver, MFD_MAX77705 should be enabled and
+	  MFD_MAX77705 calls this driver.
+
+config MAX77705_VIB_FOLD_MODEL
+	tristate "get support for folder status "
+	default n
+	depends on MAX77705_VIBRATOR
+	help
+	  If you enable this feature,
+	  you will get event for folder status
+	  through event_cmd sysfs
+
+config SEC_VIBRATOR
+	tristate "sec vibrator"
+	default n
+	help
+	  If you say yes here you will get support for the
+	  sec vibrator driver
+
+config SEC_VIB_NOTIFIER
+	tristate "use sec vibrator notifier"
+	default n
+	depends on SEC_VIBRATOR
+	help
+	  Enable notifier functions to get motor enable status
+	  and timeout value by register notifiy
+	  If you unsure, please select n

@@ -12911,16 +12911,25 @@
 
 	haptic {
 		status = "okay";
-		haptic,max_timeout = <0x2710>;
-		haptic,multi_frequency = <0x7>;
-		haptic,duty = <0x9ede 0xbebc 0x9896 0x7270 0x7f27 0x90f4 0x90f4>;
-		haptic,period = <0xbf68 0xfe50 0xcb73 0x9896 0xa98a 0x9896 0x9896>;
+		haptic,max_timeout = <10000>;
+		/* for multi-frequency */
+		haptic,multi_frequency = <7>;
+		haptic,frequency = <1595 1200 1500 2000 1800 2000 2000>;
+		/* frequency     alert low   mid   high  0     press release */
+		haptic,duty   = <40527 54036 43228 32421 36023 37108 37108>;
+		haptic,period = <48828 65104 52083 39062 43402 39062 39062>;
 		haptic,reg2 = <0x82>;
-		haptic,pwm_id = <0x1>;
+		haptic,pwm_id = <1>;
 		haptic,regulator_name = "VDD_MOTOR_3P3";
-		haptic,normal_ratio = <0x4b>;
-		haptic,overdrive_ratio = <0x5f>;
-		haptic,type = "LINEAR_1040";
+		haptic,normal_ratio = <83>;
+		haptic,overdrive_ratio = <95>;
+		haptic,high_temp_ratio = <60>;
+		haptic,high_temp_ref = <55>;
+		pwms = <0xffffffff 0x00 0xf4240 0x00>;
+		haptic,motor_type = "LINEAR_1040";
+		samsung,steps = <6>;
+		samsung,intensities = <0 3000 4000 6000 8000 10000>;
+		samsung,haptic_intensities = <0 2000 4000 6000 8000 10000>;
 	};
 
 	sound {
