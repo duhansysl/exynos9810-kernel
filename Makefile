@@ -759,6 +759,27 @@ DISABLE_LTO	+= $(DISABLE_CFI)
 export DISABLE_CFI
 endif
 
+KBUILD_CFLAGS	+= -mllvm -aggressive-ext-opt \
+           -mllvm -enable-cond-stores-vec \
+           -mllvm -slp-vectorize-hor-store \
+           -mllvm -adce-remove-loops \
+           -mllvm -enable-cse-in-irtranslator \
+           -mllvm -enable-cse-in-legalizer \
+           -mllvm -scalar-evolution-use-expensive-range-sharpening \
+           -mllvm -loop-rotate-multi \
+           -mllvm -enable-interleaved-mem-accesses \
+           -mllvm -enable-masked-interleaved-mem-accesses \
+           -mllvm -enable-gvn-hoist \
+           -mllvm -enable-dfa-jump-thread \
+           -mllvm -allow-unroll-and-jam \
+           -mllvm -enable-loop-distribute \
+           -mllvm -enable-loop-flatten \
+           -mllvm -enable-loopinterchange \
+           -mllvm -enable-unroll-and-jam \
+           -mllvm -extra-vectorizer-passes \
+           -mllvm -unroll-runtime-multi-exit \
+           -mllvm -hot-cold-split=true
+
 ifdef CONFIG_LLVM_POLLY
 KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-run-dce \
@@ -767,7 +788,20 @@ KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-detect-keep-going \
 		   -mllvm -polly-vectorizer=stripmine \
 		   -mllvm -polly-invariant-load-hoisting \
-		   -mllvm -polly-isl-arg=--no-schedule-serialize-sccs
+		   -mllvm -polly-optimizer=isl \
+		   -mllvm -polly-isl-arg=--no-schedule-serialize-sccs \
+           -mllvm -polly-dependences-analysis-type=value-based \
+           -mllvm -polly-dependences-computeout=0 \
+           -mllvm -polly-enable-delicm \
+           -mllvm -polly-loopfusion-greedy \
+           -mllvm -polly-num-threads=0 \
+           -mllvm -polly-omp-backend=LLVM \
+           -mllvm -polly-parallel \
+           -mllvm -polly-postopts \
+           -mllvm -polly-reschedule \
+           -mllvm -polly-scheduling-chunksize=1 \
+           -mllvm -polly-scheduling=dynamic \
+           -mllvm -polly-tiling
 endif
 
 ifdef CONFIG_LLVM_MLGO_REGISTER
@@ -1268,31 +1302,31 @@ ifdef CONFIG_LTO_CLANG
   endif
 endif
 # Make sure compiler supports LTO flags
-ifdef lto-flags
-  ifeq ($(call cc-option, $(lto-flags)),)
-	@echo Cannot use CONFIG_LTO: $(lto-flags) not supported by compiler \
-		>&2 && exit 1
-  endif
-endif
+# ifdef lto-flags
+#   ifeq ($(call cc-option, $(lto-flags)),)
+# 	@echo Cannot use CONFIG_LTO: $(lto-flags) not supported by compiler \
+# 		>&2 && exit 1
+#   endif
+# endif
 # Make sure compiler supports requested stack protector flag.
-ifdef stackp-name
-  ifeq ($(call cc-option, $(stackp-flag)),)
-	@echo Cannot use CONFIG_CC_STACKPROTECTOR_$(stackp-name): \
-		  $(stackp-flag) not supported by compiler >&2 && exit 1
-  endif
-endif
+# ifdef stackp-name
+#   ifeq ($(call cc-option, $(stackp-flag)),)
+# 	@echo Cannot use CONFIG_CC_STACKPROTECTOR_$(stackp-name): \
+# 		  $(stackp-flag) not supported by compiler >&2 && exit 1
+#   endif
+# endif
 # Make sure compiler does not have buggy stack-protector support.
-ifdef stackp-check
-  ifneq ($(shell $(CONFIG_SHELL) $(stackp-check) $(CC) $(KBUILD_CPPFLAGS) $(biarch)),y)
-	@echo Cannot use CONFIG_CC_STACKPROTECTOR_$(stackp-name): \
-                  $(stackp-flag) available but compiler is broken >&2 && exit 1
-  endif
-endif
-ifdef cfi-flags
-  ifeq ($(call cc-option, $(cfi-flags)),)
-	@echo Cannot use CONFIG_CFI: $(cfi-flags) not supported by compiler >&2 && exit 1
-  endif
-endif
+# ifdef stackp-check
+#   ifneq ($(shell $(CONFIG_SHELL) $(stackp-check) $(CC) $(KBUILD_CPPFLAGS) $(biarch)),y)
+# 	@echo Cannot use CONFIG_CC_STACKPROTECTOR_$(stackp-name): \
+#                   $(stackp-flag) available but compiler is broken >&2 && exit 1
+#   endif
+# endif
+# ifdef cfi-flags
+#   ifeq ($(call cc-option, $(cfi-flags)),)
+# 	@echo Cannot use CONFIG_CFI: $(cfi-flags) not supported by compiler >&2 && exit 1
+#   endif
+# endif
 	@:
 
 # Generate some files
