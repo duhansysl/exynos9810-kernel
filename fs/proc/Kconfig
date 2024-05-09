@@ -119,3 +119,9 @@ config PROC_TRIGGER_SQLITE_BUG
 	bool "Trigger bug for SQLite debugging"
 	depends on PROC_FS
 	default y if !SAMSUNG_PRODUCT_SHIP && ANDROID_VERSION > "90000"
+
+config PROC_SPOOF_CMDLINE
+	bool "Spoof locked bootloader properties in cmdline"
+	default n
+	help
+	For Play Integrity API / SafetyNet attestation
