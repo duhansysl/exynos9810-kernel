@@ -3,6 +3,7 @@
 
 #include <uapi/linux/btf.h>
 #include <uapi/linux/types.h>
+#include <linux/refcount.h>
 #include <linux/seq_file.h>
 #include <linux/compiler.h>
 #include <linux/errno.h>
