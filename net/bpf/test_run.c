@@ -9,7 +9,7 @@
 #include <linux/vmalloc.h>
 #include <linux/etherdevice.h>
 #include <linux/filter.h>
-#include <linux/sched/signal.h>
+#include <linux/sched.h>
 
 static __always_inline u32 bpf_test_run_one(struct bpf_prog *prog, void *ctx)
 {
