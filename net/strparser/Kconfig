@@ -1,4 +1,4 @@
 
 config STREAM_PARSER
 	tristate
-	default n
+	default y
