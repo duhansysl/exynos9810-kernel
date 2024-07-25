@@ -34,8 +34,8 @@ CR_KERNEL=$CR_DIR/arch/arm64/boot/Image
 # Compiled dtb by dtbtool
 CR_DTB=$CR_DIR/arch/arm64/boot/dtb.img
 # Kernel Name and Version
-CR_VERSION=V6.0
-CR_NAME=Apollo
+CR_VERSION=V6.5
+CR_NAME=DS
 # Thread count
 CR_JOBS=$(nproc --all)
 # Target Android version
@@ -44,7 +44,7 @@ CR_PLATFORM=13.0.0
 # Target ARCH
 CR_ARCH=arm64
 # Current Date
-CR_DATE=$(date +%Y%m%d)
+CR_DATE=$(date +%d.%m.%Y)
 # General init
 export ANDROID_MAJOR_VERSION=$CR_ANDROID
 export PLATFORM_VERSION=$CR_PLATFORM
@@ -72,11 +72,11 @@ CR_SELINUX="1"
 CR_KSU="n"
 CR_CLEAN="n"
 # Compiler Paths
-CR_GCC4=~/Android/Toolchains/aarch64-linux-android-4.9/bin/aarch64-linux-android-
-CR_GCC9=~/Android/Toolchains/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
-CR_GCC12=~/Android/Toolchains/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
-CR_GCC13=~/Android/Toolchains/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
-CR_CLANG=~/Android/Toolchains/clang-r383902-jopp
+CR_GCC4=~/compiler/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+CR_GCC9=~/compiler/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
+CR_GCC12=~/compiler/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
+CR_GCC13=~/compiler/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
+CR_CLANG=~/compiler/proton-clang-20210522
 #####################################################
 
 # Compiler Selection
@@ -212,7 +212,7 @@ BUILD_GENERATE_CONFIG()
   if [ $CR_KSU = "y" ]; then
     echo " Building KernelSU Kernel"
     echo "CONFIG_KSU=y" >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
-    CR_IMAGE_NAME=$CR_IMAGE_NAME-ksu
+    CR_IMAGE_NAME=$CR_IMAGE_NAME-KSU
     zver=$zver-KernelSU
   else
     echo "# CONFIG_KSU is not set" >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
@@ -530,11 +530,11 @@ echo "1) $CR_GCC4 (GCC 4.9)"
 echo "2) $CR_GCC9 (GCC 9.x)" 
 echo "3) $CR_GCC12 (GCC 12.x)" 
 echo "4) $CR_GCC13 (GCC 13.x)" 
-echo "5) $CR_CLANG (CLANG 11)"
+echo "5) $CR_CLANG (Proton CLANG 13)"
 echo " "
 read -p "Please select your compiler (1-5) > " CR_COMPILER
 echo " "
-echo "1) Selinux Permissive " "2) Selinux Enforcing"
+echo "1) SELinux Permissive " "2) SELinux Enforcing"
 echo " "
 read -p "Please select your SElinux mode (1-2) > " CR_SELINUX
 echo " "
