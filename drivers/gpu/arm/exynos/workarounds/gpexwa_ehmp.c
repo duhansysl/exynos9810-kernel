@@ -51,7 +51,7 @@ void gpexwa_ehmp_set(void) {
 	gpexbe_qos_request_update_timeout(PMQOS_MIDDLE | PMQOS_MIN, ehmp_info.lock_clock, QOS_TIMEOUT);
 }
 
-void gpexwa_ehmp_unset() {
+void gpexwa_ehmp_unset(void) {
 	mutex_lock(&ehmp_info.gpu_sched_hmp_lock);
 	if (ehmp_info.ctx_need_qos) {
 		ehmp_info.ctx_need_qos = false;

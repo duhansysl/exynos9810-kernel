@@ -37,7 +37,7 @@ void gpex_thermal_set_status(bool status)
 	thermal.tmu_enabled = status;
 }
 
-int gpex_thermal_gpu_normal()
+int gpex_thermal_gpu_normal(void)
 {
 	int ret = 0;
 	ret = gpex_clock_lock_clock(GPU_CLOCK_MAX_UNLOCK, TMU_LOCK, 0);
@@ -158,7 +158,7 @@ static void gpex_thermal_create_sysfs_file(void)
 /***********************************************************************
  * INIT, TERM FUNCTIONS
  ***********************************************************************/
-int gpex_thermal_init()
+int gpex_thermal_init(void)
 {
 	gpex_thermal_create_sysfs_file();
 
@@ -167,7 +167,7 @@ int gpex_thermal_init()
 	return 0;
 }
 
-void gpex_thermal_term()
+void gpex_thermal_term(void)
 {
 	thermal.tmu_enabled = false;
 

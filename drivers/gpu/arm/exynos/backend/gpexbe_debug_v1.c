@@ -36,12 +36,12 @@ void gpexbe_debug_dbg_snapshot_freq_out(int freq_before, int freq_after)
 	return;
 }
 
-int gpexbe_debug_init()
+int gpexbe_debug_init(void)
 {
 	return 0;
 }
 
-void gpexbe_debug_term()
+void gpexbe_debug_term(void)
 {
 	return;
 }

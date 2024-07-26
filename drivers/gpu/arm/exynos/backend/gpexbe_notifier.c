@@ -106,7 +106,7 @@ static struct notifier_block gpu_tmu_nb = {
 	.notifier_call = tmu_notifier,
 };
 
-int gpexbe_notifier_init()
+int gpexbe_notifier_init(void)
 {
 	int ret = 0;
 
@@ -123,7 +123,7 @@ int gpexbe_notifier_init()
 	return ret;
 }
 
-void gpexbe_notifier_term()
+void gpexbe_notifier_term(void)
 {
 	gpexbe_notifier_internal_remove(GPU_NOTIFIER_MIN_LOCK, &gpu_min_qos_notifier);
 	gpexbe_notifier_internal_remove(GPU_NOTIFIER_MAX_LOCK, &gpu_max_qos_notifier);
