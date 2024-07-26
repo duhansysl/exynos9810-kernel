@@ -101,17 +101,17 @@ int gpex_pm_get_status(bool clock_lock)
 }
 
 /* Read the power_status value set by gpex_pm module */
-int gpex_pm_get_power_status()
+int gpex_pm_get_power_status(void)
 {
 	return pm.power_status;
 }
 
-void gpex_pm_lock()
+void gpex_pm_lock(void)
 {
 	gpexbe_pm_access_lock();
 }
 
-void gpex_pm_unlock()
+void gpex_pm_unlock(void)
 {
 	gpexbe_pm_access_unlock();
 }
