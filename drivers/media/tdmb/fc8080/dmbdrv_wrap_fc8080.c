@@ -383,7 +383,7 @@ int dmb_drv_get_dat_sub_ch_cnt(void)
 }
 
 
-char *dmb_drv_get_ensemble_label()
+char *dmb_drv_get_ensemble_label(void)
 {
 	struct esbinfo_t *esb;
 
