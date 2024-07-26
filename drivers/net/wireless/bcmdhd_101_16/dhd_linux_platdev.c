@@ -864,7 +864,7 @@ static int dhd_wifi_platform_load_usb(void)
 	return 0;
 }
 
-static int dhd_wifi_platform_load()
+static int dhd_wifi_platform_load(void)
 {
 	int err = 0;
 
