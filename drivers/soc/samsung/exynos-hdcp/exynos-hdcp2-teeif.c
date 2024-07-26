@@ -55,7 +55,7 @@ int hdcp_tee_open(void)
 	return 0;
 }
 
-int hdcp_tee_close()
+int hdcp_tee_close(void)
 {
 	int ret;
 
