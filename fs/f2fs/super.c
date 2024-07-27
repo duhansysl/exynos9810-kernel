@@ -2453,7 +2453,7 @@ static const struct fscrypt_operations f2fs_cryptops = {
 #endif
 	.dummy_context	= f2fs_dummy_context,
 	.empty_dir	= f2fs_empty_dir,
-	.max_namelen	= F2FS_NAME_LEN,
+	.max_namelen = (unsigned int (*)(struct inode *)) F2FS_NAME_LEN,
 };
 #endif
 
