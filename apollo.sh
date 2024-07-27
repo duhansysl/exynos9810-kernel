@@ -105,12 +105,6 @@ export CROSS_COMPILE=$CR_GCC13
 compile="make"
 CR_COMPILER="$CR_GCC13"
 fi
-if [ $CR_COMPILER = "5" ]; then
-# Check packages
-if ! dpkg-query -W -f='${Status}' gcc-arm-linux-gnueabi  | grep "ok installed"; then
-	echo " gcc-arm-linux-gnueabi is missing, please install with sudo apt-get install gcc-arm-linux-gnueabi"
-	exit 0;
-fi
 if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ]; then
     if [ $CR_COMPILER = "5" ]; then
         CR_CLANG=$CR_CLANG_11
@@ -123,9 +117,6 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
     fi
 
 # Check packages
-if ! dpkg-query -W -f='${Status}' gcc-aarch64-linux-gnu  | grep "ok installed"; then
-	echo " gcc-aarch64-linux-gnu is missing, please install with sudo apt-get install gcc-aarch64-linux-gnu"
-	exit 0;
 for pkg in gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu; do
 if ! dpkg-query -W -f='${Status}' $pkg | grep "ok installed"; then
     echo " $pkg is missing, please install with sudo apt-get install $pkg"
