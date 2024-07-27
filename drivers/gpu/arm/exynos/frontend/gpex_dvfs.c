@@ -172,12 +172,12 @@ static void gpu_dvfs_timer_control(bool timer_state)
 	spin_unlock_irqrestore(&dvfs.spinlock, flags);
 }
 
-void gpex_dvfs_start()
+void gpex_dvfs_start(void)
 {
 	gpu_dvfs_timer_control(true);
 }
 
-void gpex_dvfs_stop()
+void gpex_dvfs_stop(void)
 {
 	gpu_dvfs_timer_control(false);
 }
@@ -220,17 +220,17 @@ static int gpu_dvfs_on_off(bool enable)
 	return 0;
 }
 
-int gpex_dvfs_enable()
+int gpex_dvfs_enable(void)
 {
 	return gpu_dvfs_on_off(true);
 }
 
-int gpex_dvfs_disable()
+int gpex_dvfs_disable(void)
 {
 	return gpu_dvfs_on_off(false);
 }
 
-static int gpu_dvfs_handler_init()
+static int gpu_dvfs_handler_init(void)
 {
 	if (!dvfs.status)
 		dvfs.status = true;
@@ -243,7 +243,7 @@ static int gpu_dvfs_handler_init()
 	return 0;
 }
 
-static int gpu_dvfs_handler_deinit()
+static int gpu_dvfs_handler_deinit(void)
 {
 	if (dvfs.status)
 		dvfs.status = false;
@@ -295,7 +295,7 @@ int gpex_dvfs_init(struct device **dev)
 	return 0;
 }
 
-void gpex_dvfs_term()
+void gpex_dvfs_term(void)
 {
 	/* DVFS stuff */
 	gpu_pm_metrics_term();
@@ -303,7 +303,7 @@ void gpex_dvfs_term()
 	dvfs.kbdev = NULL;
 }
 
-int gpex_dvfs_get_status()
+int gpex_dvfs_get_status(void)
 {
 	return dvfs.status;
 }
