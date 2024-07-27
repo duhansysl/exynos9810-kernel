@@ -118,7 +118,7 @@ int gpex_qos_unset(gpex_qos_flag flags)
 	return 0;
 }
 
-int gpex_qos_init()
+int gpex_qos_init(void)
 {
 	int i = 0;
 	gpu_dt *dt = gpexbe_devicetree_get_gpu_dt();
@@ -179,7 +179,7 @@ int gpex_qos_init()
 	return 0;
 }
 
-void gpex_qos_term()
+void gpex_qos_term(void)
 {
 	gpexbe_qos_request_remove(PMQOS_MIF | PMQOS_LITTLE | PMQOS_MIDDLE | PMQOS_BIG | PMQOS_MIN |
 				  PMQOS_MAX);

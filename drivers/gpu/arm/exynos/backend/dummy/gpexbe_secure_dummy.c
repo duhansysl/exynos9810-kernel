@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <linux/types.h>
 
-struct protected_mode_ops *gpexbe_secure_get_protected_mode_ops()
+struct protected_mode_ops *gpexbe_secure_get_protected_mode_ops(void)
 {
 	return NULL;
 }
