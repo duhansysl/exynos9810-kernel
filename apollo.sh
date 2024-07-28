@@ -79,7 +79,7 @@ CR_GCC13=~/compiler/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
 CR_CLANG_11=~/compiler/clang-r383902b-11.0.2
 CR_CLANG_12=~/compiler/clang-r416183b-12.0.0
 CR_CLANG_14=~/compiler/clang-r450784d-13.0.0
-CR_CLANG_EXP=~/compiler/clang-r522817-18.0.1
+CR_CLANG_18=~/compiler/clang-r522817-18.0.1
 #####################################################
 
 # Compiler Selection
@@ -113,7 +113,7 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
     elif [ $CR_COMPILER = "7" ]; then
         CR_CLANG=$CR_CLANG_14
     elif [ $CR_COMPILER = "8" ]; then
-        CR_CLANG=$CR_CLANG_EXP
+        CR_CLANG=$CR_CLANG_18
     fi
 
 # Check packages
@@ -430,7 +430,7 @@ CR_KSU="y"
 CR_CLEAN="n"
 echo " DEBUG : Set Build options "
 echo " DEBUG : Variant  : $CR_VARIANT_G965N"
-echo " DEBUG : Compiler : $CR_CLANG_EXP"
+echo " DEBUG : Compiler : $CR_CLANG_18"
 echo " DEBUG : Selinux  : $CR_SELINUX Enforcing"
 echo " DEBUG : Clean    : $CR_CLEAN"
 echo "----------------------------------------------"
@@ -544,7 +544,7 @@ echo "4) $CR_GCC13 (GCC 13.x)"
 echo "5) $CR_CLANG_11 (Clang 11 - Samsung)"
 echo "6) $CR_CLANG_12 (Clang 12)" 
 echo "7) $CR_CLANG_14 (Clang 14)"
-echo "8) $CR_CLANG_EXP (Clang 18)"
+echo "8) $CR_CLANG_18 (Clang 18)"
 echo " "
 read -p "Please select your compiler (1-8) > " CR_COMPILER
 echo " "
