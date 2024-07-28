@@ -80,6 +80,9 @@ CR_CLANG_11=~/compiler/clang-r383902b-11.0.2
 CR_CLANG_12=~/compiler/clang-r416183b-12.0.0
 CR_CLANG_14=~/compiler/clang-r450784d-13.0.0
 CR_CLANG_18=~/compiler/clang-r522817-18.0.1
+CR_CLANG_18N=~/compiler/neutron-clang-05012024
+CR_CLANG_19=~/compiler/clang19-18.07.24
+CR_CLANG_20=~/compiler/clang20-26.07.24
 #####################################################
 
 # Compiler Selection
@@ -105,7 +108,7 @@ export CROSS_COMPILE=$CR_GCC13
 compile="make"
 CR_COMPILER="$CR_GCC13"
 fi
-if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ]; then
+if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ] || [ $CR_COMPILER = "9" ] || [ $CR_COMPILER = "10" ] || [ $CR_COMPILER = "11" ]; then
     if [ $CR_COMPILER = "5" ]; then
         CR_CLANG=$CR_CLANG_11
     elif [ $CR_COMPILER = "6" ]; then
@@ -114,6 +117,12 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
         CR_CLANG=$CR_CLANG_14
     elif [ $CR_COMPILER = "8" ]; then
         CR_CLANG=$CR_CLANG_18
+    elif [ $CR_COMPILER = "9" ]; then
+        CR_CLANG=$CR_CLANG_18N
+    elif [ $CR_COMPILER = "10" ]; then
+        CR_CLANG=$CR_CLANG_19
+    elif [ $CR_COMPILER = "11" ]; then
+        CR_CLANG=$CR_CLANG_20		
     fi
 
 # Check packages
@@ -545,8 +554,11 @@ echo "5) $CR_CLANG_11 (Clang 11 - Samsung)"
 echo "6) $CR_CLANG_12 (Clang 12)" 
 echo "7) $CR_CLANG_14 (Clang 14)"
 echo "8) $CR_CLANG_18 (Clang 18)"
+echo "9) $CR_CLANG_18N (Neutron Clang 18)"
+echo "10) $CR_CLANG_19 (Clang 19)"
+echo "11) $CR_CLANG_20 (Clang 20)"
 echo " "
-read -p "Please select your compiler (1-8) > " CR_COMPILER
+read -p "Please select your compiler (1-11) > " CR_COMPILER
 echo " "
 echo "1) SELinux Permissive " "2) SELinux Enforcing"
 echo " "
