@@ -6,6 +6,8 @@
 #include <linux/fuse.h>
 #include <linux/idr.h>
 #include <linux/uio.h>
+#include <linux/mm.h>
+#include <linux/types.h>
 
 #define PASSTHROUGH_IOCB_MASK                                                  \
 	(IOCB_APPEND | IOCB_DSYNC | IOCB_HIPRI | IOCB_NOWAIT | IOCB_SYNC)
@@ -46,15 +48,27 @@ static void fuse_file_accessed(struct file *dst_file, struct file *src_file)
 	touch_atime(&dst_file->f_path);
 }
 
+/* @fs.sec -- 3dd584f42d6edc81d1e439f5fe51974f -- */
+static void fuse_invalidate_inode_pages_range(struct inode *fuse_inode, loff_t start,
+				 loff_t end)
+{
+	pgoff_t start_index = start >> PAGE_SHIFT;
+	pgoff_t end_index = end >> PAGE_SHIFT;
+
+	invalidate_inode_pages2_range(fuse_inode->i_mapping, start_index, end_index);
+}
+
 static void fuse_copyattr(struct file *dst_file, struct file *src_file)
 {
 	struct inode *dst = file_inode(dst_file);
 	struct inode *src = file_inode(src_file);
 
+	i_size_write(dst, i_size_read(src));
+	dst->i_blocks = src->i_blocks;
+	dst->i_blkbits = src->i_blkbits;
 	dst->i_atime = src->i_atime;
 	dst->i_mtime = src->i_mtime;
 	dst->i_ctime = src->i_ctime;
-	i_size_write(dst, i_size_read(src));
 }
 
 static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req)
@@ -66,7 +80,12 @@ static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req)
 		__sb_writers_acquired(file_inode(iocb->ki_filp)->i_sb,
 				      SB_FREEZE_WRITE);
 		file_end_write(iocb->ki_filp);
-		fuse_copyattr(iocb_fuse->ki_filp, iocb->ki_filp);
+
+		if (iocb->ki_pos > iocb_fuse->ki_pos) {
+			fuse_invalidate_inode_pages_range(file_inode(iocb_fuse->ki_filp),
+					     iocb_fuse->ki_pos, iocb->ki_pos - 1);
+			fuse_copyattr(iocb_fuse->ki_filp, iocb->ki_filp);
+		}
 	}
 
 	iocb_fuse->ki_pos = iocb->ki_pos;
@@ -144,13 +163,18 @@ ssize_t fuse_passthrough_write_iter(struct kiocb *iocb_fuse,
 
 	old_cred = override_creds(ff->passthrough.cred);
 	if (is_sync_kiocb(iocb_fuse)) {
+		loff_t start = iocb_fuse->ki_pos;
+
 		file_start_write(passthrough_filp);
 		ret = vfs_iter_write(passthrough_filp, iter, &iocb_fuse->ki_pos,
 				     iocb_to_rw_flags(iocb_fuse->ki_flags,
 						      PASSTHROUGH_IOCB_MASK));
 		file_end_write(passthrough_filp);
-		if (ret > 0)
+		if (ret > 0) {
+			fuse_invalidate_inode_pages_range(fuse_inode, start,
+					     iocb_fuse->ki_pos - 1);
 			fuse_copyattr(fuse_filp, passthrough_filp);
+		}
 	} else {
 		struct fuse_aio_req *aio_req;
 
