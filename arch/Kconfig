@@ -468,6 +468,12 @@ config CC_STACKPROTECTOR_STRONG
 
 endchoice
 
+config LLVM_MLGO_REGISTER
+	bool "Enable Machine Learning Guided Optimizations (MLGO)"
+	help
+	  This enables Machine Learning Guided Optimizations (MLGO) for register
+	  allocation on LLVM.
+
 config THIN_ARCHIVES
 	bool
 	help

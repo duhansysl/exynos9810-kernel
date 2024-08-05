@@ -770,6 +770,20 @@ DISABLE_LTO	+= $(DISABLE_CFI)
 export DISABLE_CFI
 endif
 
+ifdef CONFIG_LLVM_MLGO_REGISTER
+# Enable MLGO for register allocation. default, release, development
+KBUILD_CFLAGS	+= -mllvm -regalloc-enable-advisor=release \
+		   -mllvm -enable-local-reassign
+KBUILD_LDFLAGS	+= -mllvm -regalloc-enable-advisor=release \
+		   -mllvm -enable-local-reassign
+endif
+
+ifdef CONFIG_LLVM_MLGO_REGISTER
+# Enable MLGO for register allocation. default, release, development
+KBUILD_CFLAGS	+= -mllvm -regalloc-enable-advisor=release \
+		   -mllvm -enable-local-reassign
+endif
+
 KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
 
 KBUILD_CFLAGS += $(call cc-ifversion, -lt, 0409, \
