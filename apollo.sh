@@ -77,11 +77,11 @@ CR_GCC9=~/compiler/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
 CR_GCC12=~/compiler/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
 CR_GCC13=~/compiler/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
 CR_CLANG_11=~/compiler/clang-r383902b-11.0.2
-CR_CLANG_12=~/compiler/clang-r416183b-12.0.0
-CR_CLANG_14=~/compiler/clang-r450784d-13.0.0
+CR_CLANG_12=~/compiler/clang-r416183b-12.0.7
+CR_CLANG_14=~/compiler/clang-r450784d-14.0.6
 CR_CLANG_18=~/compiler/clang-r522817-18.0.1
 CR_CLANG_18N=~/compiler/neutron-clang-05012024
-CR_CLANG_19=~/compiler/clang19-18.07.24
+CR_CLANG_19N=~/compiler/neutron-clang-10032024
 CR_CLANG_20=~/compiler/clang20-26.07.24
 #####################################################
 
@@ -120,7 +120,7 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
     elif [ $CR_COMPILER = "9" ]; then
         CR_CLANG=$CR_CLANG_18N
     elif [ $CR_COMPILER = "10" ]; then
-        CR_CLANG=$CR_CLANG_19
+        CR_CLANG=$CR_CLANG_19N
     elif [ $CR_COMPILER = "11" ]; then
         CR_CLANG=$CR_CLANG_20		
     fi
@@ -555,7 +555,7 @@ echo "6) $CR_CLANG_12 (Clang 12)"
 echo "7) $CR_CLANG_14 (Clang 14)"
 echo "8) $CR_CLANG_18 (Clang 18)"
 echo "9) $CR_CLANG_18N (Neutron Clang 18)"
-echo "10) $CR_CLANG_19 (Clang 19)"
+echo "10) $CR_CLANG_19N (Neutron Clang 19)"
 echo "11) $CR_CLANG_20 (Clang 20)"
 echo " "
 read -p "Please select your compiler (1-11) > " CR_COMPILER
