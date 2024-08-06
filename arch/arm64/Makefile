@@ -55,6 +55,10 @@ $(warning LSE atomics not supported by binutils)
 endif
 
 ifeq ($(CONFIG_COMPAT_VDSO), y)
+ifeq ($(LLVM_IAS),1)
+   export CONFIG_VDSO32 := y
+   vdso32 := -DCONFIG_VDSO32=1
+else
   CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_ARM32:"%"=%)
    # Check that the user has provided a valid prefix for the 32-bit toolchain.
   # To prevent selecting the system $(cc-name) by default, the prefix is not
@@ -84,6 +88,7 @@ ifeq ($(CONFIG_COMPAT_VDSO), y)
     export CONFIG_VDSO32 := y
     vdso32 := -DCONFIG_VDSO32=1
   endif
+endif
 endif
 
 ifeq ($(cc-name),clang)

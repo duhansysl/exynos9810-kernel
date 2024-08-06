@@ -134,9 +134,6 @@ fi
 done
 
 export PATH=$CR_CLANG/bin:$CR_CLANG/lib:${PATH}
-export CLANG_TRIPLE=aarch64-linux-gnu-
-export CROSS_COMPILE=$CR_CLANG_18N/bin/aarch64-linux-gnu-
-export CROSS_COMPILE_ARM32=$CR_CLANG_18N/arm-linux-gnueabi-
 export CC=$CR_CLANG/bin/clang
 export REAL_CC=$CR_CLANG/bin/clang
 export LD=$CR_CLANG/bin/ld.lld
