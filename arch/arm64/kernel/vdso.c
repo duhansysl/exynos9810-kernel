@@ -172,23 +172,15 @@ static int __init vdso_mappings_init(const char *name,
 	struct page **vdso_pagelist;
 	unsigned long pfn;
 
-	if (memcmp(&vdso_start, "\177ELF", 4)) {
-		pr_err("vDSO is not a valid ELF object!\n");
 	if (memcmp(code_start, "\177ELF", 4)) {
 		pr_err("%sis not a valid ELF object!\n", name);
 		return -EINVAL;
 	}
-
-	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
 	vdso_pages = (code_end - code_start) >> PAGE_SHIFT;
 	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
 		name, vdso_pages + 1, vdso_pages, code_start, 1L, vdso_data);
 
 	/* Allocate the vDSO pagelist, plus a page for the data. */
-	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
-				GFP_KERNEL);
 	/*
 	 * Allocate space for storing pointers to the vDSO code pages + the
 	 * data page. The pointers must have the same lifetime as the mappings,
