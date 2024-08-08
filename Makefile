@@ -571,6 +571,9 @@ KBUILD_CPPFLAGS += -Qunused-arguments
 endif
 endif
 
+ifneq ($(LLVM_IAS),1)
+CLANG_FLAGS	+= -no-integrated-as
+endif
 
 ifeq ($(mixed-targets),1)
 # ===========================================================================
