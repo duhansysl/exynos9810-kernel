@@ -10,6 +10,8 @@ CFLAGS_REMOVE_ftrace.o = -pg
 CFLAGS_REMOVE_insn.o = -pg
 CFLAGS_REMOVE_return_address.o = -pg
 
+CFLAGS_cpufeature.o += $(DISABLE_LTO)
+
 CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
 
 ifeq ($(SEC_BUILD_CONF_DMV_ALTA),true)

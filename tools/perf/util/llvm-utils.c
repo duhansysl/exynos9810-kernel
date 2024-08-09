@@ -430,6 +430,25 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 	force_set_env("CLANG_OPTIONS", clang_opt);
 	force_set_env("KERNEL_INC_OPTIONS", kbuild_include_opts);
 	force_set_env("WORKING_DIR", kbuild_dir ? : ".");
+	
+	if (opts) {
+		err = search_program(llvm_param.llc_path, "llc", llc_path);
+		if (err) {
+			pr_err("ERROR:\tunable to find llc.\n"
+			       "Hint:\tTry to install latest clang/llvm to support BPF. Check your $PATH\n"
+			       "     \tand 'llc-path' option in [llvm] section of ~/.perfconfig.\n");
+			version_notice();
+			goto errout;
+		}
+
+		err = -ENOMEM;
+		if (asprintf(&pipe_template, "%s -emit-llvm | %s -march=bpf %s -filetype=obj -o -",
+			      template, llc_path, opts) < 0) {
+			pr_err("ERROR:\tnot enough memory to setup command line\n");
+			goto errout;
+		}
+		template = pipe_template;
+	}	
 
 	/*
 	 * Since we may reset clang's working dir, path of source file
@@ -439,7 +458,43 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 	force_set_env("CLANG_SOURCE",
 		      (path[0] == '-') ? path : abspath);
 
-	pr_debug("llvm compiling command template: %s\n", template);
+	pr_debug("llvm compiling command template: %s\n", template);	
+	
+	/*
+	 * Below, substitute control characters for values that can cause the
+	 * echo to misbehave, then substitute the values back.
+	 */	
+	
+	err = -ENOMEM;
+	if (asprintf(&command_echo, "echo -n \a%s\a", template) < 0)
+		goto errout;
+	
+#define SWAP_CHAR(a, b) do { if (*p == a) *p = b; } while (0)
+	for (char *p = command_echo; *p; p++) {
+		SWAP_CHAR('<', '\001');
+		SWAP_CHAR('>', '\002');
+		SWAP_CHAR('"', '\003');
+		SWAP_CHAR('\'', '\004');
+		SWAP_CHAR('|', '\005');
+		SWAP_CHAR('&', '\006');
+		SWAP_CHAR('\a', '"');
+	}
+	
+	err = read_from_pipe(command_echo, (void **) &command_out, NULL);
+	if (err)
+		goto errout;
+
+	for (char *p = command_out; *p; p++) {
+		SWAP_CHAR('\001', '<');
+		SWAP_CHAR('\002', '>');
+		SWAP_CHAR('\003', '"');
+		SWAP_CHAR('\004', '\'');
+		SWAP_CHAR('\005', '|');
+		SWAP_CHAR('\006', '&');
+	}
+#undef SWAP_CHAR
+	pr_debug("llvm compiling command : %s\n", command_out);	
+	
 	err = read_from_pipe(template, &obj_buf, &obj_buf_sz);
 	if (err) {
 		pr_err("ERROR:\tunable to compile %s\n", path);
@@ -450,8 +505,12 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 		goto errout;
 	}
 
+	free(command_echo);
+	free(command_out);
 	free(kbuild_dir);
 	free(kbuild_include_opts);
+	free(perf_bpf_include_opts);
+	free(perf_include_dir);
 
 	if (llvm_param.dump_obj)
 		dump_obj(path, obj_buf, obj_buf_sz);
@@ -465,9 +524,13 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 		*p_obj_buf_sz = obj_buf_sz;
 	return 0;
 errout:
+	free(command_echo);
 	free(kbuild_dir);
 	free(kbuild_include_opts);
 	free(obj_buf);
+	free(perf_bpf_include_opts);
+	free(perf_include_dir);
+	free(pipe_template);
 	if (p_obj_buf)
 		*p_obj_buf = NULL;
 	if (p_obj_buf_sz)

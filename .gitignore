@@ -52,6 +52,8 @@ Module.symvers
 /vmlinuz
 /System.map
 /Module.markers
+arch/arm64/lib/lib.a.symversions
+lib/lib.a.symversions
 
 #
 # Debian directory (make deb-pkg)
@@ -145,3 +147,6 @@ scripts/fmp/__pycache__/
 
 # KSU
 drivers/kernelsu
+
+# Toolchain
+toolchain/*
