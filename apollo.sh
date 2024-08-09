@@ -254,9 +254,9 @@ BUILD_OPTIONS()
 		echo " Env		- Dirty Build"
 	fi
 	if [ $CR_SELINUX = "1" ]; then
-		echo " Selinux	- Permissive"
+		echo " SELinux	- Permissive"
 	else
-		echo " Selinux	- Enforcing"
+		echo " SELinux	- Enforcing"
 	fi
 	if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
 		if [ -n "$KSU_VERSION" ]; then
