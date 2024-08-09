@@ -72,6 +72,7 @@ CR_SELINUX="1"
 CR_KSU="n"
 CR_CLEAN="n"
 # Compiler Paths
+<<<<<<< HEAD
 CR_GCC4=~/compiler/aarch64-linux-android-4.9/bin/aarch64-linux-android-
 CR_GCC9=~/compiler/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
 CR_GCC12=~/compiler/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
@@ -83,6 +84,16 @@ CR_CLANG_18=~/compiler/clang-r522817-18.0.1
 CR_CLANG_18N=~/compiler/neutron-clang-05012024
 CR_CLANG_19=~/compiler/clang19-18.07.24
 CR_CLANG_20=~/compiler/clang20-26.07.24
+=======
+CR_GCC4=~/Android/Toolchains/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+CR_GCC9=~/Android/Toolchains/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
+CR_GCC12=~/Android/Toolchains/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
+CR_GCC13=~/Android/Toolchains/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
+CR_CLANG_11=~/Android/Toolchains/clang-r383902-jopp
+CR_CLANG_12=~/Android/Toolchains/clang-r416183b
+CR_CLANG_14=~/Android/Toolchains/clang-r450784d
+CR_CLANG_EXP=~/Android/Toolchains/clang-r522817
+>>>>>>> d6c9619
 #####################################################
 
 # Compiler Selection
@@ -108,7 +119,11 @@ export CROSS_COMPILE=$CR_GCC13
 compile="make"
 CR_COMPILER="$CR_GCC13"
 fi
+<<<<<<< HEAD
 if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ] || [ $CR_COMPILER = "9" ] || [ $CR_COMPILER = "10" ] || [ $CR_COMPILER = "11" ]; then
+=======
+if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ]; then
+>>>>>>> d6c9619
     if [ $CR_COMPILER = "5" ]; then
         CR_CLANG=$CR_CLANG_11
     elif [ $CR_COMPILER = "6" ]; then
@@ -116,6 +131,7 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
     elif [ $CR_COMPILER = "7" ]; then
         CR_CLANG=$CR_CLANG_14
     elif [ $CR_COMPILER = "8" ]; then
+<<<<<<< HEAD
         CR_CLANG=$CR_CLANG_18
     elif [ $CR_COMPILER = "9" ]; then
         CR_CLANG=$CR_CLANG_18N
@@ -123,6 +139,9 @@ if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] ||
         CR_CLANG=$CR_CLANG_19
     elif [ $CR_COMPILER = "11" ]; then
         CR_CLANG=$CR_CLANG_20		
+=======
+        CR_CLANG=$CR_CLANG_EXP
+>>>>>>> d6c9619
     fi
 
 # Check packages
@@ -134,9 +153,15 @@ fi
 done
 
 export PATH=$CR_CLANG/bin:$CR_CLANG/lib:${PATH}
+<<<<<<< HEAD
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=$CR_CLANG_18N/bin/aarch64-linux-gnu-
 export CROSS_COMPILE_ARM32=$CR_CLANG_18N/arm-linux-gnueabi-
+=======
+#export CLANG_TRIPLE=$CR_GCC9
+#export CROSS_COMPILE=$CR_GCC9
+#export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+>>>>>>> d6c9619
 export CC=$CR_CLANG/bin/clang
 export REAL_CC=$CR_CLANG/bin/clang
 export LD=$CR_CLANG/bin/ld.lld
@@ -439,7 +464,11 @@ CR_KSU="y"
 CR_CLEAN="n"
 echo " DEBUG : Set Build options "
 echo " DEBUG : Variant  : $CR_VARIANT_G965N"
+<<<<<<< HEAD
 echo " DEBUG : Compiler : $CR_CLANG_18"
+=======
+echo " DEBUG : Compiler : $CR_CLANG_EXP"
+>>>>>>> d6c9619
 echo " DEBUG : Selinux  : $CR_SELINUX Enforcing"
 echo " DEBUG : Clean    : $CR_CLEAN"
 echo "----------------------------------------------"
@@ -553,12 +582,18 @@ echo "4) $CR_GCC13 (GCC 13.x)"
 echo "5) $CR_CLANG_11 (Clang 11 - Samsung)"
 echo "6) $CR_CLANG_12 (Clang 12)" 
 echo "7) $CR_CLANG_14 (Clang 14)"
+<<<<<<< HEAD
 echo "8) $CR_CLANG_18 (Clang 18)"
 echo "9) $CR_CLANG_18N (Neutron Clang 18)"
 echo "10) $CR_CLANG_19 (Clang 19)"
 echo "11) $CR_CLANG_20 (Clang 20)"
 echo " "
 read -p "Please select your compiler (1-11) > " CR_COMPILER
+=======
+echo "8) $CR_CLANG_EXP (Clang 18)"
+echo " "
+read -p "Please select your compiler (1-8) > " CR_COMPILER
+>>>>>>> d6c9619
 echo " "
 echo "1) SELinux Permissive " "2) SELinux Enforcing"
 echo " "
