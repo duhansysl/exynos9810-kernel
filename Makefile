@@ -826,7 +826,6 @@ KBUILD_CFLAGS	+= -mllvm -aggressive-ext-opt \
            -mllvm -enable-interleaved-mem-accesses \
            -mllvm -enable-masked-interleaved-mem-accesses \
            -mllvm -enable-gvn-hoist \
-           -mllvm -enable-dfa-jump-thread \
            -mllvm -allow-unroll-and-jam \
            -mllvm -enable-loop-distribute \
            -mllvm -enable-loop-flatten \
@@ -858,6 +857,10 @@ KBUILD_CFLAGS	+= -mllvm -polly \
            -mllvm -polly-scheduling-chunksize=1 \
            -mllvm -polly-scheduling=dynamic \
            -mllvm -polly-tiling
+endif
+
+ifdef CONFIG_LLVM_DFA_JUMP_THREAD
+KBUILD_CFLAGS	+= -mllvm -enable-dfa-jump-thread
 endif
 
 ifdef CONFIG_LLVM_MLGO_REGISTER
