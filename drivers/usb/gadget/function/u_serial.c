@@ -26,7 +26,7 @@
 #include <linux/tty_flip.h>
 #include <linux/slab.h>
 #include <linux/export.h>
-#include <linux/module.h>F
+#include <linux/module.h>
 #include <linux/console.h>
 #include <linux/kthread.h>
 

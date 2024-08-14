@@ -555,7 +555,7 @@ ssize_t light_hiddenhole_version_store(struct device *dev,
 	}
 
 	if (strlen(str) < COLOR_ID_IDS_LENGTH) {
-		iRet = sscanf(str, "%20s", str_ids);
+		iRet = sscanf(str, "%19s", str_ids);
 		if (iRet < 0)
 			return iRet;
 	} else {

@@ -33,8 +33,6 @@ struct scsi_log_buf {
 	unsigned long map;
 };
 
-static DEFINE_PER_CPU(struct scsi_log_buf, scsi_format_log);
-
 static char *scsi_log_reserve_buffer(size_t *len)
 {
 	*len = 128;
