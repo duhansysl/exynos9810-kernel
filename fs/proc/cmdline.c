@@ -52,10 +52,6 @@ static int __init proc_cmdline_init(void)
 	proc_cmdline_set("androidboot.verifiedbootstate", "green");
 	proc_cmdline_set("androidboot.warranty_bit", "0");
 	proc_cmdline_set("androidboot.fmp_config", "1");
-	proc_cmdline_set("androidboot.flash.locked", "1");
-	proc_cmdline_set("androidboot.boot_recovery", "0");
-	proc_cmdline_set("androidboot.veritymode", "enforcing");
-	proc_cmdline_set("androidboot.vbmeta.device_state", "locked");
 
 	proc_create("cmdline", 0, NULL, &cmdline_proc_fops);
 	return 0;
