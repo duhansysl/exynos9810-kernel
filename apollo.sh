@@ -327,7 +327,6 @@ BUILD_OUT()
 # KSU Version
 	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
   echo "----------------------------------------------"
-  echo
   echo " Kernel		- $CR_IMAGE_NAME"
   echo " Device		- $CR_VARIANT"
   echo " Compiler	- $CR_COMPILER_ARG"
@@ -342,7 +341,6 @@ BUILD_OUT()
 		echo " SELinux	- Enforcing"
 	fi
   echo " KernelSU	- Version: $KSU_VERSION"
-  echo " "
   echo "----------------------------------------------"
   echo "$CR_VARIANT kernel build finished."
   echo "Compiled DTB Size = $sizdT Kb"
