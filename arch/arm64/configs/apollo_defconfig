@@ -16,11 +16,6 @@ CONFIG_INCREASE_MAXIMUM_SWAPPINESS=y
 CONFIG_KSWAPD_CPU=0x3F
 
 #
-# SEC Memory Management Options
-#
-CONFIG_SEC_MM=y
-
-#
 # MoroSound
 #
 CONFIG_MORO_SOUND=y
