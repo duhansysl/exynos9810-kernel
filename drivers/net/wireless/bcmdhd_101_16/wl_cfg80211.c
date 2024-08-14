@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 2022, Broadcom.
+ * Copyright (C) 2021, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -9730,35 +9730,6 @@ s32 wl_mode_to_nl80211_iftype(s32 mode)
 }
 
 static bool
-wl_is_ccode_change_allowed(struct net_device *net)
-{
-	struct wireless_dev *wdev = ndev_to_wdev(net);
-	struct wiphy *wiphy = wdev->wiphy;
-	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
-	struct net_info *iter, *next;
-
-	/* Country code isn't allowed change on AP/GO, NDP established  */
-	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
-	for_each_ndev(cfg, iter, next) {
-		GCC_DIAGNOSTIC_POP();
-		if (iter->ndev) {
-			if (wl_get_drv_status(cfg, AP_CREATED, iter->ndev)) {
-				WL_ERR(("AP active. skip coutry ccode change"));
-				return false;
-			}
-		}
-	}
-
-#ifdef WL_NAN
-	if (wl_cfgnan_is_enabled(cfg) && wl_cfgnan_is_dp_active(net)) {
-		WL_ERR(("NDP established. skip coutry ccode change"));
-		return false;
-	}
-#endif /* WL_NAN */
-	return true;
-}
-
-static bool
 wl_is_ccode_change_required(struct net_device *net,
 	char *country_code, int revinfo)
 {
@@ -9795,13 +9766,22 @@ wl_cfg80211_cleanup_connection(struct net_device *net, bool user_enforced)
 	struct wiphy *wiphy = wdev->wiphy;
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	struct net_info *iter, *next;
-	BCM_REFERENCE(ret);
+	scb_val_t scbval;
 
 	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
 	for_each_ndev(cfg, iter, next) {
 		GCC_DIAGNOSTIC_POP();
 		if (iter->ndev) {
-			if (wl_get_drv_status(cfg, CONNECTED, iter->ndev)) {
+			if (wl_get_drv_status(cfg, AP_CREATED, iter->ndev)) {
+				memset(scbval.ea.octet, 0xff, ETHER_ADDR_LEN);
+				scbval.val = DOT11_RC_DEAUTH_LEAVING;
+				if ((ret = wldev_ioctl_set(iter->ndev,
+						WLC_SCB_DEAUTHENTICATE_FOR_REASON,
+						&scbval, sizeof(scb_val_t))) != 0) {
+					WL_ERR(("Failed to disconnect STAs %d\n", ret));
+				}
+
+			} else if (wl_get_drv_status(cfg, CONNECTED, iter->ndev)) {
 				if ((iter->ndev == net) && !user_enforced)
 					continue;
 				wl_cfg80211_disassoc(iter->ndev, WLAN_REASON_DEAUTH_LEAVING);
@@ -9818,7 +9798,6 @@ wl_cfg80211_cleanup_connection(struct net_device *net, bool user_enforced)
 #ifdef WL_NAN
 	if (wl_cfgnan_is_enabled(cfg)) {
 		mutex_lock(&cfg->if_sync);
-		cfg->nancfg->notify_user = true;
 		ret = wl_cfgnan_check_nan_disable_pending(cfg, true, true);
 		mutex_unlock(&cfg->if_sync);
 		if (ret != BCME_OK) {
@@ -9849,12 +9828,6 @@ wl_cfg80211_set_country_code(struct net_device *net, char *country_code,
 		goto exit;
 	}
 
-	if (wl_is_ccode_change_allowed(net) == false) {
-		WL_ERR(("country code change isn't allowed during AP role/NAN connected\n"));
-		ret = BCME_EPERM;
-		goto exit;
-	}
-
 	wl_cfg80211_cleanup_connection(net, user_enforced);
 
 	/* Store before applying - so that if event comes earlier that is handled properly */
@@ -9880,7 +9853,7 @@ wl_cfg80211_set_country_code(struct net_device *net, char *country_code,
 	}
 
 exit:
-	return OSL_ERROR(ret);
+	return ret;
 }
 
 #ifdef CONFIG_PM
@@ -10994,7 +10967,7 @@ int wl_get_bss_info(struct bcm_cfg80211 *cfg, struct net_device *dev, const u8 *
 		if ((interworking_ie = bcm_parse_tlvs(ie, ie_len,
 				DOT11_MNG_INTERWORKING_ID)) != NULL) {
 			if ((tlv_ie = bcm_parse_tlvs(ie, ie_len, DOT11_MNG_VS_ID)) != NULL) {
-				remained_len = ie_len - ((u8*)tlv_ie - ie);
+				remained_len = ie_len;
 
 				while (tlv_ie) {
 					if (count > MAX_VNDR_IE_NUMBER)
@@ -11735,12 +11708,12 @@ wl_handle_link_down(struct bcm_cfg80211 *cfg, wl_assoc_status_t *as)
 
 	/* clear profile before reporting link down */
 	wl_init_prof(cfg, ndev);
-
+	
 	if (wl_get_drv_status(cfg, DISCONNECTING, ndev)) {
 		/* If DISCONNECTING bit is set, mark locally generated */
 		loc_gen = 1;
 	}
-
+	
 	CFG80211_DISCONNECTED(ndev, reason, ie_ptr, ie_len,
 		loc_gen, GFP_KERNEL);
 	WL_INFORM_MEM(("[%s] Disconnect event sent to upper layer"
@@ -12284,7 +12257,6 @@ char wl_check_pmstatus_time_str[DEBUG_DUMP_TIME_BUF_LEN];
 #define DPM_MAX_CONT_EVT_CNT	(5u)	/* 120sec * 5times = 10min */
 #define DPM_MIN_CONT_EVT_INTV	(1000u)	/* 1000ms */
 #define DPM_MAX_INACT_CNT	(CUSTOM_EVENT_PM_WAKE * 4 * 6)	/* 6 pkts/sec */
-#define DPM_LMT_RSSI		-80 /* dbm */
 
 static void
 wl_check_pmstatus_memdump(struct bcm_cfg80211 *cfg, struct net_device *ndev,
@@ -12299,20 +12271,8 @@ wl_check_pmstatus_memdump(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	if (cur_pm_dur - cfg->dpm_prev_pmdur < DPM_MIN_CONT_EVT_INTV) {
 		cfg->dpm_cont_evt_cnt++;
 		if (cfg->dpm_cont_evt_cnt == DPM_MAX_CONT_EVT_CNT) {
-			int val = 0;
-			scb_val_t scb_val;
-			s32 rssi = DPM_LMT_RSSI;
-
-			val = wldev_ioctl_get(ndev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t));
-			if (val) {
-				WL_ERR(("Could not get rssi(%d)\n", val));
-			} else {
-				rssi = wl_rssi_offset(dtoh32(scb_val.val));
-			}
-
-			WL_INFORM(("DPM event RSSI (%d)\n", rssi));
 #if defined(DHD_FW_COREDUMP)
-			if (dhd->memdump_enabled && (rssi > DPM_LMT_RSSI)) {
+			if (dhd->memdump_enabled) {
 				dhd->memdump_type = DUMP_TYPE_CONT_EXCESS_PM_AWAKE;
 				dhd_bus_mem_dump(dhd);
 			}
@@ -12683,12 +12643,6 @@ static s32 wl_update_bss_info(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	}
 	bi = (wl_bss_info_t *)(buf + 4);
 	chspec = wl_chspec_driver_to_host(bi->chanspec);
-	/* chanspec queried for ASSOCIATED BSSID needs to be valid */
-	if (!wf_chspec_valid(chspec)) {
-		WL_ERR(("Invalid chanspec from get bss info %x\n", chspec));
-		err = BCME_BADCHAN;
-		goto update_bss_info_out;
-	}
 	wl_update_prof(cfg, ndev, NULL, &chspec, WL_PROF_CHAN);
 
 	if (!bss) {
@@ -12767,6 +12721,7 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	s32 err = 0;
 	u8 *curbssid;
 	chanspec_t *chanspec;
+	scb_val_t scbval;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) || defined(WL_COMPAT_WIRELESS)
 	struct wiphy *wiphy = bcmcfg_to_wiphy(cfg);
 	struct ieee80211_channel *notify_channel = NULL;
@@ -12829,6 +12784,17 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 			dhd_net2idx(dhdp->info, ndev), WLAN_REASON_DEAUTH_LEAVING);
 		WL_ERR(("Fetching Assoc IEs failed, Skipping roamed event to"
 			" upper layer\n"));
+		/* To make sure disconnect, and fw sync, explictly send dissassoc
+		 * for BSSID 00:00:00:00:00:00 issue
+		 */
+		bzero(&scbval, sizeof(scb_val_t));
+		scbval.val = WLAN_REASON_DEAUTH_LEAVING;
+		memcpy(&scbval.ea, curbssid, ETHER_ADDR_LEN);
+		scbval.val = htod32(scbval.val);
+		if (wldev_ioctl_set(ndev, WLC_DISASSOC, &scbval,
+				sizeof(scb_val_t)) < 0) {
+			WL_ERR(("WLC_DISASSOC error\n"));
+		}
 		goto fail;
 	}
 
@@ -12844,18 +12810,8 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	chanspec = (chanspec_t *)wl_read_prof(cfg, ndev, WL_PROF_CHAN);
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) || defined(WL_COMPAT_WIRELESS)
 	/* channel info for cfg80211_roamed introduced in 2.6.39-rc1 */
-	if (!wf_chspec_valid(*chanspec)) {
-		WL_ERR(("Invalid chanspec (%x) for roam, triggering a disassoc\n", *chanspec));
-		err = BCME_BADCHAN;
-		goto fail;
-	}
 	freq = wl_channel_to_frequency(wf_chspec_ctlchan(*chanspec), CHSPEC_BAND(*chanspec));
 	notify_channel = ieee80211_get_channel(wiphy, freq);
-	if (notify_channel == NULL) {
-		WL_ERR(("Invalid roam notify channel\n"));
-		err = BCME_BADCHAN;
-		goto fail;
-	}
 #endif /* LINUX_VERSION > 2.6.39  || WL_COMPAT_WIRELESS */
 #ifdef WLFBT
 	/* back up the given FBT key for the further supplicant request,
@@ -12933,10 +12889,6 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	return err;
 
 fail:
-	/* Trigger a disassoc to avoid state mismatch between driver and upper
-	* layers, since we skip roam indication to upper layers in fail: handling
-	*/
-	wl_cfg80211_disassoc(ndev, WLAN_REASON_DEAUTH_LEAVING);
 #ifdef DHD_LOSSLESS_ROAMING
 	wl_del_roam_timeout(cfg);
 #endif  /* DHD_LOSSLESS_ROAMING */
@@ -13174,10 +13126,7 @@ wl_bss_connect_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 			* For cases, there is no match available,
 			* need to update the cache based on bss info from fw.
 			*/
-		if ((err = wl_update_bss_info(cfg, ndev, true)) != BCME_OK) {
-			WL_ERR(("failed to update bss info, err=%d\n", err));
-			goto exit;
-		}
+		wl_update_bss_info(cfg, ndev, true);
 		if (cfg->wlc_ver.wlc_ver_major < PMKDB_WLC_VER) {
 			wl_update_pmklist(ndev, cfg->pmk_list, err);
 		}
@@ -14994,6 +14943,7 @@ static s32 wl_cfg80211_attach_post(struct net_device *ndev)
 			}
 		}
 	}
+	wl_set_drv_status(cfg, READY, ndev);
 fail:
 	return err;
 }
@@ -16491,6 +16441,7 @@ static s32 __wl_cfg80211_up(struct bcm_cfg80211 *cfg)
 	cfg->scan_request = NULL;
 
 	INIT_DELAYED_WORK(&cfg->pm_enable_work, wl_cfg80211_work_handler);
+	wl_set_drv_status(cfg, READY, ndev);
 
 	return err;
 }
@@ -16828,11 +16779,6 @@ s32 wl_cfg80211_up(struct net_device *net)
 	bcm_cfg80211_add_ibss_if(cfg->wdev->wiphy, IBSS_IF_NAME);
 #endif /* WLAIBSS_MCHAN */
 	cfg->spmk_info_list->pmkids.count = 0;
-
-	if (err == BCME_OK) {
-		wl_set_drv_status(cfg, READY, net);
-	}
-
 	return err;
 }
 
