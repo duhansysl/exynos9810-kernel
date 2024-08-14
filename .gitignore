@@ -149,6 +149,7 @@ firmware/five/ffffffff000000000000000000000072.tlbin
 net/wireguard/crypto/zinc/chacha20/chacha20-arm64.S
 net/wireguard/crypto/zinc/poly1305/poly1305-arm64.S
 scripts/dtbtool_exynos/dtbtool
+arch/arm64/boot/dts/exynos/*reverse.dts
 
 # KSU
 drivers/kernelsu
