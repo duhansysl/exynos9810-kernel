@@ -2,7 +2,7 @@
  * Broadcom Dongle Host Driver (DHD), Linux-specific network interface.
  * Basically selected code segments from usb-cdc.c and usb-rndis.c
  *
- * Copyright (C) 2021, Broadcom.
+ * Copyright (C) 2022, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -979,27 +979,41 @@ static int dhd_pm_callback(struct notifier_block *nfb, unsigned long action, voi
 	int ret = NOTIFY_DONE;
 	bool suspend = FALSE;
 	dhd_info_t *dhdinfo;
+	unsigned long flags = 0;
 
 	BCM_REFERENCE(dhdinfo);
 	BCM_REFERENCE(suspend);
+
+	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
+	dhdinfo = container_of(nfb, dhd_info_t, pm_notifier);
+	GCC_DIAGNOSTIC_POP();
+
+	if (!dhdinfo->pub.up) {
+		return ret;
+	}
+
+	DHD_GENERAL_LOCK(&dhdinfo->pub, flags);
+	DHD_BUS_BUSY_SET_IN_PM_CALLBACK(&dhdinfo->pub);
+	DHD_GENERAL_UNLOCK(&dhdinfo->pub, flags);
+	DHD_ERROR(("%s action: %lu\n", __FUNCTION__, action));
 
 	switch (action) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
 		suspend = TRUE;
+#ifdef DHD_PCIE_RUNTIMEPM
+		DHD_DISABLE_RUNTIME_PM(&dhdinfo->pub);
+#endif /* DHD_PCIE_RUNTIMEPM */
 		break;
 
 	case PM_POST_HIBERNATION:
 	case PM_POST_SUSPEND:
 		suspend = FALSE;
+#ifdef DHD_PCIE_RUNTIMEPM
+		DHD_ENABLE_RUNTIME_PM(&dhdinfo->pub);
+#endif /* DHD_PCIE_RUNTIMEPM */
 		break;
 	}
-
-	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
-	dhdinfo = container_of(nfb, struct dhd_info, pm_notifier);
-	GCC_DIAGNOSTIC_POP();
-
-	DHD_BUS_BUSY_SET_IN_PM_CALLBACK(&dhdinfo->pub);
 
 #if defined(DHD_USE_PM_SLEEP)
 	/* The resume setting is handled in wl_android_set_suspendmode(). */
@@ -1027,8 +1041,9 @@ static int dhd_pm_callback(struct notifier_block *nfb, unsigned long action, voi
 	dhd_mmc_suspend = suspend;
 	smp_mb();
 #endif
-
+	DHD_GENERAL_LOCK(&dhdinfo->pub, flags);
 	DHD_BUS_BUSY_CLEAR_IN_PM_CALLBACK(&dhdinfo->pub);
+	DHD_GENERAL_UNLOCK(&dhdinfo->pub, flags);
 	return ret;
 }
 
@@ -2077,7 +2092,7 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 							__FUNCTION__, ret));
 					}
 				}
-				dhd->sroamed = FALSE;
+				dhd->sroamed = TRUE;
 #endif /* CONFIG_SILENT_ROAM */
 #endif /* DHD_USE_EARLYSUSPEND || DHD_USE_PM_SLEEP */
 			} else {
@@ -2203,6 +2218,7 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				if (ret < 0) {
 					DHD_ERROR(("%s set sroam failed %d\n", __FUNCTION__, ret));
 				}
+				dhd->sroamed = FALSE;
 #endif /* CONFIG_SILENT_ROAM */
 #endif /* DHD_USE_EARLYSUSPEND || DHD_USE_PM_SLEEP */
 			}
@@ -4891,11 +4907,6 @@ dhd_dbg_periodic_cntrs_start(dhd_pub_t * dhdp)
 	dhd_info_t *dhd = NULL;
 	uint32 current_time = wl_cfgdbg_current_timestamp();
 
-	if (FW_SUPPORTED(dhdp, ecounters)) {
-		/* Not required DHD periodic conters */
-		return;
-	}
-
 	if (dhdp && dhdp->info) {
 		dhd = (dhd_info_t *)dhdp->info;
 	} else {
@@ -4903,6 +4914,11 @@ dhd_dbg_periodic_cntrs_start(dhd_pub_t * dhdp)
 	}
 
 	if (dhdp->dongle_reset) {
+		return;
+	}
+
+	if (FW_SUPPORTED(dhdp, ecounters)) {
+		/* Not required DHD periodic conters */
 		return;
 	}
 
@@ -5986,7 +6002,7 @@ dhd_add_monitor_if(dhd_info_t *dhd)
 	if (FW_SUPPORTED((&dhd->pub), monitor)) {
 #ifdef DHD_PCIE_RUNTIMEPM
 		/* Disable RuntimePM in monitor mode */
-		DHD_DISABLE_RUNTIME_PM(&dhd->pub);
+		DHD_STOP_RPM_TIMER(&dhd->pub);
 		DHD_ERROR(("%s : disable runtime PM in monitor mode\n", __FUNCTION__));
 #endif /* DHD_PCIE_RUNTIME_PM */
 		scan_suppress = TRUE;
@@ -6020,7 +6036,7 @@ dhd_del_monitor_if(dhd_info_t *dhd)
 	if (FW_SUPPORTED((&dhd->pub), monitor)) {
 #ifdef DHD_PCIE_RUNTIMEPM
 		/* Enable RuntimePM */
-		DHD_ENABLE_RUNTIME_PM(&dhd->pub);
+		DHD_START_RPM_TIMER(&dhd->pub);
 		DHD_ERROR(("%s : enabled runtime PM\n", __FUNCTION__));
 #endif /* DHD_PCIE_RUNTIME_PM */
 		scan_suppress = FALSE;
@@ -6853,6 +6869,12 @@ dhd_open(struct net_device *net)
 			DHD_ERROR(("%s: set force reg on\n", __FUNCTION__));
 			dhd->wl_accel_force_reg_on = TRUE;
 		}
+		if (!dhd->wl_accel_force_reg_on && !DHD_BUS_BUSY_CHECK_IDLE(&dhd->pub)) {
+			DHD_ERROR(("%s: clear dhd_bus_busy_state: 0x%x\n",
+					__FUNCTION__, dhd->pub.dhd_bus_busy_state));
+			dhd->pub.dhd_bus_busy_state = 0;
+			dhd->wl_accel_force_reg_on = TRUE;
+		}
 #endif /* WLAN_ACCEL_BOOT */
 		if (!dhd_driver_init_done) {
 			DHD_ERROR(("%s: WLAN driver is not initialized\n", __FUNCTION__));
@@ -7167,6 +7189,11 @@ dhd_open(struct net_device *net)
 
 exit:
 	mutex_unlock(&dhd->pub.ndev_op_sync);
+
+	if (dhd_query_bus_erros(&dhd->pub)) {
+		ret = BCME_ERROR;
+	}
+
 	if (ret) {
 		dhd_stop(net);
 	}
@@ -16397,6 +16424,10 @@ static void dhd_hang_process(struct work_struct *work_data)
 	dhd = container_of(work_data, dhd_info_t, dhd_hang_process_work);
 	GCC_DIAGNOSTIC_POP();
 
+	if (!dhd) {
+		return;
+	}
+
 	dev = dhd->iflist[0]->net;
 
 	if (dev) {
@@ -16425,7 +16456,7 @@ static void dhd_hang_process(struct work_struct *work_data)
 #endif /* HANG_DELAY_BEFORE_DEV_CLOSE */
 
 	rtnl_lock();
-	for (i = 0; i < DHD_MAX_IFS && dhd; i++) {
+	for (i = 0; i < DHD_MAX_IFS; i++) {
 		ndev = dhd->iflist[i] ? dhd->iflist[i]->net : NULL;
 		if (ndev && (ndev->flags & IFF_UP)) {
 			DHD_ERROR(("ndev->name : %s dev close\n",
@@ -24331,6 +24362,7 @@ static void dhd_dump_proc(struct work_struct *work_data)
 {
 	dhd_info_t *dhd_info = NULL;
 	dhd_pub_t *dhdp = NULL;
+	unsigned long flags = 0;
 
 	/* Ignore compiler warnings due to -Werror=cast-qual */
 	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
@@ -24342,8 +24374,12 @@ static void dhd_dump_proc(struct work_struct *work_data)
 		return;
 	}
 
+	DHD_GENERAL_LOCK(dhdp, flags);
 	DHD_BUS_BUSY_SET_IN_SYSFS_DUMP(dhdp);
+	DHD_GENERAL_UNLOCK(dhdp, flags);
 	dhd_log_dump_trigger(dhdp, CMD_DEFAULT);
+	DHD_GENERAL_LOCK(dhdp, flags);
 	DHD_BUS_BUSY_CLEAR_IN_SYSFS_DUMP(dhdp);
+	DHD_GENERAL_UNLOCK(dhdp, flags);
 }
 #endif /* DHD_FILE_DUMP_EVENT */

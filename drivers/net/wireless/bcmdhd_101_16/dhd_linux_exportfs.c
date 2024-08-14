@@ -2,7 +2,7 @@
  * Broadcom Dongle Host Driver (DHD), Linux-specific network interface
  * Basically selected code segments from usb-cdc.c and usb-rndis.c
  *
- * Copyright (C) 2021, Broadcom.
+ * Copyright (C) 2022, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -2270,7 +2270,7 @@ static struct kobj_attribute hdm_wlan_attr =
 	__ATTR(hdm_wlan_loader, 0660, NULL, hdm_load_module);
 
 void
-dhd_hdm_wlan_sysfs_init()
+dhd_hdm_wlan_sysfs_init(void)
 {
 	DHD_ERROR(("export hdm_wlan_loader\n"));
 	if (sysfs_create_file(kernel_kobj, &hdm_wlan_attr.attr)) {

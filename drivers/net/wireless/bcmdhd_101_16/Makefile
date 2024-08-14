@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2021, Broadcom.
+# Copyright (C) 2022, Broadcom.
 #
 #      Unless you and Broadcom execute a separate written software license
 # agreement governing use of this software, this software is licensed to you
@@ -135,6 +135,9 @@ endif
 	DHDCFLAGS += -DDHD_FLOW_RING_STATUS_TRACE
 	# Enable internal Rx packet pool
 	DHDCFLAGS += -DRX_PKT_POOL
+ifeq ($(filter y,$(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO)),y)
+	DHDCFLAGS += -DUSE_ISB_IN_FLR
+endif
 endif
 
 
@@ -415,7 +418,7 @@ DHDCFLAGS += -DWL_STA_ASSOC_RAND
 #Soft AP MAC randomization
 DHDCFLAGS += -DWL_SOFTAP_RAND
 #p2p MAC randomization
-#DHDCFLAGS += -DWL_P2P_RAND
+DHDCFLAGS += -DWL_P2P_RAND
 
 # Set initial country code to World Wide Safe
 DHDCFLAGS += -DCUSTOM_COUNTRY_CODE_XZ
@@ -514,6 +517,8 @@ endif
 
 # NAN-Ranging BW private command
   DHDCFLAGS += -DSUPPORT_NAN_RANGING_TEST_BW
+# NAN customer discovery cache nubmer
+  DHDCFLAGS += -DCUSTOM_NAN_MAX_CACHE_DISC_RESULT=160
 
 ifeq ($(CONFIG_ARCH_QCOM),y)
 # Due to GKI config, Exynos has ARCH_QCOM & ARCH_EXYNOS, MSM has ARCH_QCOM only, Temporary solution
@@ -801,9 +806,10 @@ ifeq ($(BUS_IFACE_PCIE),y)
   DHDCFLAGS += -DDHDTCPACK_SUPPRESS
 endif
  DHDCFLAGS += -DFLOW_RING_PREALLOC
- DHDCFLAGS += -DDHD_PERIODIC_CNTRS
 # NAN-Ranging BW private command
  DHDCFLAGS += -DSUPPORT_NAN_RANGING_TEST_BW
+# NAN customer discovery cache nubmer
+  DHDCFLAGS += -DCUSTOM_NAN_MAX_CACHE_DISC_RESULT=40
 
 ifeq ($(CONFIG_ARCH_QCOM),y)
 # Due to GKI config, Exynos has ARCH_QCOM & ARCH_EXYNOS, MSM has ARCH_QCOM only, Temporary solution

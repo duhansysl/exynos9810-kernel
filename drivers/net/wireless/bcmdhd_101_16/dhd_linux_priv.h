@@ -1,7 +1,7 @@
 /*
  * DHD Linux header file - contains private structure definition of the Linux specific layer
  *
- * Copyright (C) 2021, Broadcom.
+ * Copyright (C) 2022, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -491,6 +491,7 @@ extern uint fis_enab;
  * 4.19.81 -> 4.19.110, 4.14.78 -> 4.14.170
  */
 #if (defined(BOARD_HIKEY) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 96))) || \
+	(defined(CONFIG_SOC_EXYNOS9830) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 87))) || \
 	(defined(CONFIG_SOC_EXYNOS9820) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 187))) \
 	|| (defined(CONFIG_ARCH_MSM) && (((LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 170)) && \
 	(LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0))) || (LINUX_VERSION_CODE >= \

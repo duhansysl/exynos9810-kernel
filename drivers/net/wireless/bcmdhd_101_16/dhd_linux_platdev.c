@@ -1,7 +1,7 @@
 /*
  * Linux platform device for DHD WLAN adapter
  *
- * Copyright (C) 2021, Broadcom.
+ * Copyright (C) 2022, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -553,6 +553,7 @@ void wifi_ctrlfunc_unregister_drv(void)
 	}
 #ifdef BCMDHD_MODULAR
 	dhd_wlan_deinit();
+	osl_static_mem_deinit(NULL, NULL);
 #ifdef WBRC
 	wbrc_exit();
 #endif /* WBRC */
