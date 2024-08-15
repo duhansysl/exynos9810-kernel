@@ -175,16 +175,6 @@ static int max77705_vib_set_ratio(struct max77705_vibrator_drvdata *ddata)
 {
 	int ratio;
 
-	if (ddata->is_high_temp)
-		ratio = ddata->pdata->high_temp_ratio;
-	else {
-#if defined(CONFIG_MAX77705_VIB_FOLD_MODEL)
-		ratio = set_fold_model_ratio(ddata);
-#else
-		ratio = ddata->pdata->normal_ratio;
-#endif
-	}
-
 	pr_info("ratio set to %d\n", ratio);
 
 	return ratio;
