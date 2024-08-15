@@ -13006,7 +13006,7 @@
 		haptic,reg2 = <0x82>;
 		haptic,pwm_id = <0x1>;
 		haptic,regulator_name = "VDD_MOTOR_3P3";
-		haptic,normal_ratio = <0x4b>;
+		haptic,normal_ratio = <0x5A>;
 		haptic,overdrive_ratio = <0x5f>;
 		haptic,motor_type = "LINEAR_1040";
 		haptic,high_temp_ratio = <0x3c>;
