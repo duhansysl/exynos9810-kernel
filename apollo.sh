@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Apollo Build Script V3.0
+# Apollo Build Script V3.5
 # For Exynos9810
 # Forked from Exynos8890 Script
 # Coded by AnanJaser1211 @ 2019-2022
@@ -17,8 +17,12 @@
 # limitations under the License.
 # Main Dir
 CR_DIR=$(pwd)
+# Compiler Dir
+CR_TC=../compiler
+# Target ARCH
+CR_ARCH=arm64
 # Define proper arch and dir for dts files
-CR_DTS=arch/arm64/boot/dts/exynos
+CR_DTS=arch/$CR_ARCH/boot/dts/exynos
 # Define boot.img out dir
 CR_OUT=$CR_DIR/Apollo/Out
 CR_PRODUCT=$CR_DIR/Apollo/Product
@@ -30,9 +34,11 @@ CR_AIK=$CR_DIR/Apollo/A.I.K
 # Main Ramdisk Location
 CR_RAMDISK=$CR_DIR/Apollo/Ramdisk
 # Compiled image name and location (Image/zImage)
-CR_KERNEL=$CR_DIR/arch/arm64/boot/Image
+CR_KERNEL=$CR_DIR/arch/$CR_ARCH/boot/Image
 # Compiled dtb by dtbtool
-CR_DTB=$CR_DIR/arch/arm64/boot/dtb.img
+CR_DTB=$CR_DIR/arch/$CR_ARCH/boot/dtb.img
+# defconfig dir
+CR_DEFCONFIG=$CR_DIR/arch/$CR_ARCH/configs
 # Kernel Name and Version
 CR_VERSION=V1.0
 CR_NAME=DS-ACK
@@ -41,8 +47,6 @@ CR_JOBS=$(nproc --all)
 # Target Android version
 CR_ANDROID=q
 CR_PLATFORM=13.0.0
-# Target ARCH
-CR_ARCH=arm64
 # Current Date
 CR_DATE=$(date +%d.%m.%Y)
 # General init
@@ -68,75 +72,121 @@ CR_CONFIG_SPLIT=NULL
 CR_CONFIG_APOLLO=apollo_defconfig
 CR_CONFIG_INTL=eur_defconfig
 CR_CONFIG_KOR=kor_defconfig
-CR_SELINUX="1"
+CR_SELINUX="2"
 CR_KSU="n"
 CR_CLEAN="n"
-# Compiler Paths
-CR_GCC4=~/compiler/aarch64-linux-android-4.9/bin/aarch64-linux-android-
-CR_GCC9=~/compiler/aarch64-linux-gnu-9.x/bin/aarch64-linux-gnu-
-CR_GCC12=~/compiler/aarch64-linux-gnu-12.x/bin/aarch64-linux-gnu-
-CR_GCC13=~/compiler/aarch64-linux-gnu-13.x/bin/aarch64-linux-gnu-
-CR_CLANG_11=~/compiler/clang-r383902b-11.0.2
-CR_CLANG_12=~/compiler/clang-r416183b-12.0.7
-CR_CLANG_14=~/compiler/clang-r450784d-14.0.6
-CR_CLANG_18=~/compiler/clang-r522817-18.0.1
-CR_CLANG_18N=~/compiler/neutron-clang-05012024
-CR_CLANG_19N=~/compiler/neutron-clang-10032024
-CR_CLANG_20=~/compiler/clang20-26.07.24
+# Default Compilation
+DEFAULT_TARGET=3   # crownlte
+DEFAULT_COMPILER=3 # clang18
+DEFAULT_SELINUX=2  # enforce
+DEFAULT_KSU=y      # enabled
+DEFAULT_CLEAN=n    # dirty
 #####################################################
 
 # Compiler Selection
 BUILD_COMPILER()
 {
+
+# Auto download and setup compilers
+# For manually adding compiler, add it under
+# Apollo/toolchain/clang-custom and select option 7
+
+# Clang Versions and features
+
 if [ $CR_COMPILER = "1" ]; then
-export CROSS_COMPILE=$CR_GCC4
-compile="make"
-CR_COMPILER="$CR_GCC4"
+CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r416183/clang-r416183.tar.gz
+CR_CLANG=$CR_TC/clang-12.0.4-r416183
 fi
 if [ $CR_COMPILER = "2" ]; then
-export CROSS_COMPILE=$CR_GCC9
-compile="make"
-CR_COMPILER="$CR_GCC9"
+CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r450784/clang-r450784b.tar.gz
+CR_CLANG=$CR_TC/clang-14.0.4-r450784
 fi
 if [ $CR_COMPILER = "3" ]; then
-export CROSS_COMPILE=$CR_GCC12
-compile="make"
-CR_COMPILER="$CR_GCC12"
+CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r522817/clang-r522817.tar.gz
+CR_CLANG=$CR_TC/clang-18.0.1-r522817
 fi
 if [ $CR_COMPILER = "4" ]; then
-export CROSS_COMPILE=$CR_GCC13
-compile="make"
-CR_COMPILER="$CR_GCC13"
+CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r530567/clang-r530567.tar.gz
+CR_CLANG=$CR_TC/clang-19.0.0-r530567
 fi
-if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ] || [ $CR_COMPILER = "7" ] || [ $CR_COMPILER = "8" ] || [ $CR_COMPILER = "9" ] || [ $CR_COMPILER = "10" ] || [ $CR_COMPILER = "11" ]; then
-    if [ $CR_COMPILER = "5" ]; then
-        CR_CLANG=$CR_CLANG_11
-    elif [ $CR_COMPILER = "6" ]; then
-        CR_CLANG=$CR_CLANG_12
-    elif [ $CR_COMPILER = "7" ]; then
-        CR_CLANG=$CR_CLANG_14
-    elif [ $CR_COMPILER = "8" ]; then
-        CR_CLANG=$CR_CLANG_18
-    elif [ $CR_COMPILER = "9" ]; then
-        CR_CLANG=$CR_CLANG_18N
-    elif [ $CR_COMPILER = "10" ]; then
-        CR_CLANG=$CR_CLANG_19N
-    elif [ $CR_COMPILER = "11" ]; then
-        CR_CLANG=$CR_CLANG_20		
-    fi
+if [ $CR_COMPILER = "5" ]; then
+CR_CLANG_URL=https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/05012024/neutron-clang-05012024.tar.zst
+CR_CLANG=$CR_TC/neutron-clang-18.0.0
+fi
+if [ $CR_COMPILER = "6" ]; then
+CR_CLANG_URL=https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst
+CR_CLANG=$CR_TC/neutron-clang-19.0.0
+fi
+if [ $CR_COMPILER = "7" ]; then
+CR_CLANG=$CR_TC/neutron-clang20-26.07.24
+fi
+if [ $CR_COMPILER = "8" ]; then
+CR_CLANG=$CR_TC/clang-custom
+fi
 
-# Check packages
-for pkg in gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu; do
-if ! dpkg-query -W -f='${Status}' $pkg | grep "ok installed"; then
-    echo " $pkg is missing, please install with sudo apt-get install $pkg"
-    exit 0;
+if [ $CR_COMPILER != "8" ]; then
+	if [ ! -d "$CR_CLANG/bin" ] || [ ! -d "$CR_CLANG/lib" ]; then
+		echo " "
+		echo " $CR_CLANG compiler is missing"
+		echo " "
+		echo " "
+		read -p "Download Toolchain ? (y/n) > " TC_DL
+		if [ $TC_DL = "y" ]; then
+			echo "Checking URL validity..."
+			URL=$CR_CLANG_URL
+			if curl --output /dev/null --silent --head --fail "$URL"; then
+				echo "URL exists: $URL"
+				echo "Downloading $CR_CLANG"
+				if [ ! -e $CR_TC ]; then
+					mkdir $CR_TC
+				fi
+				if [ ! -e $CR_CLANG ]; then
+					mkdir $CR_CLANG
+				else
+					# Remove incomplete
+					rm -rf $CR_CLANG
+					mkdir $CR_CLANG
+				fi
+				wget -qO- $URL | tar --use-compress-program=unzstd -xv -C $CR_CLANG
+				if [ $? -ne 0 ]; then
+					echo "Download failed or was incomplete"
+					echo "Setup Compiler and try again"
+					exit 0;
+				fi
+				# Neutron Needs patches
+				if [ $CR_COMPILER = "5" ] || [ $CR_COMPILER = "6" ]; then
+					cd $CR_CLANG
+					bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") --patch=glibc
+					cd $CR_DIR
+				fi
+				echo "Compiler Downloaded."
+			else
+				echo "Invalid URL: $URL"
+				exit 0;
+			fi
+		else
+			echo " Aborting "
+			echo " Setup Compiler and try again"
+			exit 0;
+		fi
+	fi
+else
+    if [ ! -d "$CR_CLANG/bin" ] || [ ! -d "$CR_CLANG/lib" ]; then
+        echo "clang-custom compiler is missing in $CR_TC/clang-custom"
+        exit 0;
+    fi
 fi
-done
+
+# Clang Features (18 and higher)
+if [ $CR_COMPILER -ge 3 ]; then
+export CONFIG_THINLTO=y
+export CONFIG_UNIFIEDLTO=y
+export CONFIG_LLVM_MLGO_REGISTER=y
+export CONFIG_LLVM_POLLY=y
+export CONFIG_LLVM_DFA_JUMP_THREAD=y
+fi
 
 export PATH=$CR_CLANG/bin:$CR_CLANG/lib:${PATH}
-export CLANG_TRIPLE=aarch64-linux-gnu-
-export CROSS_COMPILE=$CR_CLANG_18N/bin/aarch64-linux-gnu-
-export CROSS_COMPILE_ARM32=$CR_CLANG_18N/arm-linux-gnueabi-
 export CC=$CR_CLANG/bin/clang
 export REAL_CC=$CR_CLANG/bin/clang
 export LD=$CR_CLANG/bin/ld.lld
@@ -147,20 +197,17 @@ export OBJDUMP=$CR_CLANG/bin/llvm-objdump
 export READELF=$CR_CLANG/bin/llvm-readelf
 export STRIP=$CR_CLANG/bin/llvm-strip
 export LLVM=1
-export LLVM_IAS=1
+export KALLSYMS_EXTRA_PASS=1
 export ARCH=arm64 && export SUBARCH=arm64
 compile="make ARCH=arm64 CC=clang"
-CR_COMPILER="$CR_CLANG"
-fi
+CR_COMPILER_ARG="$CR_CLANG"
 }
 
 # Clean-up Function
 
 BUILD_CLEAN()
 {
-if [ $CR_CLEAN = "y" ]; then
-     echo " "
-     echo " Cleaning build dir"
+if [[ "$CR_CLEAN" =~ ^[yY]$ ]]; then
      $compile clean && $compile mrproper
      rm -r -f $CR_DTB
      rm -r -f $CR_KERNEL
@@ -170,10 +217,7 @@ if [ $CR_CLEAN = "y" ]; then
      rm -rf $CR_DIR/.config
      rm -rf $CR_OUT/*.img
      rm -rf $CR_OUT/*.zip
-fi
-if [ $CR_CLEAN = "n" ]; then
-     echo " "
-     echo " Skip Full cleaning"
+else
      rm -r -f $CR_DTB
      rm -r -f $CR_KERNEL
      rm -rf $CR_DTS/.*.tmp
@@ -193,58 +237,110 @@ BUILD_IMAGE_NAME()
     
 }
 
+# Build options
+BUILD_OPTIONS()
+{
+	# KSU Version
+	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
+	echo "----------------------------------------------"
+	echo " Apollo Kernel Build Options "
+	echo " "
+	echo " Kernel		- $CR_IMAGE_NAME"
+	echo " Device		- $CR_VARIANT"
+	echo " Compiler	- $CR_COMPILER_ARG"
+	if [[ "$CR_CLEAN" =~ ^[yY]$ ]]; then
+		echo " Env		- Clean Build"
+	else
+		echo " Env		- Dirty Build"
+	fi
+	if [ $CR_SELINUX = "1" ]; then
+		echo " SELinux	- Permissive"
+	else
+		echo " SELinux	- Enforcing"
+	fi
+	if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
+		if [ -n "$KSU_VERSION" ]; then
+		echo " KernelSU	- Version: $KSU_VERSION"
+		else
+		echo " KernelSU	- Enabled"
+		fi
+	else
+		echo " KernelSU	- Disabled"
+	fi
+	echo " "
+}
+
 # Config Generation Function
 
 BUILD_GENERATE_CONFIG()
 {
   # Only use for devices that are unified with 2 or more configs
   echo "----------------------------------------------"
-  echo "Building defconfig for $CR_VARIANT"
+  echo " Generating defconfig for $CR_VARIANT"
   echo " "
   # Respect CLEAN build rules
   BUILD_CLEAN
-  if [ -e $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig ]; then
-    echo " cleanup old configs "
-    rm -rf $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+  if [ -e $CR_DEFCONFIG/tmp_defconfig ]; then
+    echo " Clean-up old config "
+    rm -rf $CR_DEFCONFIG/tmp_defconfig
   fi
-  echo " Copy $CR_CONFIG "
-  cp -f $CR_DIR/arch/$CR_ARCH/configs/$CR_CONFIG $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+  echo " Base	- $CR_CONFIG "
+  cp -f $CR_DEFCONFIG/$CR_CONFIG $CR_DEFCONFIG/tmp_defconfig
   # Split-config support for devices with unified defconfigs (Universal + device)
   if [ $CR_CONFIG_SPLIT = NULL ]; then
     echo " No split config support! "
   else
-    echo " Copy $CR_CONFIG_SPLIT "
-    cat $CR_DIR/arch/$CR_ARCH/configs/$CR_CONFIG_SPLIT >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+    echo " Device - $CR_CONFIG_SPLIT "
+    cat $CR_DEFCONFIG/$CR_CONFIG_SPLIT >> $CR_DEFCONFIG/tmp_defconfig
   fi
   # Regional Config
-  echo " Copy $CR_CONFIG_REGION "
-  cat $CR_DIR/arch/$CR_ARCH/configs/$CR_CONFIG_REGION >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+  echo " Region	- $CR_CONFIG_REGION "
+  cat $CR_DEFCONFIG/$CR_CONFIG_REGION >> $CR_DEFCONFIG/tmp_defconfig
   # Apollo Custom defconfig
-  echo " Copy $CR_CONFIG_APOLLO "
-  cat $CR_DIR/arch/$CR_ARCH/configs/$CR_CONFIG_APOLLO >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+  echo " Apollo	- $CR_CONFIG_APOLLO "
+  cat $CR_DEFCONFIG/$CR_CONFIG_APOLLO >> $CR_DEFCONFIG/tmp_defconfig
   # Selinux Never Enforce all targets
   if [ $CR_SELINUX = "1" ]; then
-    echo " Building Permissive Kernel"
-    echo "CONFIG_ALWAYS_PERMISSIVE=y" >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+    echo " Building SELinux Permissive Kernel"
+    echo "CONFIG_ALWAYS_PERMISSIVE=y" >> $CR_DEFCONFIG/tmp_defconfig
     CR_IMAGE_NAME=$CR_IMAGE_NAME-Permissive
     zver=$zver-Permissive
+  else
+    echo " Building SELinux Enforced Kernel"
   fi
-  if [ $CR_KSU = "y" ]; then
-    echo " Building KernelSU Kernel"
-    echo "CONFIG_KSU=y" >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+  if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
+    echo " Building KernelSU"
+    echo "CONFIG_KSU=y" >> $CR_DEFCONFIG/tmp_defconfig
     CR_IMAGE_NAME=$CR_IMAGE_NAME-KSU
     zver=$zver-KernelSU
   else
-    echo "# CONFIG_KSU is not set" >> $CR_DIR/arch/$CR_ARCH/configs/tmp_defconfig
+    echo "# CONFIG_KSU is not set" >> $CR_DEFCONFIG/tmp_defconfig
   fi
-  echo " Set $CR_VARIANT to generated config "
+  echo " $CR_VARIANT config generated "
+  echo " "
   CR_CONFIG=tmp_defconfig
 }
 
 # Kernel information Function
 BUILD_OUT()
 {
-  echo " "
+# KSU Version
+	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
+  echo "----------------------------------------------"
+  echo " Kernel		- $CR_IMAGE_NAME"
+  echo " Device		- $CR_VARIANT"
+  echo " Compiler	- $CR_COMPILER_ARG"
+	if [[ "$CR_CLEAN" =~ ^[yY]$ ]]; then
+		echo " Env		- Clean Build"
+	else
+		echo " Env		- Dirty Build"
+	fi
+	if [ $CR_SELINUX = "1" ]; then
+		echo " SELinux	- Permissive"
+	else
+		echo " SELinux	- Enforcing"
+	fi
+  echo " KernelSU	- Version: $KSU_VERSION"
   echo "----------------------------------------------"
   echo "$CR_VARIANT kernel build finished."
   echo "Compiled DTB Size = $sizdT Kb"
@@ -264,7 +360,7 @@ BUILD_ZIMAGE()
 	export LOCALVERSION=-$CR_IMAGE_NAME
 	echo "Make $CR_CONFIG"
 	$compile $CR_CONFIG
-	echo "Make Kernel with $CR_COMPILER"
+	echo "Make Kernel with $CR_COMPILER_ARG"
 	$compile -j$CR_JOBS
 	if [ ! -e $CR_KERNEL ]; then
 	exit 0;
@@ -347,44 +443,44 @@ BUILD()
 	if [ "$CR_TARGET" = "1" ]; then
 		echo " Galaxy S9 INTL"
 		CR_CONFIG_SPLIT=$CR_CONFIG_G960
-        CR_CONFIG_REGION=$CR_CONFIG_INTL
+		CR_CONFIG_REGION=$CR_CONFIG_INTL
 		CR_VARIANT=$CR_VARIANT_G960F
 		export "CONFIG_MACH_EXYNOS9810_STARLTE_EUR_OPEN=y"
 	fi
 	if [ "$CR_TARGET" = "2" ]; then
 		echo " Galaxy S9+ INTL"
 		CR_CONFIG_SPLIT=$CR_CONFIG_G965
-        CR_CONFIG_REGION=$CR_CONFIG_INTL
+		CR_CONFIG_REGION=$CR_CONFIG_INTL
 		CR_VARIANT=$CR_VARIANT_G965F
 		export "CONFIG_MACH_EXYNOS9810_STAR2LTE_EUR_OPEN=y"
 	fi
 	if [ "$CR_TARGET" = "3" ]
 	then
-		echo " Galaxy Note 9 INTL"
+		echo " Galaxy Note9 INTL"
 		CR_CONFIG_SPLIT=$CR_CONFIG_N960
-        CR_CONFIG_REGION=$CR_CONFIG_INTL
+		CR_CONFIG_REGION=$CR_CONFIG_INTL
 		CR_VARIANT=$CR_VARIANT_N960F
 		export "CONFIG_MACH_EXYNOS9810_CROWNLTE_EUR_OPEN=y"
 	fi
 	if [ "$CR_TARGET" = "4" ]; then
 		echo " Galaxy S9 KOR"
 		CR_CONFIG_SPLIT=$CR_CONFIG_G960
-        CR_CONFIG_REGION=$CR_CONFIG_KOR
+		CR_CONFIG_REGION=$CR_CONFIG_KOR
 		CR_VARIANT=$CR_VARIANT_G960N
 		export "CONFIG_MACH_EXYNOS9810_STARLTE_KOR=y"
 	fi
 	if [ "$CR_TARGET" = "5" ]; then
 		echo " Galaxy S9+ KOR"
 		CR_CONFIG_SPLIT=$CR_CONFIG_G965
-        CR_CONFIG_REGION=$CR_CONFIG_KOR
+		CR_CONFIG_REGION=$CR_CONFIG_KOR
 		CR_VARIANT=$CR_VARIANT_G965N
 		export "CONFIG_MACH_EXYNOS9810_STAR2LTE_KOR=y"
 	fi
 	if [ "$CR_TARGET" = "6" ]
 	then
-		echo " Galaxy Note 9 KOR"
+		echo " Galaxy Note9 KOR"
 		CR_CONFIG_SPLIT=$CR_CONFIG_N960
-        CR_CONFIG_REGION=$CR_CONFIG_KOR
+		CR_CONFIG_REGION=$CR_CONFIG_KOR
 		CR_VARIANT=$CR_VARIANT_N960N
 		export "CONFIG_MACH_EXYNOS9810_CROWNLTE_KOR=y"
 	fi	
@@ -393,6 +489,8 @@ BUILD()
 	BUILD_CLEAN
 	BUILD_IMAGE_NAME
 	BUILD_GENERATE_CONFIG
+	# Print build options
+	BUILD_OPTIONS
 	BUILD_ZIMAGE
 	BUILD_DTB
 	if [ "$CR_MKZIP" = "y" ]; then # Allow Zip Package for mass compile only
@@ -433,13 +531,13 @@ BUILD_DEBUG(){
 echo "----------------------------------------------"
 echo " DEBUG : Debug build initiated "
 CR_TARGET=5
-CR_COMPILER=8
+CR_COMPILER=3
 CR_SELINUX=0
 CR_KSU="y"
 CR_CLEAN="n"
 echo " DEBUG : Set Build options "
-echo " DEBUG : Variant  : $CR_VARIANT_G965N"
-echo " DEBUG : Compiler : $CR_CLANG_18"
+echo " DEBUG : Variant  : $CR_VARIANT_N960F"
+echo " DEBUG : Compiler : Clang 18"
 echo " DEBUG : Selinux  : $CR_SELINUX Enforcing"
 echo " DEBUG : Clean    : $CR_CLEAN"
 echo "----------------------------------------------"
@@ -462,8 +560,20 @@ CR_BASE_DTB=$CR_OUTZIP/floyd/G960F-dtb
 
 # Check packages
 if ! dpkg-query -W -f='${Status}' bsdiff  | grep "ok installed"; then 
-	echo " bsdiff is missing, please install with sudo apt install bsdiff" 
-	exit 0; 
+	echo "bsdiff is missing and is required for ZIP Packaging."
+	read -p "Do you want to install bsdiff? This requires sudo privileges. (y/n) > " INSTALL_BSDIFF
+	if [ "$INSTALL_BSDIFF" = "y" ]; then
+		echo "installing bsdiff."
+		sudo apt update
+		sudo apt install -y bsdiff
+		if ! dpkg-query -W -f='${Status}' bsdiff | grep "ok installed"; then
+			echo "Failed to install bsdiff. Please try installing it manually."
+			exit 0;
+		fi
+	else
+		echo "Please install bsdiff with sudo apt install bsdiff and try again."
+		exit 0;
+	fi
 fi
 
 # Initalize with base image (Starlte)
@@ -546,21 +656,18 @@ echo "----------------------------------------------"
 read -p "Please select your build target (1-8) > " CR_TARGET
 echo "----------------------------------------------"
 echo " "
-echo "1) (GCC 4.9) - $CR_GCC4"
-echo "2) (GCC 9.x) - $CR_GCC9" 
-echo "3) (GCC 12.x) - $CR_GCC12" 
-echo "4) (GCC 13.x) - $CR_GCC13" 
-echo "5) (Clang 11 - Samsung) - $CR_CLANG_11"
-echo "6) (Clang 12) - $CR_CLANG_12" 
-echo "7) (Clang 14) - $CR_CLANG_14"
-echo "8) (Clang 18) - $CR_CLANG_18"
-echo "9) (Neutron Clang 18) - $CR_CLANG_18N"
-echo "10) (Neutron Clang 19) - $CR_CLANG_19N"
-echo "11) (Clang 20) - $CR_CLANG_20"
+echo "1) Clang 12 (LLVM +LTO)"
+echo "2) Clang 14 (LLVM +LTO)"
+echo "3) Clang 18 (LLVM +LTO PGO Bolt MLGO Polly)"
+echo "4) Clang 19 (^)"
+echo "5) Neutron Clang 18 (^)"
+echo "6) Neutron Clang 19 (^)"
+echo "7) Neutron Clang 20 (BETA)"
+echo "8) Other (Apollo/toolchain/clang-custom)"
 echo " "
-read -p "Please select your compiler (1-11) > " CR_COMPILER
+read -p "Please select your compiler (1-7) > " CR_COMPILER
 echo " "
-echo "1) SELinux Permissive " "2) SELinux Enforcing"
+echo "1) SELinux Permissive "  "2) SELinux Enforcing"
 echo " "
 read -p "Please select your SElinux mode (1-2) > " CR_SELINUX
 echo " "
@@ -573,6 +680,28 @@ fi
 echo " "
 read -p "Clean Builds? (y/n) > " CR_CLEAN
 echo " "
+
+# Validate options
+if ! [[ "$CR_TARGET" =~ ^[1-8]$ ]]; then
+    CR_TARGET=$DEFAULT_TARGET
+    echo " No target selected, defaulting to star2ltekor"
+fi
+
+if ! [[ "$CR_COMPILER" =~ ^[1-7]$ ]]; then
+    CR_COMPILER=$DEFAULT_COMPILER
+fi
+
+if ! [[ "$CR_SELINUX" =~ ^[1-2]$ ]]; then
+    CR_SELINUX=$DEFAULT_SELINUX
+fi
+
+if ! [[ "$CR_KSU" =~ ^[yYnN]$ ]]; then
+    CR_KSU=$DEFAULT_KSU
+fi
+if ! [[ "$CR_CLEAN" =~ ^[yYnN]$ ]]; then
+    CR_CLEAN=$DEFAULT_CLEAN
+fi
+
 # Call functions
 if [ "$CR_TARGET" = "7" ]; then
 echo " "
