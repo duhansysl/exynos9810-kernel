@@ -1465,7 +1465,7 @@ static int max77865_fg_get_property(struct power_supply *psy,
 	static int abnormal_current_cnt = 0;
 	union power_supply_propval value;
 	u8 data[2] = {0, 0};
-    enum power_supply_property ext_psp = psp;
+    enum power_supply_ext_property ext_psp = psp;
 
 	switch (psp) {
 		/* Cell voltage (VCELL, mV) */
@@ -1719,7 +1719,7 @@ static int max77865_fg_set_property(struct power_supply *psy,
 	struct max77865_fuelgauge_data *fuelgauge = power_supply_get_drvdata(psy);
 	u8 data[2] = {0, 0};
 	static bool low_temp_wa = false;
-	enum power_supply_property ext_psp = psp;
+	enum power_supply_ext_property ext_psp = psp;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
