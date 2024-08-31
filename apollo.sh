@@ -48,7 +48,7 @@ CR_JOBS=$(nproc --all)
 CR_ANDROID=q
 CR_PLATFORM=13.0.0
 # Current Date
-CR_DATE=$(date +%d.%m.%Y)
+CR_DATE=$(date +%Y%m%d)
 # General init
 export ANDROID_MAJOR_VERSION=$CR_ANDROID
 export PLATFORM_VERSION=$CR_PLATFORM
