@@ -356,16 +356,16 @@ BUILD_ZIMAGE()
 {
 	echo "----------------------------------------------"
 	echo " "
-	echo "Building zImage for $CR_VARIANT"
+	echo "为 $CR_VARIANT 构建 zImage"
 	export LOCALVERSION=-$CR_IMAGE_NAME
-	echo "Make $CR_CONFIG"
+	echo "编译 $CR_CONFIG"
 	$compile $CR_CONFIG
-	echo "Make Kernel with $CR_COMPILER_ARG"
+	echo "使用 $CR_COMPILER_ARG 编译内核"
 	$compile -j$CR_JOBS
 	if [ ! -e $CR_KERNEL ]; then
 	exit 0;
-	echo "Image Failed to Compile"
-	echo " Abort "
+	echo "镜像编译失败"
+	echo " 中止 "
 	fi
 	du -k "$CR_KERNEL" | cut -f1 >sizT
 	sizT=$(head -n 1 sizT)
