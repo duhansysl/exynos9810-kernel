@@ -48,7 +48,7 @@ CR_JOBS=$(nproc --all)
 CR_ANDROID=q
 CR_PLATFORM=13.0.0
 # Current Date
-CR_DATE=$(date +%Y%m%d)
+CR_DATE=$(date +%y%m%d)
 # General init
 export ANDROID_MAJOR_VERSION=$CR_ANDROID
 export PLATFORM_VERSION=$CR_PLATFORM
@@ -232,7 +232,7 @@ fi
 
 BUILD_IMAGE_NAME()
 {
-	CR_IMAGE_NAME=$CR_NAME-$CR_VERSION-$CR_VARIANT-$CR_DATE
+	CR_IMAGE_NAME=$CR_NAME-$CR_VERSION-$CR_DATE
 	zver=$CR_NAME-$CR_VERSION-$CR_DATE
     
 }
@@ -357,7 +357,7 @@ BUILD_ZIMAGE()
 	echo "----------------------------------------------"
 	echo " "
 	echo "为 $CR_VARIANT 构建 zImage"
-	export LOCALVERSION=_$CR_IMAGE_NAME-$CR_VERSION
+	export LOCALVERSION=_$CR_IMAGE_NAME
 	echo "编译 $CR_CONFIG"
 	$compile $CR_CONFIG
 	echo "使用 $CR_COMPILER_ARG 编译内核"
