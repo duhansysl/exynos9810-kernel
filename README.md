@@ -8,7 +8,6 @@
 仅在 Deepin 上测试过，但应该适用于任何基于 Debian/Ubuntu 的发行版。
 
 ```bash
-  sudo apt-get install clang-18
   git clone https://github.com/mrcxlinux/exynos9810-yinghuochong
   cd exynos9810-yinghuochong
   ./Apollo.sh
