@@ -10,7 +10,7 @@
 ```bash
   git clone https://github.com/mrcxlinux/exynos9810-yinghuochong
   cd exynos9810-yinghuochong
-  ./Apollo.sh
+  ./apollo.sh
 ```
 ## 安装
 只需将 IMG 文件刷入“boot”分区，或在 TWRP 中刷入 ZIP 文件。
