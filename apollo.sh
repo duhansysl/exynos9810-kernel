@@ -357,7 +357,7 @@ BUILD_ZIMAGE()
 	echo "----------------------------------------------"
 	echo " "
 	echo "为 $CR_VARIANT 构建 zImage"
-	export LOCALVERSION=-$CR_IMAGE_NAME
+	export LOCALVERSION=_$CR_IMAGE_NAME-$CR_VERSION
 	echo "编译 $CR_CONFIG"
 	$compile $CR_CONFIG
 	echo "使用 $CR_COMPILER_ARG 编译内核"
