@@ -3153,15 +3153,10 @@ static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
 		op_flags |= REQ_SYNC;
 		clear_buffer_sync_flush(bh);
 	}
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (buffer_journal(bh)) {
-		bio_set_flag(bio, BIO_JOURNAL);
-		clear_buffer_journal(bh);
-	}
-#endif
-
 	bio_set_op_attrs(bio, op, op_flags);
 
+	if (bio->bi_opf & REQ_CRYPT)
+		bio->bi_aux_private = bh->b_private;
 	submit_bio(bio);
 	return 0;
 }

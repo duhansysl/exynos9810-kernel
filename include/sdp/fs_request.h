@@ -34,6 +34,7 @@
 #define FSOP_AUDIT_FAIL_ENCRYPT		51
 #define FSOP_AUDIT_FAIL_DECRYPT		52
 #define FSOP_AUDIT_FAIL_ACCESS		53
+#define FSOP_AUDIT_FAIL_DE_ACCESS	54
 
 // opcode, ret, inode
 typedef void (*fs_request_cb_t)(int, int, unsigned long);
@@ -46,12 +47,13 @@ typedef struct sdp_fs_command {
 	int part_id;
 	unsigned long ino;
 	int pid;
+	int err;
 } sdp_fs_command_t;
 
 extern int sdp_fs_request(sdp_fs_command_t *sdp_req, fs_request_cb_t callback);
 
 static inline sdp_fs_command_t *sdp_fs_command_alloc(int opcode, int pid,
-	int userid, int partid, unsigned long ino, gfp_t gfp) {
+	int userid, int partid, unsigned long ino, int err, gfp_t gfp) {
 	sdp_fs_command_t *cmd;
 
 	cmd = kmalloc(sizeof(sdp_fs_command_t), gfp);
@@ -66,6 +68,7 @@ static inline sdp_fs_command_t *sdp_fs_command_alloc(int opcode, int pid,
 	cmd->user_id = userid;
 	cmd->part_id = partid;
 	cmd->ino = ino;
+	cmd->err = err;
 
 	return cmd;
 }
