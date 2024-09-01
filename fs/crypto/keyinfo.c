@@ -16,6 +16,7 @@
 #include <crypto/algapi.h>
 #include <crypto/sha.h>
 #include <crypto/skcipher.h>
+#include <crypto/diskcipher.h>
 #include "fscrypt_private.h"
 #ifdef CONFIG_FSCRYPT_SDP
 static int derive_fek(struct inode *inode,
@@ -151,7 +152,7 @@ static struct fscrypt_mode available_modes[] = {
 		.cipher_str = "cbc(aes)",
 		.keysize = 16,
 		.ivsize = 16,
-		.needs_essiv = true,
+		.flags = CRYPT_MODE_ESSIV,
 	},
 	[FS_ENCRYPTION_MODE_AES_128_CTS] = {
 		.friendly_name = "AES-128-CTS-CBC",
@@ -164,6 +165,13 @@ static struct fscrypt_mode available_modes[] = {
 		.cipher_str = "adiantum(xchacha12,aes)",
 		.keysize = 32,
 		.ivsize = 32,
+	},
+	[FS_ENCRYPTION_MODE_PRIVATE] = {
+		.friendly_name = "AES_256-XTS-diskcipher",
+		.cipher_str = "xts(aes)-disk",
+		.keysize = 64,
+		.ivsize = 16,
+		.flags = CRYPT_MODE_DISKCIPHER,
 	},
 };
 
@@ -233,6 +241,44 @@ static int find_and_derive_key(const struct inode *inode,
 	return err;
 }
 
+
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+/* Allocate and key a diskcipher cipher object for the given encryption mode */
+static struct crypto_diskcipher *
+allocate_diskcipher_for_mode(struct fscrypt_mode *mode, const u8 *raw_key,
+			   const struct inode *inode)
+{
+	struct crypto_diskcipher *tfm;
+	int err;
+	bool force = (mode->flags == CRYPT_MODE_DISKCIPHER) ? 0 : 1;
+
+	tfm = crypto_alloc_diskcipher(mode->cipher_str, 0, 0, force);
+	if (IS_ERR(tfm)) {
+		fscrypt_warn(inode->i_sb,
+				 "error allocating '%s' transform for inode %lu: %ld",
+				 mode->cipher_str, inode->i_ino, PTR_ERR(tfm));
+		return tfm;
+	}
+	err = crypto_diskcipher_setkey(tfm, raw_key, mode->keysize, 0, inode);
+	if (err)
+		goto err_free_dtfm;
+
+	return tfm;
+
+err_free_dtfm:
+	crypto_free_diskcipher(tfm);
+	return ERR_PTR(err);
+}
+#endif
+
+static inline int __find_and_derive_key(const struct inode *inode,
+					const struct fscrypt_context *ctx,
+					u8 *derived_key, const struct fscrypt_mode *mode,
+					struct fscrypt_info *ci)
+{
+	return find_and_derive_key(inode, ctx, derived_key, mode);
+}
+
 /* Allocate and key a symmetric cipher object for the given encryption mode */
 static struct crypto_skcipher *
 allocate_skcipher_for_mode(struct fscrypt_mode *mode, const u8 *raw_key,
@@ -278,7 +324,13 @@ struct fscrypt_master_key {
 	struct hlist_node mk_node;
 	atomic_t mk_refcount;
 	const struct fscrypt_mode *mk_mode;
-	struct crypto_skcipher *mk_ctfm;
+	union {
+		struct crypto_skcipher *mk_ctfm;
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+		struct crypto_diskcipher *mk_dtfm;
+#endif
+	} cipher_tfm;
+
 	u8 mk_descriptor[FS_KEY_DESCRIPTOR_SIZE];
 	u8 mk_raw[FS_MAX_KEY_SIZE];
 };
@@ -286,7 +338,11 @@ struct fscrypt_master_key {
 static void free_master_key(struct fscrypt_master_key *mk)
 {
 	if (mk) {
-		crypto_free_skcipher(mk->mk_ctfm);
+		crypto_free_skcipher(mk->cipher_tfm.mk_ctfm);
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+		if (mk->cipher_tfm.mk_dtfm)
+			crypto_free_diskcipher(mk->cipher_tfm.mk_dtfm);
+#endif
 		kzfree(mk);
 	}
 }
@@ -364,10 +420,25 @@ fscrypt_get_master_key(const struct fscrypt_info *ci, struct fscrypt_mode *mode,
 		return ERR_PTR(-ENOMEM);
 	atomic_set(&mk->mk_refcount, 1);
 	mk->mk_mode = mode;
-	mk->mk_ctfm = allocate_skcipher_for_mode(mode, raw_key, inode);
-	if (IS_ERR(mk->mk_ctfm)) {
-		err = PTR_ERR(mk->mk_ctfm);
-		mk->mk_ctfm = NULL;
+
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+	if (S_ISREG(inode->i_mode)) {
+		mk->cipher_tfm.mk_dtfm = allocate_diskcipher_for_mode(mode, raw_key, inode);
+		if (IS_ERR(mk->cipher_tfm.mk_dtfm)) {
+			fscrypt_warn(inode->i_sb, "fails to get diskipher: %p", mk->cipher_tfm.mk_dtfm);
+			mk->cipher_tfm.mk_dtfm = NULL;
+		} else
+			goto end_get_tfm;
+	}
+	mk->cipher_tfm.mk_ctfm = allocate_skcipher_for_mode(mode, raw_key, inode);
+end_get_tfm:
+#else
+	mk->cipher_tfm.mk_ctfm = allocate_skcipher_for_mode(mode, raw_key, inode);
+#endif
+
+	if (IS_ERR(mk->cipher_tfm.mk_ctfm)) {
+		err = PTR_ERR(mk->cipher_tfm.mk_ctfm);
+		mk->cipher_tfm.mk_ctfm = NULL;
 		goto err_free_mk;
 	}
 	memcpy(mk->mk_descriptor, ci->ci_master_key_descriptor,
@@ -465,17 +536,33 @@ static int setup_crypto_transform(struct fscrypt_info *ci,
 		mk = fscrypt_get_master_key(ci, mode, raw_key, inode);
 		if (IS_ERR(mk))
 			return PTR_ERR(mk);
-		ctfm = mk->mk_ctfm;
+		ctfm = mk->cipher_tfm.mk_ctfm;
 	} else {
 		mk = NULL;
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+		if (S_ISREG(inode->i_mode)) {
+			ci->ci_dtfm = allocate_diskcipher_for_mode(mode, raw_key, inode);
+			if (IS_ERR(ci->ci_dtfm)) {
+				fscrypt_warn(inode->i_sb, "fails to get diskipher: %p", ci->ci_dtfm);
+				ci->ci_dtfm = NULL;
+			} else
+				goto end_get_tfm;
+		}
+#endif
 		ctfm = allocate_skcipher_for_mode(mode, raw_key, inode);
 		if (IS_ERR(ctfm))
 			return PTR_ERR(ctfm);
 	}
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+	ci->ci_ctfm = ctfm;
+end_get_tfm:
+	ci->ci_master_key = mk;
+#else
 	ci->ci_master_key = mk;
 	ci->ci_ctfm = ctfm;
+#endif
 
-	if (mode->needs_essiv) {
+	if (mode->flags == CRYPT_MODE_ESSIV) {
 		/* ESSIV implies 16-byte IVs which implies !DIRECT_KEY */
 		WARN_ON(mode->ivsize != AES_BLOCK_SIZE);
 		WARN_ON(ci->ci_flags & FS_POLICY_FLAG_DIRECT_KEY);
@@ -505,6 +592,10 @@ static void put_crypt_info(struct fscrypt_info *ci)
 	if (ci->ci_master_key) {
 		put_master_key(ci->ci_master_key);
 	} else {
+#if defined(CONFIG_CRYPTO_DISKCIPHER)
+		if (ci->ci_dtfm)
+			crypto_free_diskcipher(ci->ci_dtfm);
+#endif
 		crypto_free_skcipher(ci->ci_ctfm);
 		crypto_free_cipher(ci->ci_essiv_tfm);
 	}

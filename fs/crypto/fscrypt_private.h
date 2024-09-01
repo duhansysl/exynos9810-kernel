@@ -25,14 +25,6 @@
 #endif
 
 /* Encryption parameters */
-#define FS_AES_128_ECB_KEY_SIZE		16
-#define FS_AES_128_CBC_KEY_SIZE		16
-#define FS_AES_128_CTS_KEY_SIZE		16
-#define FS_AES_256_GCM_KEY_SIZE		32
-#define FS_AES_256_CBC_KEY_SIZE		32
-#define FS_AES_256_CTS_KEY_SIZE		32
-#define FS_AES_256_XTS_KEY_SIZE		64
-
 #define FS_KEY_DERIVATION_NONCE_SIZE	16
 
 /**
@@ -81,6 +73,10 @@ struct fscrypt_info {
 	/* The actual crypto transform used for encryption and decryption */
 	struct crypto_skcipher *ci_ctfm;
 
+	/* Cipher for inline encryption engine */
+#ifdef CONFIG_CRYPTO_DISKCIPHER
+	struct crypto_diskcipher *ci_dtfm;
+#endif
 	/*
 	 * Cipher for ESSIV IV generation.  Only set for CBC contents
 	 * encryption, otherwise is NULL.
@@ -138,6 +134,10 @@ static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
 	    filenames_mode == FS_ENCRYPTION_MODE_ADIANTUM)
 		return true;
 
+	if (contents_mode == FS_ENCRYPTION_MODE_PRIVATE &&
+		filenames_mode == FS_ENCRYPTION_MODE_AES_256_CTS)
+		return true;
+
 	return false;
 }
 
@@ -184,8 +184,15 @@ extern int fname_encrypt(struct inode *inode, const struct qstr *iname,
 extern bool fscrypt_fname_encrypted_size(const struct inode *inode,
 					 u32 orig_len, u32 max_len,
 					 u32 *encrypted_len_ret);
+extern void fscrypt_free_bounce_page(void *pool);
 
 /* keyinfo.c */
+
+enum cipher_flags {
+	CRYPT_MODE_SKCIPHER,
+	CRYPT_MODE_ESSIV,
+	CRYPT_MODE_DISKCIPHER,
+};
 
 struct fscrypt_mode {
 	const char *friendly_name;
@@ -193,7 +200,7 @@ struct fscrypt_mode {
 	int keysize;
 	int ivsize;
 	bool logged_impl_name;
-	bool needs_essiv;
+	enum cipher_flags flags;
 };
 
 #ifdef CONFIG_FSCRYPT_SDP
