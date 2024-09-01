@@ -304,17 +304,23 @@ int fuse_passthrough_setup(struct fuse_conn *fc, struct fuse_file *ff,
 		return -EINVAL;
 
 	spin_lock(&fc->passthrough_req_lock);
-	passthrough = idr_remove(&fc->passthrough_req, passthrough_fh);
-	spin_unlock(&fc->passthrough_req_lock);
 
-	if (!passthrough)
+	passthrough = idr_find(&fc->passthrough_req, passthrough_fh);
+	if (!passthrough) {
+		spin_unlock(&fc->passthrough_req_lock);
 		return -EINVAL;
+	}
+
+	idr_remove(&fc->passthrough_req, passthrough_fh);
+
+	spin_unlock(&fc->passthrough_req_lock);
 
 	ff->passthrough = *passthrough;
 	kfree(passthrough);
 
 	return 0;
 }
+
 
 void fuse_passthrough_release(struct fuse_passthrough *passthrough)
 {
