@@ -188,7 +188,7 @@ static dma_addr_t add_iovm_region(struct exynos_iovmm *vmm,
 {
 	struct exynos_vm_region *region, *pos;
 
-	region = kmalloc(sizeof(*region), GFP_KERNEL);
+	region = kzalloc(sizeof(*region), GFP_KERNEL);
 	if (!region)
 		return 0;
 
@@ -610,6 +610,69 @@ void exynos_iovmm_unmap_userptr(struct device *dev, dma_addr_t iova)
 		free_iovm_region(vmm, region);
 	} else {
 		dev_err(dev, "IOVMM: No IOVM region %pa to free.\n", &iova);
+	}
+}
+
+int iovmm_map_oto(struct device *dev, phys_addr_t phys, size_t size)
+{
+	struct exynos_iovmm *vmm = exynos_get_iovmm(dev);
+	int ret;
+
+	BUG_ON(!IS_ALIGNED(phys, PAGE_SIZE));
+	BUG_ON(!IS_ALIGNED(size, PAGE_SIZE));
+
+	if (vmm == NULL) {
+		dev_err(dev, "%s: IOVMM not found\n", __func__);
+		return -EINVAL;
+	}
+
+	if (WARN_ON((phys < vmm->iova_start) ||
+			(phys + size) >= (vmm->iova_start + vmm->iovm_size))) {
+		dev_err(dev,
+			"Unable to create one to one mapping for %#zx @ %pa\n",
+			size, &phys);
+		return -EINVAL;
+	}
+
+	if (!add_iovm_region(vmm, (dma_addr_t)phys, size))
+		return -EADDRINUSE;
+
+	ret = iommu_map(vmm->domain, (dma_addr_t)phys, phys, size, 0);
+	if (ret < 0)
+		free_iovm_region(vmm,
+				remove_iovm_region(vmm, (dma_addr_t)phys));
+
+	return ret;
+}
+
+void iovmm_unmap_oto(struct device *dev, phys_addr_t phys)
+{
+	struct exynos_iovmm *vmm = exynos_get_iovmm(dev);
+	struct exynos_vm_region *region;
+	size_t unmap_size;
+
+	/* This function must not be called in IRQ handlers */
+	BUG_ON(in_irq());
+	BUG_ON(!IS_ALIGNED(phys, PAGE_SIZE));
+
+	if (vmm == NULL) {
+		dev_err(dev, "%s: IOVMM not found\n", __func__);
+		return;
+	}
+
+	region = remove_iovm_region(vmm, (dma_addr_t)phys);
+	if (region) {
+		unmap_size = iommu_unmap(vmm->domain, (dma_addr_t)phys,
+							region->size);
+		WARN_ON(unmap_size != region->size);
+
+		exynos_sysmmu_tlb_invalidate(vmm->domain, (dma_addr_t)phys,
+					     region->size);
+
+		free_iovm_region(vmm, region);
+
+		dev_dbg(dev, "IOVMM: Unmapped %#zx bytes from %pa.\n",
+						unmap_size, &phys);
 	}
 }
 

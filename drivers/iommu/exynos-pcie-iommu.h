@@ -245,7 +245,6 @@ typedef u32 sysmmu_pte_t;
 #define LV2TABLE_REFCNT_SZ		(LV2TABLE_SIZE * 2)
 #define NUM_DRAM_REGION			(10)
 #define SYSMMU_NO_PANIC			(1)
-#define MAX_HISTROY_BUFF		(2048)
 
 struct ext_buff {
 	int index;
