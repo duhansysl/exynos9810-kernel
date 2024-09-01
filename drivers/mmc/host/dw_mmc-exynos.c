@@ -21,7 +21,7 @@
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/smc.h>
-#include <linux/sec_class.h>
+#include <linux/sec_sysfs.h>
 
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
