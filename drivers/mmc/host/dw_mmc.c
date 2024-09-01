@@ -850,6 +850,7 @@ static inline int dw_mci_prepare_desc64(struct dw_mci *host,
 	int i, ret;
 	const struct dw_mci_drv_data *drv_data = host->drv_data;
 	int sector_offset = 0;
+	int page_index = 0;
 	u32 val;
 
 	desc_first = desc_last = desc = host->sg_cpu;
@@ -873,9 +874,8 @@ static inline int dw_mci_prepare_desc64(struct dw_mci *host,
 			 */
 			if (readl_poll_timeout_atomic(&desc->des0, val,
 						!(val & IDMAC_DES0_OWN),
-						10, 100 * USEC_PER_MSEC)) {
+						10, 100 * USEC_PER_MSEC))
 				goto err_own_bit;
-			}
 
 			/*
 			 * Set the OWN bit and disable interrupts
@@ -894,7 +894,8 @@ static inline int dw_mci_prepare_desc64(struct dw_mci *host,
 
 			if (drv_data->crypto_engine_cfg) {
 				ret = drv_data->crypto_engine_cfg(host, desc, data,
-						sg_page(&data->sg[i]), sector_offset, false);
+						sg_page(&data->sg[i]), page_index++,
+						sector_offset, false);
 				if (ret) {
 					dev_err(host->dev,
 							"%s: failed to configure crypto engine (%d)\n",
@@ -2361,8 +2362,8 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
 			data->error = -EILSEQ;
 		}
 
-		dev_err(host->dev, "data error, status 0x%08x CMD: %d\n", status,
-				host->cur_slot->mrq->cmd->opcode);
+		dev_err(host->dev, "data error, status 0x%08x %d\n", status,
+				host->dir_status);
 
 		/*
 		 * After an error, there may be data lingering
@@ -2466,18 +2467,26 @@ static void dw_mci_tasklet_func(unsigned long priv)
 					continue;
 				}
 
+				dw_mci_fifo_reset(host->dev, host);
 				send_stop_abort(host, data);
 				dw_mci_stop_dma(host);
 				state = STATE_SENDING_STOP;
+				dw_mci_debug_req_log(host,
+						host->mrq,
+						STATE_REQ_CMD_PROCESS, state);
 				break;
 			}
 
 			if (!cmd->data || err) {
-				dw_mci_request_end(host, mrq);
+				if (host->sw_timeout_chk != true)
+					dw_mci_request_end(host, mrq);
 				goto unlock;
 			}
 
 			prev_state = state = STATE_SENDING_DATA;
+			dw_mci_debug_req_log(host, host->mrq,
+					STATE_REQ_CMD_PROCESS, state);
+
 			/* fall through */
 
 		case STATE_SENDING_DATA:
@@ -3832,20 +3841,18 @@ static void dw_mci_work_routine_card(struct work_struct *work)
 				dw_mci_reset(host);
 			spin_unlock_bh(&host->lock);
 		}
-		if (present)
-			mmc_detect_change(slot->mmc,
-					msecs_to_jiffies(host->pdata->detect_delay_ms));
-		else {
-			mmc_detect_change(slot->mmc,
-					msecs_to_jiffies(host->pdata->detect_delay_ms));
+
+		mmc_detect_change(slot->mmc, msecs_to_jiffies(host->pdata->detect_delay_ms));
+
+		if (!present) {
 			if (host->pdata->only_once_tune)
 				host->pdata->tuned = false;
 
 			if (host->pdata->quirks & DW_MCI_QUIRK_USE_SSC) {
 				if (drv_data && drv_data->ssclk_control)
 					drv_data->ssclk_control(host, 0);
+			}
 		}
-	}
 
 	}
 }
@@ -4091,28 +4098,11 @@ int dw_mci_probe(struct dw_mci *host)
 			drv_data->hwacg_control(host, HWACG_Q_ACTIVE_DIS);
 	}
 
-	if (drv_data && drv_data->access_control_get_dev) {
-		ret = drv_data->access_control_get_dev(host);
-		if (ret == -EPROBE_DEFER)
-			dev_err(host->dev, "%s: Access control device not probed yet.(%d)\n",
-					__func__, ret);
-		else if (ret)
-			dev_err(host->dev, "%s, Fail to get Access control device.(%d)\n",
-					__func__, ret);
-	}
-
-	if (drv_data && drv_data->access_control_sec_cfg) {
-		ret = drv_data->access_control_sec_cfg(host);
-		if (ret)
-			dev_err(host->dev, "%s: Fail to control security config.(%x)\n",
-						__func__, ret);
-	}
-
-	if (drv_data && drv_data->access_control_init) {
-		ret = drv_data->access_control_init(host);
+	if (drv_data && drv_data->crypto_sec_cfg) {
+		ret = drv_data->crypto_sec_cfg(host, true);
 		if (ret)
 			dev_err(host->dev, "%s: Fail to initialize access control.(%d)\n",
-					__func__, ret);
+				__func__, ret);
 	}
 
 	setup_timer(&host->cmd11_timer,
@@ -4429,18 +4419,11 @@ int dw_mci_resume(struct dw_mci *host)
 			drv_data->hwacg_control(host, HWACG_Q_ACTIVE_DIS);
 	}
 
-	if (drv_data && drv_data->access_control_sec_cfg) {
-		ret = drv_data->access_control_sec_cfg(host);
+	if (drv_data && drv_data->crypto_sec_cfg) {
+		ret = drv_data->crypto_sec_cfg(host, false);
 		if (ret)
 			dev_err(host->dev, "%s: Fail to control security config.(%x)\n",
-						__func__, ret);
-	}
-
-	if (drv_data && drv_data->access_control_resume) {
-		ret = drv_data->access_control_resume(host);
-		if (ret)
-			dev_err(host->dev, "%s: Fail to resume access control.(%d)\n",
-					__func__, ret);
+				__func__, ret);
 	}
 
 	/*

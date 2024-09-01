@@ -21,14 +21,11 @@
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/smc.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
 #include "dw_mmc-exynos.h"
-
-#include "dw_mmc-exynos-smu.h"
-#include "dw_mmc-exynos-fmp.h"
 
 extern int cal_pll_mmc_set_ssc(unsigned int mfr, unsigned int mrr, unsigned int ssc_on);
 extern int cal_pll_mmc_check(void);
@@ -400,7 +397,7 @@ static void dw_mci_exynos_adjust_clock(struct dw_mci *host, unsigned int wanted)
 	if (wanted == priv->cur_speed) {
 		clock = clk_get_rate(host->ciu_clk);
 		if (clock == priv->cur_speed * div)
-		return;
+			return;
 	}
 
 	ret = clk_set_rate(host->ciu_clk, wanted * div);
@@ -782,7 +779,7 @@ static u8 dw_mci_tuning_sampling(struct dw_mci *host)
 
 	if (phase6_en & (0x1 << sample) || phase7_en & (0x1 << sample))
 		sample_path_sel_en(host, AXI_BURST_LEN);
-		else
+	else
 		sample_path_sel_dis(host, AXI_BURST_LEN);
 
 	if (priv->ctrl_flag & DW_MMC_EXYNOS_ENABLE_SHIFT)
@@ -894,7 +891,7 @@ static void exynos_dwmci_tuning_drv_st(struct dw_mci *host)
 	struct dw_mci_exynos_priv_data *priv = host->priv;
 
 	dev_info(host->dev, "Clock GPIO Drive Strength Value: x%d\n",
-			priv->clk_drive_tuning);
+			(priv->clk_drive_tuning));
 
 	if (priv->pinctrl && priv->clk_drive_str[priv->clk_drive_tuning - 1])
 		pinctrl_select_state(priv->pinctrl, priv->clk_drive_str[priv->clk_drive_tuning - 1]);
@@ -1117,13 +1114,13 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot, u32 opcode,
 	if (tuned) {
 		host->pdata->clk_smpl = priv->tuned_sample = best_sample;
 		if (host->pdata->only_once_tune)
-		host->pdata->tuned = true;
+			host->pdata->tuned = true;
 
 		if (best_sample_ori % 2)
 			best_sample += 1;
 
 		dw_mci_exynos_set_sample(host, best_sample, false);
-				dw_mci_set_fine_tuning_bit(host, false);
+		dw_mci_set_fine_tuning_bit(host, false);
 	} else {
 		/* Failed. Just restore and return error */
 		dev_err(host->dev, "tuning err\n");
@@ -1146,38 +1143,32 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot, u32 opcode,
 
 static struct device *sd_detection_cmd_dev;
 
-
 static ssize_t sd_detection_cmd_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct dw_mci *host = dev_get_drvdata(dev);
 	struct dw_mci_exynos_priv_data *priv = host->priv;
 
-	if (host->cur_slot && host->cur_slot->mmc && host->cur_slot->mmc->card) {
-		if (priv->sec_sd_slot_type > 0 && !gpio_is_valid(priv->cd_gpio))
-			goto gpio_error;
+	if (priv->sec_sd_slot_type > 0 && !gpio_is_valid(priv->cd_gpio))
+		goto gpio_error;
 
+	if (gpio_get_value(priv->cd_gpio) ^ (host->pdata->use_gpio_invert)
+			&& (priv->sec_sd_slot_type == SEC_HYBRID_SD_SLOT)) {
+		dev_info(host->dev, "SD slot tray Removed.\n");
+		return sprintf(buf, "Notray\n");
+	}
+
+	if (host->cur_slot && host->cur_slot->mmc && host->cur_slot->mmc->card) {
 		dev_info(host->dev, "SD card inserted.\n");
 		return sprintf(buf, "Insert\n");
-	} else {
-		if (priv->sec_sd_slot_type > 0 && !gpio_is_valid(priv->cd_gpio))
-			goto gpio_error;
-
-		if (gpio_get_value(priv->cd_gpio)
-				&& priv->sec_sd_slot_type == SEC_HYBRID_SD_SLOT) {
-			dev_info(host->dev, "SD slot tray Removed.\n");
-			return sprintf(buf, "Notray\n");
-		}
-
-		dev_info(host->dev, "SD card removed.\n");
-		return sprintf(buf, "Remove\n");
 	}
+	dev_info(host->dev, "SD card removed.\n");
+	return sprintf(buf, "Remove\n");
 
 gpio_error:
 	dev_info(host->dev, "%s : External SD detect pin Error\n", __func__);
 	return  sprintf(buf, "Error\n");
 }
-
 
 static ssize_t sd_detection_cnt_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1270,8 +1261,8 @@ static ssize_t sdcard_summary_show(struct device *dev,
 		else								/* 1 Sector = 1024 Bytes */
 			size = card->csd.capacity;
 
-		if (size >= 380000000 && size <= 410000000) {	/* QUIRK 400GB SD Card */
-			sprintf(ret_size, "400GB");
+		if (size >= 380000000 && size <= 410000000) {	/* QUIRK 400GB SD Card */ 
+			sprintf(ret_size, "400GB"); 
 		} else if(size >= 190000000 && size <= 210000000) {	/* QUIRK 200GB SD Card */
 			sprintf(ret_size, "200GB");
 		} else {
@@ -1654,47 +1645,6 @@ static int dw_mci_exynos_misc_control(struct dw_mci *host,
 	return ret;
 }
 
-static int dw_mci_exynos_crypto_engine_cfg(struct dw_mci *host,
-					void *desc,
-					struct mmc_data *data,
-					struct page *page,
-					int sector_offset,
-					bool cmdq_enabled)
-{
-	return exynos_mmc_fmp_cfg(host, desc, data, page, sector_offset, cmdq_enabled);
-}
-
-static int dw_mci_exynos_crypto_engine_clear(struct dw_mci *host, void *desc,
-					bool cmdq_enabled)
-{
-	return exynos_mmc_fmp_clear(host, desc, cmdq_enabled);
-}
-
-static int dw_mci_exynos_access_control_get_dev(struct dw_mci *host)
-{
-	return exynos_mmc_smu_get_dev(host);
-}
-
-static int dw_mci_exynos_access_control_sec_cfg(struct dw_mci *host)
-{
-	return exynos_mmc_smu_sec_cfg(host);
-}
-
-static int dw_mci_exynos_access_control_init(struct dw_mci *host)
-{
-	return exynos_mmc_smu_init(host);
-}
-
-static int dw_mci_exynos_access_control_abort(struct dw_mci *host)
-{
-	return exynos_mmc_smu_abort(host);
-}
-
-static int dw_mci_exynos_access_control_resume(struct dw_mci *host)
-{
-	return exynos_mmc_smu_resume(host);
-}
-
 static const struct dw_mci_drv_data exynos_drv_data = {
 	.caps			= exynos_dwmmc_caps,
 	.init			= dw_mci_exynos_priv_init,
@@ -1706,13 +1656,6 @@ static const struct dw_mci_drv_data exynos_drv_data = {
 	.prepare_hs400_tuning	= dw_mci_exynos_prepare_hs400_tuning,
 #endif
 	.misc_control           = dw_mci_exynos_misc_control,
-	.crypto_engine_cfg	= dw_mci_exynos_crypto_engine_cfg,
-	.crypto_engine_clear	= dw_mci_exynos_crypto_engine_clear,
-	.access_control_get_dev	= dw_mci_exynos_access_control_get_dev,
-	.access_control_sec_cfg	= dw_mci_exynos_access_control_sec_cfg,
-	.access_control_init	= dw_mci_exynos_access_control_init,
-	.access_control_abort	= dw_mci_exynos_access_control_abort,
-	.access_control_resume	= dw_mci_exynos_access_control_resume,
 	.ssclk_control		= dw_mci_ssclk_control,
 };
 
