@@ -12,7 +12,6 @@
 #ifndef _DW_MMC_EXYNOS_H_
 #define _DW_MMC_EXYNOS_H_
 
-#include <crypto/smu.h>
 #include <crypto/fmp.h>
 
 #define NUM_PINS(x)			(x + 2)
@@ -40,16 +39,6 @@
 #define TUNING_PHASE_13		13
 #define TUNING_PHASE_14		14
 #define TUNING_PHASE_15		15
-
-struct exynos_smu_data {
-	struct exynos_smu_variant_ops *vops;
-	struct platform_device *pdev;
-};
-
-struct exynos_fmp_data {
-	struct exynos_fmp_variant_ops *vops;
-	struct platform_device *pdev;
-};
 
 /* Exynos implementation specific driver private data */
 struct dw_mci_exynos_priv_data {
@@ -89,8 +78,8 @@ struct dw_mci_exynos_priv_data {
 	u32			ignore_phase;
 	u32			selclk_drv;
 	u32			voltage_int_extra;
-	struct exynos_smu_data	smu;
-	struct exynos_fmp_data	fmp;
+	enum smu_id	fmp;
+	enum smu_id	smu;
 
 #define DW_MMC_EXYNOS_BYPASS_FOR_ALL_PASS	BIT(0)
 #define DW_MMC_EXYNOS_ENABLE_SHIFT		BIT(1)
