@@ -31,10 +31,6 @@
 #include "xattr.h"
 #include "acl.h"
 
-#ifdef CONFIG_EXT4_DLP
-#include "ext4_dlp.h"
-#endif
-
 /*
  * Called when an inode is released. Note that this is different
  * from ext4_file_open: open gets called at every open, but release
@@ -366,24 +362,10 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 			ext4_journal_stop(handle);
 		}
 	}
-
-#ifdef CONFIG_EXT4_DLP
-	if (ext4_test_inode_flag(inode, EXT4_DLP_FL)) {
-		int ret = ext4_dlp_open(inode, filp);
-
-		if (ret < 0) {
-			pr_err("DLP %s: return [%d]\n", __func__, ret);
-			return ret;
-		}
-	}
-#endif
-
 	if (ext4_encrypted_inode(inode)) {
 		ret = fscrypt_get_encryption_info(inode);
-		if (ret) {
-			printk(KERN_ERR	"%s:failed to get encryption info (%d)", __func__, ret);
+		if (ret)
 			return -EACCES;
-		}
 		if (!fscrypt_has_encryption_key(inode))
 			return -ENOKEY;
 	}

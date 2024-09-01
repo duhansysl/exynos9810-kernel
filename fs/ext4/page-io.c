@@ -24,9 +24,6 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/backing-dev.h>
-
-#include <crypto/fmp.h>
-
 #include "ext4_jbd2.h"
 #include "xattr.h"
 #include "acl.h"
@@ -343,10 +340,32 @@ void ext4_io_submit(struct ext4_io_submit *io)
 		int io_op_flags = io->io_wbc->sync_mode == WB_SYNC_ALL ?
 				  WRITE_SYNC : 0;
 		bio_set_op_attrs(io->io_bio, REQ_OP_WRITE, io_op_flags);
+		if (ext4_encrypted_inode(io->io_end->inode) &&
+				S_ISREG(io->io_end->inode->i_mode))
+			fscrypt_set_bio(io->io_end->inode, io->io_bio, 0);
 		submit_bio(io->io_bio);
 	}
 	io->io_bio = NULL;
 }
+
+#ifdef CONFIG_DDAR
+int ext4_io_submit_to_dd(struct inode *inode, struct ext4_io_submit *io)
+{
+	struct bio *bio = io->io_bio;
+
+	if (!fscrypt_dd_encrypted_inode(inode))
+		return -EOPNOTSUPP;
+
+	if (bio) {
+		int io_op_flags = io->io_wbc->sync_mode == WB_SYNC_ALL ?
+				  REQ_SYNC : 0;
+		bio_set_op_attrs(io->io_bio, REQ_OP_WRITE, io_op_flags);
+		fscrypt_dd_submit_bio(inode, io->io_bio);
+	}
+	io->io_bio = NULL;
+	return 0;
+}
+#endif
 
 void ext4_io_submit_init(struct ext4_io_submit *io,
 			 struct writeback_control *wbc)
@@ -383,7 +402,10 @@ static int io_submit_add_bh(struct ext4_io_submit *io,
 
 	if (io->io_bio && bh->b_blocknr != io->io_next_block) {
 submit_and_retry:
-		ext4_io_submit(io);
+// CONFIG_DDAR [
+		if (ext4_io_submit_to_dd(inode, io) == -EOPNOTSUPP)
+			ext4_io_submit(io);
+// ] CONFIG_DDAR
 	}
 	if (io->io_bio == NULL) {
 		ret = io_submit_init_bio(io, bh);
@@ -453,7 +475,10 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 			if (!buffer_mapped(bh))
 				clear_buffer_dirty(bh);
 			if (io->io_bio)
-				ext4_io_submit(io);
+// CONFIG_DDAR [
+				if (ext4_io_submit_to_dd(inode, io) == -EOPNOTSUPP)
+					ext4_io_submit(io);
+// ] CONFIG_DDAR
 			continue;
 		}
 		if (buffer_new(bh)) {
@@ -466,13 +491,8 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	bh = head = page_buffers(page);
 
-#ifdef CONFIG_FS_PRIVATE_ENCRYPTION
 	if (ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode) &&
-	    nr_to_submit && !inode->i_mapping->fmp_ci.private_algo_mode) {
-#else
-	if (ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode) &&
-	    nr_to_submit) {
-#endif /* CONFIG_FS_PRIVATE_ENCRYPTION */
+	    nr_to_submit && !fscrypt_disk_encrypted(inode)) {
 		gfp_t gfp_flags = GFP_NOFS;
 
 		/*
@@ -491,7 +511,10 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 			    (io->io_bio || wbc->sync_mode == WB_SYNC_ALL)) {
 				gfp_flags = GFP_NOFS;
 				if (io->io_bio)
-					ext4_io_submit(io);
+// CONFIG_DDAR [
+					if (ext4_io_submit_to_dd(inode, io) == -EOPNOTSUPP)
+						ext4_io_submit(io);
+// ] CONFIG_DDAR
 				else
 					gfp_flags |= __GFP_NOFAIL;
 				congestion_wait(BLK_RW_ASYNC, HZ/50);

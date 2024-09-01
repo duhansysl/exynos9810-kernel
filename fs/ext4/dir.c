@@ -86,9 +86,8 @@ int __ext4_check_dir_entry(const char *function, unsigned int line,
 	else
 		return 0;
 
-	/* for debugging, sangwoo2.lee */
+	/* @fs.sec -- e5c3ce7f01257fd22ad1329270d5fe928a3f9dc4 -- */
 	print_bh(dir->i_sb, bh, 0, EXT4_BLOCK_SIZE(dir->i_sb));
-	/* for debugging */
 
 	if (filp)
 		ext4_error_file(filp, function, line, bh->b_blocknr,
@@ -619,13 +618,8 @@ finished:
 
 static int ext4_dir_open(struct inode * inode, struct file * filp)
 {
-	if (ext4_encrypted_inode(inode)) {
-		int ret = fscrypt_get_encryption_info(inode);
-		if (ret) {
-			printk(KERN_ERR	"%s:failed to get encryption info (%d)", __func__, ret);
-			return -EACCES;
-		}
-	}
+	if (ext4_encrypted_inode(inode))
+		return fscrypt_get_encryption_info(inode) ? -EACCES : 0;
 	return 0;
 }
 
