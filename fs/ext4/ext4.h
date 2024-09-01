@@ -394,14 +394,11 @@ struct flex_groups {
 #define EXT4_EXTENTS_FL			0x00080000 /* Inode uses extents */
 #define EXT4_EA_INODE_FL	        0x00200000 /* Inode used for large EA */
 #define EXT4_EOFBLOCKS_FL		0x00400000 /* Blocks allocated beyond EOF */
-#ifdef CONFIG_EXT4_DLP
-#define EXT4_DLP_FL				0x01000000 /* DLP file */
-#endif
 #define EXT4_INLINE_DATA_FL		0x10000000 /* Inode has inline data. */
 #define EXT4_PROJINHERIT_FL		0x20000000 /* Create with parents projid */
 #define EXT4_RESERVED_FL		0x80000000 /* reserved for ext4 lib */
 
-#define EXT4_FL_USER_VISIBLE		0x404BDFFF /* User visible flags */
+#define EXT4_FL_USER_VISIBLE		0x304BDFFF /* User visible flags */
 #define EXT4_FL_USER_MODIFIABLE		0x204380FF /* User modifiable flags */
 
 #define EXT4_FL_XFLAG_VISIBLE		(EXT4_SYNC_FL | \
@@ -1322,9 +1319,7 @@ struct ext4_super_block {
 	__le32	s_lpf_ino;		/* Location of the lost+found inode */
 	__le32	s_prj_quota_inum;	/* inode for tracking project quota */
 	__le32	s_checksum_seed;	/* crc32c(uuid) if csum_seed set */
-	__le32	s_reserved[92];	 	/* Padding to the s_sec_magic */
-	__le32	s_sec_magic;		/* flag for reserved inodes */
-	__le32	s_reserved2[5];		/* Padding to the end of the block */
+	__le32	s_reserved[98];		/* Padding to the end of the block */
 	__le32	s_checksum;		/* crc32c(superblock) */
 };
 
@@ -1523,14 +1518,6 @@ struct ext4_sb_info {
 
 	/* Barrier between changing inodes' journal flags and writepages ops. */
 	struct percpu_rw_semaphore s_journal_flag_rwsem;
-
-	/* To gather information of fragmentation */
-	unsigned int s_sec_part_best_extents;
-	unsigned int s_sec_part_current_extents;
-	unsigned int s_sec_part_score;
-	unsigned int s_sec_defrag_writes_kb;
-	unsigned int s_sec_num_apps;
-	unsigned int s_sec_capacity_apps_kb;
 };
 
 static inline struct ext4_sb_info *EXT4_SB(struct super_block *sb)
@@ -1893,8 +1880,6 @@ static inline bool ext4_has_incompat_features(struct super_block *sb)
  * Default reserved inode count
  */
 #define EXT4_DEF_RESERVE_INODE 8192
-#define EXT4_SEC_DATA_MAGIC 0xBAB0CAFE /* data partition magic */
-
 /*
  * Minimum number of groups in a flexgroup before we separate out
  * directories into the first block group of a flexgroup
@@ -2711,13 +2696,11 @@ extern void ext4_group_desc_csum_set(struct super_block *sb, __u32 group,
 extern int ext4_register_li_request(struct super_block *sb,
 				    ext4_group_t first_not_zeroed);
 
-/* for debugging, sangwoo2.lee */
 extern void print_iloc_info(struct super_block *sb, struct ext4_iloc iloc);
 extern void print_bh(struct super_block *sb,
 		struct buffer_head *bh, int start, int len);
 extern void print_block_data(struct super_block *sb, sector_t blocknr,
 		unsigned char *data_to_dump, int start, int len);
-/* for debugging */
 
 static inline int ext4_has_group_desc_csum(struct super_block *sb)
 {
@@ -3181,6 +3164,14 @@ extern void ext4_io_submit_init(struct ext4_io_submit *io,
 				struct writeback_control *wbc);
 extern void ext4_end_io_rsv_work(struct work_struct *work);
 extern void ext4_io_submit(struct ext4_io_submit *io);
+#ifdef CONFIG_DDAR
+#define	EXT4_IOC_GET_DD_POLICY		FS_IOC_GET_DD_POLICY
+#define	EXT4_IOC_SET_DD_POLICY		FS_IOC_SET_DD_POLICY
+
+int ext4_io_submit_to_dd(struct inode *inode, struct ext4_io_submit *io);
+#else
+static inline int ext4_io_submit_to_dd(struct inode *inode, struct ext4_io_submit *io) { return -EOPNOTSUPP; }
+#endif
 extern int ext4_bio_write_page(struct ext4_io_submit *io,
 			       struct page *page,
 			       int len,

@@ -46,8 +46,6 @@
 #include <trace/events/ext4.h>
 #include <trace/events/android_fs.h>
 
-#include <crypto/fmp.h>
-
 #define MPAGE_DA_EXTENT_TAIL 0x01
 
 static __u32 ext4_inode_csum(struct inode *inode, struct ext4_inode *raw,
@@ -380,11 +378,10 @@ static int __check_block_validity(struct inode *inode, const char *func,
 {
 	if (!ext4_data_block_valid(EXT4_SB(inode->i_sb), map->m_pblk,
 				   map->m_len)) {
-		/* for debugging, sangwoo2.lee */
 		printk(KERN_ERR "printing inode..\n");
 		print_block_data(inode->i_sb, 0, (unsigned char *)inode, 0,
 				EXT4_INODE_SIZE(inode->i_sb));
-		/* for debugging */
+
 		ext4_error_inode(inode, func, line, map->m_pblk,
 				 "lblock %lu mapped to illegal pblock %llu "
 				 "(length %d)", (unsigned long) map->m_lblk,
@@ -1108,6 +1105,9 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 	unsigned bbits;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh = wait;
 	bool decrypt = false;
+#ifdef CONFIG_DDAR
+	bool dd_decrypt = false;
+#endif
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(from > PAGE_SIZE);
@@ -1160,10 +1160,21 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 		if (!buffer_uptodate(bh) && !buffer_delay(bh) &&
 		    !buffer_unwritten(bh) &&
 		    (block_start < from || block_end > to)) {
-			ll_rw_block(REQ_OP_READ, 0, 1, &bh);
+		    int bi_opf = 0;
+
+			if (S_ISREG(inode->i_mode) && ext4_encrypted_inode(inode)
+					&& fscrypt_has_encryption_key(inode)) {
+					bh->b_private = fscrypt_get_diskcipher(inode);
+					if (bh->b_private)
+						bi_opf = REQ_CRYPT;
+			}
+			ll_rw_block(REQ_OP_READ, bi_opf, 1, &bh);
 			*wait_bh++ = bh;
 			decrypt = ext4_encrypted_inode(inode) &&
-				S_ISREG(inode->i_mode);
+				S_ISREG(inode->i_mode) && !bh->b_private;
+#ifdef CONFIG_DDAR
+			dd_decrypt = fscrypt_dd_encrypted_inode(inode);
+#endif
 		}
 	}
 	/*
@@ -1176,15 +1187,15 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 	}
 	if (unlikely(err))
 		page_zero_new_buffers(page, from, to);
-#ifdef CONFIG_FS_PRIVATE_ENCRYPTION
-	else if (decrypt & !inode->i_mapping->fmp_ci.private_algo_mode)
-		err = fscrypt_decrypt_page(page->mapping->host, page,
-				PAGE_SIZE, 0, page->index);
-#else
 	else if (decrypt)
 		err = fscrypt_decrypt_page(page->mapping->host, page,
 				PAGE_SIZE, 0, page->index);
+
+#ifdef CONFIG_DDAR
+	if (dd_decrypt)
+		err = fscrypt_dd_decrypt_page(inode, page);
 #endif
+
 	return err;
 }
 #endif
@@ -2127,7 +2138,10 @@ static int ext4_writepage(struct page *page,
 		return -ENOMEM;
 	}
 	ret = ext4_bio_write_page(&io_submit, page, len, wbc, keep_towrite);
-	ext4_io_submit(&io_submit);
+// CONFIG_DDAR [
+	if (ext4_io_submit_to_dd(inode, &io_submit) == -EOPNOTSUPP)
+		ext4_io_submit(&io_submit);
+// ] CONFIG_DDAR
 	/* Drop io_end reference we got from init */
 	ext4_put_io_end_defer(io_submit.io_end);
 	return ret;
@@ -2825,7 +2839,10 @@ retry:
 			handle = NULL;
 		}
 		/* Submit prepared bio */
-		ext4_io_submit(&mpd.io_submit);
+// CONFIG_DDAR [
+		if (ext4_io_submit_to_dd(inode, &mpd.io_submit) == -EOPNOTSUPP)
+			ext4_io_submit(&mpd.io_submit);
+// ] CONFIG_DDAR
 		/* Unlock pages we didn't use */
 		mpage_release_unused_pages(&mpd, give_up_on_write);
 		/*
@@ -3515,7 +3532,7 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 		get_block_func = ext4_dio_get_block_unwritten_async;
 		dio_flags = DIO_LOCKING;
 	}
-#if defined(CONFIG_EXT4_FS_ENCRYPTION) && !defined(CONFIG_FS_PRIVATE_ENCRYPTION)
+#if defined(CONFIG_EXT4_FS_ENCRYPTION) && !defined(CONFIG_CRYPTO_DISKCIPHER)
 	BUG_ON(ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode));
 #endif
 	if (IS_DAX(inode)) {
@@ -3637,10 +3654,12 @@ static ssize_t ext4_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	ssize_t ret;
 	int rw = iov_iter_rw(iter);
 
-	if (ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode) &&
-			(inode->i_mapping->fmp_ci.private_algo_mode ==
-			 EXYNOS_FMP_BYPASS_MODE))
+#if defined(CONFIG_EXT4_FS_ENCRYPTION)
+	/* Diskcipher can use direct-io */
+	if (ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode)
+			&& !fscrypt_disk_encrypted(inode))
 		return 0;
+#endif
 
 	/*
 	 * If we are doing data journalling we don't support O_DIRECT
@@ -3828,7 +3847,14 @@ static int __ext4_block_zero_page_range(handle_t *handle,
 
 	if (!buffer_uptodate(bh)) {
 		err = -EIO;
-		ll_rw_block(REQ_OP_READ, 0, 1, &bh);
+		if (S_ISREG(inode->i_mode) && ext4_encrypted_inode(inode)
+				&& fscrypt_has_encryption_key(inode))
+			bh->b_private = fscrypt_get_diskcipher(inode);
+		if (bh->b_private)
+			ll_rw_block(REQ_OP_READ, REQ_CRYPT, 1, &bh);
+		else
+			ll_rw_block(REQ_OP_READ, 0, 1, &bh);
+
 		wait_on_buffer(bh);
 		/* Uhhuh. Read error. Complain and punt. */
 		if (!buffer_uptodate(bh))
@@ -3838,14 +3864,16 @@ static int __ext4_block_zero_page_range(handle_t *handle,
 			/* We expect the key to be set. */
 			BUG_ON(!fscrypt_has_encryption_key(inode));
 			BUG_ON(blocksize != PAGE_SIZE);
-#ifdef CONFIG_FS_PRIVATE_ENCRYPTION
-			if (!page->mapping->fmp_ci.private_algo_mode)
-				WARN_ON_ONCE(fscrypt_decrypt_page(page->mapping->host,
-						page, PAGE_SIZE, 0, page->index));
-#else
-			WARN_ON_ONCE(fscrypt_decrypt_page(page->mapping->host,
-						page, PAGE_SIZE, 0, page->index));
+
+			if (!bh->b_private) {
+				WARN_ON_ONCE(fscrypt_decrypt_page(
+					page->mapping->host,
+					page, PAGE_SIZE, 0, page->index));
+#ifdef CONFIG_DDAR
+				if (fscrypt_dd_encrypted_inode(inode))
+					WARN_ON_ONCE(fscrypt_dd_decrypt_page(page->mapping->host, page));
 #endif
+			}
 		}
 	}
 	if (ext4_should_journal_data(inode)) {
@@ -4571,6 +4599,7 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 	if ((ino == EXT4_ROOT_INO) && (raw_inode->i_links_count == 0)) {
 		EXT4_ERROR_INODE(inode, "root inode unallocated");
 		ret = -EFSCORRUPTED;
+		print_iloc_info(sb, iloc);
 		goto bad_inode;
 	}
 
@@ -5252,15 +5281,6 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 		handle_t *handle;
 		loff_t oldsize = inode->i_size;
 		int shrink = (attr->ia_size <= inode->i_size);
-
-		/* support truncate zero-out */
-		if (ext4_encrypted_inode(inode)) {
-			error = fscrypt_get_encryption_info(inode);
-			if (error)
-				return error;
-			if (!fscrypt_has_encryption_key(inode))
-				return -ENOKEY;
-		}
 
 		if (!(ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))) {
 			struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);

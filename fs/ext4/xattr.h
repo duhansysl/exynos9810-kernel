@@ -102,10 +102,6 @@ extern const struct xattr_handler ext4_xattr_security_handler;
 
 #define EXT4_XATTR_NAME_ENCRYPTION_CONTEXT "c"
 
-#ifdef CONFIG_EXT4_DLP
-#define KNOX_DLP_XATTR_NAME "knox_dlp"
-#endif
-
 /*
  * The EXT4_STATE_NO_EXPAND is overloaded and used for two purposes.
  * The first is to signal that there the inline xattrs and data are

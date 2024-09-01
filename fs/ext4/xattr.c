@@ -55,7 +55,6 @@
 #include <linux/slab.h>
 #include <linux/mbcache.h>
 #include <linux/quotaops.h>
-#include <linux/fslog.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
 #include "xattr.h"
@@ -827,16 +826,6 @@ ext4_xattr_block_set(handle_t *handle, struct inode *inode,
 	int error = 0;
 	struct mb_cache *ext4_mb_cache = EXT4_GET_MB_CACHE(inode);
 
-	if (!strcmp(i->name, "selinux")) {
-		if (!i->value || !strcmp(i->value, "") ||
-				strstr(i->value, "unlabeled")) {
-			SE_LOG("%s : ino(%lu) label set, value : %s.",
-					__func__, inode->i_ino, i->value?i->value:"NuLL");
-			dump_stack();
-			fslog_kmsg_selog(__func__, 12);
-		}			
-	}
-
 #define header(x) ((struct ext4_xattr_header *)(x))
 
 	if (i->value && i->value_len > sb->s_blocksize)
@@ -1106,7 +1095,9 @@ int ext4_xattr_ibody_inline_set(handle_t *handle, struct inode *inode,
 	struct ext4_xattr_search *s = &is->s;
 	int error;
 
-	if (EXT4_I(inode)->i_extra_isize == 0)
+	/* @fs.sec -- ec294112f1af9d4be72e6292e7e994e522fccbeb -- */
+	if (EXT4_I(inode)->i_extra_isize == 0 ||
+			(void *) EXT4_XATTR_NEXT(s->first) >= s->end)
 		return -ENOSPC;
 	error = ext4_xattr_set_entry(i, s, inode);
 	if (error)
@@ -1130,6 +1121,7 @@ static int ext4_xattr_ibody_set(handle_t *handle, struct inode *inode,
 	struct ext4_xattr_search *s = &is->s;
 	int error;
 
+	/* @fs.sec -- 27aa4ade7b90e77a75b0f821924eaac228cfdd43 -- */
 	if (EXT4_I(inode)->i_extra_isize == 0 ||
 			(void *) EXT4_XATTR_NEXT(s->first) >= s->end)
 		return -ENOSPC;
@@ -1256,8 +1248,6 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 				goto cleanup;
 			if (!is.s.not_found) {
 				i.value = NULL;
-				SE_LOG(">>> Don't trust next log. %s : ino(%lu)",
-						__func__, inode->i_ino);
 				error = ext4_xattr_ibody_set(handle, inode, &i,
 							     &is);
 			}
