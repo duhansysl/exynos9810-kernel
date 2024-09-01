@@ -512,8 +512,10 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 				gfp_flags = GFP_NOFS;
 				if (io->io_bio)
 // CONFIG_DDAR [
+				{
 					if (ext4_io_submit_to_dd(inode, io) == -EOPNOTSUPP)
 						ext4_io_submit(io);
+				}
 // ] CONFIG_DDAR
 				else
 					gfp_flags |= __GFP_NOFAIL;
