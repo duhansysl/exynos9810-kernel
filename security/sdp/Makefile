@@ -9,3 +9,4 @@ else
 obj-$(CONFIG_SDP) += dek_legacy.o 
 endif
 obj-$(CONFIG_DLP) += sdp_dlp.o
+obj-$(CONFIG_DDAR) += dd_core.o dd_xattr.o dd_kernel_crypto.o

@@ -102,7 +102,7 @@ int is_root(void) {
 	return 0;
 }
 
-int is_current_adbd(void) {
+int is_current_adbd() {
     DEK_LOGD("current->comm : %s\n", current->comm);
 #if 1
     if(is_root()) {
@@ -118,7 +118,7 @@ int is_current_adbd(void) {
 #endif
 }
 
-int is_current_epmd(void) {
+int is_current_epmd() {
     DEK_LOGD("current->comm : %s\n", current->comm);
 #if 1
     if(is_root()) {

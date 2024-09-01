@@ -54,6 +54,8 @@ struct bio {
 	bio_end_io_t		*bi_end_io;
 
 	void			*bi_private;
+	void			*bi_aux_private;
+
 #ifdef CONFIG_BLK_CGROUP
 	/*
 	 * Optional ioc and css associated with this bio.  Put on bio
@@ -69,19 +71,6 @@ struct bio {
 	};
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
-	struct {
-		int		private_enc_mode;	/* Encryption mode */
-		int 		private_algo_mode;	/* Encryption algorithm */
-		unsigned char	*key;		/* Encryption Key */
-		unsigned int	key_length;	/* Encryption Key length */
-
-		/*
-		 * When using dircet-io (O_DIRECT), we can't get the inode from a bio
-		 * by walking bio->bi_io_vec->bv_page->mapping->host
-		 * since the page is anon.
-		 */
-		struct inode	*bi_dio_inode;
-	} fmp_ci;
 
 	/*
 	 * Everything starting with bi_max_vecs will be preserved by bio_reset()
@@ -94,6 +83,10 @@ struct bio {
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
 	struct bio_set		*bi_pool;
+
+#ifdef CONFIG_DDAR
+	struct inode		*bi_dio_inode;
+#endif
 
 	/*
 	 * We can inline a number of vecs at the end of the bio, to avoid
@@ -135,10 +128,6 @@ struct bio {
 #define BIO_QUIET	7	/* Make BIO Quiet */
 #define BIO_CHAIN	8	/* chained bio, ->bi_remaining in effect */
 #define BIO_REFFED	9	/* bio has elevated ->bi_cnt */
-#ifdef CONFIG_JOURNAL_DATA_TAG
-/* XXX Be carefull not to touch BIO_RESET_BITS */
-#define BIO_JOURNAL    9       /* bio contains journal data */
-#endif
 
 /*
  * Flags starting here get preserved by bio_reset() - this includes

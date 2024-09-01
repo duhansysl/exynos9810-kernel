@@ -103,6 +103,7 @@ config CRYPTO_KPP
 config CRYPTO_ACOMP2
 	tristate
 	select CRYPTO_ALGAPI2
+	select SGL_ALLOC
 
 config CRYPTO_ACOMP
 	tristate
@@ -1606,6 +1607,22 @@ config CRYPTO_TWOFISH_AVX_X86_64
 
 	  See also:
 	  <http://www.schneier.com/twofish.html>
+
+config CRYPTO_DISKCIPHER
+	bool "Diskcipher support"
+	default n
+	help
+	  Disk cipher algorithm
+
+	  This cipher supports the crypt operation of the block host device
+	  that has inline crypto engine.
+
+config CRYPTO_DISKCIPHER_DEBUG
+	bool "Diskcipher debugging"
+	default n
+	depends on CRYPTO_DISKCIPHER
+	help
+	 support Diskcipher debugging
 
 comment "Compression"
 

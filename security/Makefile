@@ -34,18 +34,6 @@ obj-$(CONFIG_SECURITY_DSMS)		+= samsung/dsms/
 subdir-$(CONFIG_INTEGRITY)		+= integrity
 obj-$(CONFIG_INTEGRITY)			+= integrity/
 
-# Knox SDP
-ifndef CONFIG_NO_SDP_BASE
-obj-y += sdp/
-obj-y += sdp/built-in.o
-endif
-
-# TIMA uevent
-obj-$(CONFIG_TIMA)     += tima_uevent/tima_uevent.o
-
-# TZ ICCC
-obj-$(CONFIG_TZ_ICCC)	  += tz_iccc/
-
 # MST driver
 obj-$(CONFIG_MST_LDO)	  += mstdrv/
 
@@ -57,9 +45,9 @@ obj-$(CONFIG_FIVE)			+= samsung/five/
 subdir-$(CONFIG_PROCA)		+= proca
 obj-$(CONFIG_PROCA)		+= proca/
 
-# Kbuild should always enter proca/gaf because gaf should be always built
-subdir-y += proca/gaf
-obj-y    += proca/gaf/
+# GAF module for PROCA, Secure Storage 1
+subdir-$(CONFIG_GAF) += proca/gaf
+obj-$(CONFIG_GAF)    += proca/gaf/
 
 # Knox SDP
 obj-$(CONFIG_SDP) += sdp/

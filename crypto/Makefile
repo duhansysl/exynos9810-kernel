@@ -2,6 +2,11 @@
 # Cryptographic API
 #
 
+ifeq ($(CONFIG_CRYPTO_FIPS), y)
+#ccflags-y := -DCONFIG_CRYPTO_FIPS_FUNC_TEST
+endif
+
+ccflags-y += $(DISABLE_LTO_CLANG) $(DISABLE_CFI_CLANG) -fno-data-sections -fno-function-sections
 # ---------------------------------------
 # Keep this at the top of FIPS boundary
 obj-$(CONFIG_CRYPTO_FIPS) += first_file.o
@@ -31,6 +36,7 @@ crypto_hash-y += ahash.o
 crypto_hash-y += shash.o
 obj-$(CONFIG_CRYPTO_HASH2) += crypto_hash.o
 
+CFLAGS_testmgr.o = -fno-merge-all-constants
 cryptomgr-y := algboss.o testmgr.o
 obj-$(CONFIG_CRYPTO_MANAGER2) += cryptomgr.o
 
@@ -87,6 +93,7 @@ obj-$(CONFIG_CRYPTO_RSA) += rsa_generic.o
 obj-$(CONFIG_CRYPTO_ACOMP2) += acompress.o
 obj-$(CONFIG_CRYPTO_ACOMP2) += scompress.o
 
+
 obj-$(CONFIG_CRYPTO_USER) += crypto_user.o
 obj-$(CONFIG_CRYPTO_CMAC) += cmac.o
 obj-$(CONFIG_CRYPTO_VMAC) += vmac.o
@@ -110,7 +117,6 @@ obj-$(CONFIG_CRYPTO_XTS) += xts.o
 obj-$(CONFIG_CRYPTO_KEYWRAP) += keywrap.o
 obj-$(CONFIG_CRYPTO_ADIANTUM) += adiantum.o
 obj-$(CONFIG_CRYPTO_NHPOLY1305) += nhpoly1305.o
-obj-$(CONFIG_CRYPTO_GCM) += gcm.o
 obj-$(CONFIG_CRYPTO_CCM) += ccm.o
 obj-$(CONFIG_CRYPTO_CHACHA20POLY1305) += chacha20poly1305.o
 obj-$(CONFIG_CRYPTO_PCRYPT) += pcrypt.o
@@ -153,6 +159,7 @@ obj-$(CONFIG_CRYPTO_USER_API_SKCIPHER) += algif_skcipher.o
 obj-$(CONFIG_CRYPTO_USER_API_RNG) += algif_rng.o
 obj-$(CONFIG_CRYPTO_USER_API_AEAD) += algif_aead.o
 obj-$(CONFIG_CRYPTO_ZSTD) += zstd.o
+obj-$(CONFIG_CRYPTO_DISKCIPHER) += diskcipher.o
 
 #
 # generic algorithms and the async_tx api
