@@ -10,21 +10,21 @@
 #ifndef _FMP_FIPS_FUNC_TEST_H_
 #define _FMP_FIPS_FUNC_TEST_H_
 
+#if defined(CONFIG_EXYNOS_FMP_FIPS)
 #if defined(CONFIG_EXYNOS_FMP_FIPS_FUNC_TEST)
 #define FMP_FUNCTEST_KAT_CASE_NUM 6
 #define FMP_FUNCTEST_NO_TEST "NO_TEST"
 
 int exynos_fmp_func_test_KAT_case(struct platform_device *pdev,
-				struct exynos_fmp *fmp,
-				struct exynos_fmp_variant_ops *fmp_vops);
+				struct exynos_fmp *fmp);
 #else
 inline int exynos_fmp_func_test_KAT_case(struct platform_device *pdev,
-				struct exynos_fmp *fmp,
-				struct exynos_fmp_variant_ops *fmp_vops)
+				struct exynos_fmp *fmp)
 {
 	if (fmp)
 		fmp->test_vops = NULL;
 	return 0;
 }
 #endif /* CONFIG_EXYNOS_FMP_FIPS_FUNC_TEST */
+#endif /* CONFIG_EXYNOS_FMP_FIPS */
 #endif /* _FMP_FIPS_FUNC_TEST_H_ */

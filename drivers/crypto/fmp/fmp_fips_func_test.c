@@ -117,21 +117,15 @@ const struct exynos_fmp_fips_test_vops exynos_fmp_fips_test_ops = {
 };
 
 int exynos_fmp_func_test_KAT_case(struct platform_device *pdev,
-				struct exynos_fmp *fmp,
-				struct exynos_fmp_variant_ops *fmp_vops)
+				struct exynos_fmp *fmp)
 {
 	int i, ret;
-	struct fmp_data_setting data;
+	struct fmp_crypto_info data;
+	struct fmp_request req;
 	struct device *dev;
 
 	if (!fmp || !fmp->dev) {
 		pr_err("%s: invalid fmp context or device\n", __func__);
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (!fmp_vops) {
-		pr_err("%s: invalid fmp variant ops\n", __func__);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -156,13 +150,22 @@ int exynos_fmp_func_test_KAT_case(struct platform_device *pdev,
 		dev_info(dev, "FIPS FUNC : (%d-1) Selftest done. FMP FIPS status : %s\n",
 				i + 1, in_fmp_fips_err() ? "FAILED" : "PASSED");
 
-		memset(&data.disk, 0, sizeof(struct fmp_crypto_setting));
-		memset(&data.file, 0, sizeof(struct fmp_crypto_setting));
-		data.table = NULL;
-		data.cmdq_enabled = 0;
+		if (!strcmp("zeroization", get_fmp_fips_functest_mode())) {
+			exynos_fmp_fips_exit(fmp);
+			continue;
+		}
+
+		memset(&data, 0, sizeof(struct fmp_crypto_info));
+		memset(&req, 0, sizeof(struct fmp_request));
 		dev_info(dev, "FIPS FUNC : (%d-2) Try to set config\n", i + 1);
 
-		ret = fmp_vops->config(pdev, &data);
+		data.use_diskc = 0;
+		data.key_size = EXYNOS_FMP_KEY_SIZE_32;
+		data.enc_mode = EXYNOS_FMP_FILE_ENC;
+		data.algo_mode = EXYNOS_FMP_ALGO_MODE_AES_XTS;
+		data.ctx = fmp;
+
+		ret = exynos_fmp_crypt(&data, &req);
 		if (ret)
 			dev_info(dev,
 				"FIPS FUNC : (%d-3) Fail FMP config as expected. ret(%d)\n",
