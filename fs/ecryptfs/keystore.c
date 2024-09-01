@@ -38,10 +38,6 @@
 #endif
 #include "ecryptfs_kernel.h"
 
-#ifdef CONFIG_SDP
-#include "ecryptfs_dek.h"
-#endif
-
 /**
  * request_key returned an error instead of a valid key address;
  * determine the type of error, make appropriate log entries, and
@@ -1852,9 +1848,6 @@ decrypt_passphrase_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 		goto out;
 	}
 #ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
-#ifdef CONFIG_SDP
-	if (!(crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
-#endif
 	if(crypt_stat->flags & ECRYPTFS_ENABLE_HMAC) {
 		if (crypt_stat->flags & ECRYPTFS_SUPPORT_HMAC_KEY
 				&& auth_tok->token.password.session_key_encryption_key_bytes == ECRYPTFS_MAX_KEY_BYTES) {
@@ -1879,9 +1872,6 @@ decrypt_passphrase_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	else {
 		ecryptfs_printk(KERN_INFO, "HMAC HASH is Not Present in SD Card...\n");
 	}
-#ifdef CONFIG_SDP
-	}
-#endif
 #endif	
 	auth_tok->session_key.flags |= ECRYPTFS_CONTAINS_DECRYPTED_KEY;
 	memcpy(crypt_stat->key, auth_tok->session_key.decrypted_key,
@@ -1940,14 +1930,6 @@ int ecryptfs_parse_packet_set(struct ecryptfs_crypt_stat *crypt_stat,
 	size_t tag_11_packet_size;
 	struct key *auth_tok_key = NULL;
 	int rc = 0;
-#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
-#ifdef CONFIG_SDP
-	char session_key_encryption_key[ECRYPTFS_MAX_KEY_BYTES];
-	int is_integrity_check_for_sdp = 0;
-	u8 ksize = 0;
-	int rz = 0;
-#endif
-#endif
 
 	INIT_LIST_HEAD(&auth_tok_list);
 	/* Parse the header to find as many packets as we can; these will be
@@ -2027,22 +2009,6 @@ int ecryptfs_parse_packet_set(struct ecryptfs_crypt_stat *crypt_stat,
 			rc = -EIO;
 			goto out_wipe_list;
 			break;
-#ifdef CONFIG_SDP
-		case ECRYPTFS_DEK_PACKET_TYPE:
-			printk("%s() ECRYPTFS_DEK_PACKET_TYPE \n",
-					__func__);
-			rc = parse_dek_packet(
-					(unsigned char *)&src[i], crypt_stat,
-					&packet_size);
-			if (rc) {
-				ecryptfs_printk(KERN_ERR, "Error parsing "
-						"dek packet %d\n", rc);
-			rc = -EIO;
-			goto out_wipe_list;
-			}
-			i += packet_size;
-			break;
-#endif
 		default:
 			ecryptfs_printk(KERN_DEBUG, "No packet at offset [%zd] "
 					"of the file header; hex value of "
@@ -2111,17 +2077,6 @@ found_matching_auth_tok:
 		       sizeof(struct ecryptfs_password));
 		up_write(&(auth_tok_key->sem));
 		key_put(auth_tok_key);
-#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
-#ifdef CONFIG_SDP
-		if ((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
-			memcpy(session_key_encryption_key,
-					candidate_auth_tok->token.password.session_key_encryption_key,
-					candidate_auth_tok->token.password.session_key_encryption_key_bytes);
-			is_integrity_check_for_sdp = 1;
-			ksize = candidate_auth_tok->token.password.session_key_encryption_key_bytes;
-		}
-#endif
-#endif
 		rc = decrypt_passphrase_encrypted_session_key(
 			candidate_auth_tok, crypt_stat);
 	} else {
@@ -2131,13 +2086,7 @@ found_matching_auth_tok:
 	}
 	if (rc) {
 		struct ecryptfs_auth_tok_list_item *auth_tok_list_item_tmp;
-#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
-#ifdef CONFIG_SDP
-		if (is_integrity_check_for_sdp) {
-			memset(session_key_encryption_key, 0, ksize);
-		}
-#endif
-#endif
+
 		ecryptfs_printk(KERN_WARNING, "Error decrypting the "
 				"session key for authentication token with sig "
 				"[%.*s]; rc = [%d]. Removing auth tok "
@@ -2158,43 +2107,6 @@ found_matching_auth_tok:
 		}
 		BUG();
 	}
-
-#ifdef CONFIG_SDP
-	if ((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
-		rc = ecryptfs_get_sdp_dek(crypt_stat);
-		if (rc) {
-			ecryptfs_printk(KERN_ERR, "Error setting sdp key after parse\n");
-			goto out_wipe_list;
-		}
-#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
-		if (is_integrity_check_for_sdp
-				&& crypt_stat->flags & ECRYPTFS_ENABLE_HMAC) {//Do integrity check for SDP-FEK
-			unsigned char hmac_hash[FEK_HASH_SIZE];
-
-			rz = calculate_hmac_sha256(session_key_encryption_key,
-					crypt_stat->key_size,
-					crypt_stat->key,
-					crypt_stat->key_size,
-					hmac_hash);
-
-			memset(session_key_encryption_key, 0, ksize);
-
-			if (unlikely(rz)) {
-				ecryptfs_printk(KERN_ERR, "Error Generating Hash for SDP FEK: rz = [%d]\n", rz);
-				goto out_wipe_list;
-			}
-
-			if (memcmp(crypt_stat->hash, hmac_hash, FEK_HASH_SIZE)) {
-				ecryptfs_printk(KERN_ERR, "SDP FEK Integrity Verification Failed...\n");
-				goto out_wipe_list;
-			} else {
-				ecryptfs_printk(KERN_INFO, "SDP FEK Integrity Verification Success...\n");
-			}
-		}
-#endif
-	}
-#endif
-
 	rc = ecryptfs_compute_root_iv(crypt_stat);
 	if (rc) {
 		ecryptfs_printk(KERN_ERR, "Error computing "
@@ -2670,16 +2582,8 @@ encrypted_session_key_set:
 	       ECRYPTFS_SALT_SIZE);
 	(*packet_size) += ECRYPTFS_SALT_SIZE;	/* salt */
 	dest[(*packet_size)++] = 0x60;	/* hash iterations (65536) */
-#ifdef CONFIG_SDP
-	if ((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
-		ecryptfs_printk(KERN_DEBUG, "Sensitive file, tag_3 to zeroes\n");
-		memset(&dest[(*packet_size)], 0, key_rec->enc_key_size);
-	} else
-#endif
-	{
-		memcpy(&dest[(*packet_size)], key_rec->enc_key,
-		       key_rec->enc_key_size);
-	}
+	memcpy(&dest[(*packet_size)], key_rec->enc_key,
+	       key_rec->enc_key_size);
 	(*packet_size) += key_rec->enc_key_size;
 out:
 	if (rc)
@@ -2771,19 +2675,6 @@ ecryptfs_generate_key_packet_set(char *dest_base,
 				goto out_free;
 			}
 			(*len) += written;
-#ifdef CONFIG_SDP
-			if (crypt_stat->flags & ECRYPTFS_DEK_SDP_ENABLED &&
-				crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
-				rc = write_dek_packet(dest_base + (*len), crypt_stat,
-						&written);
-				if (rc) {
-					ecryptfs_printk(KERN_WARNING, "Error "
-							"writing dek packet\n");
-					goto out_free;
-				}
-				(*len) += written;
-			}
-#endif
 		} else if (auth_tok->token_type == ECRYPTFS_PRIVATE_KEY) {
 			rc = write_tag_1_packet(dest_base + (*len), &max,
 						auth_tok_key, auth_tok,
