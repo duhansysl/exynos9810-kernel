@@ -13,7 +13,6 @@
 #define _UFS_EXYNOS_H_
 
 #include <linux/pm_qos.h>
-#include <crypto/smu.h>
 #include <crypto/fmp.h>
 #include "ufs-cal-9810.h"
 
@@ -524,16 +523,6 @@ struct exynos_ufs_debug {
 	struct exynos_ufs_misc_log misc;
 };
 
-struct exynos_smu_data {
-	struct exynos_smu_variant_ops *vops;
-	struct platform_device *pdev;
-};
-
-struct exynos_fmp_data {
-	struct exynos_fmp_variant_ops *vops;
-	struct platform_device *pdev;
-};
-
 struct exynos_ufs {
 	struct device *dev;
 	struct ufs_hba *hba;
@@ -559,8 +548,8 @@ struct exynos_ufs {
 	struct uic_pwr_mode req_pmd_parm;
 	struct uic_pwr_mode act_pmd_parm;
 
-	struct exynos_smu_data smu;
-	struct exynos_fmp_data fmp;
+	enum smu_id		fmp;
+	enum smu_id		smu;
 
 	u32 rx_min_actv_time_cap;
 	u32 rx_hibern8_time_cap;
