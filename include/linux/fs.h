@@ -1825,6 +1825,23 @@ struct inode_operations {
 	int (*set_acl)(struct inode *, struct posix_acl *, int);
 } ____cacheline_aligned;
 
+static inline ssize_t call_read_iter(struct file *file, struct kiocb *kio,
+				     struct iov_iter *iter)
+{
+	return file->f_op->read_iter(kio, iter);
+}
+
+static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
+				      struct iov_iter *iter)
+{
+	return file->f_op->write_iter(kio, iter);
+}
+
+static inline int call_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	return file->f_op->mmap(file, vma);
+}
+
 ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
 			      unsigned long nr_segs, unsigned long fast_segs,
 			      struct iovec *fast_pointer,
@@ -2888,8 +2905,10 @@ extern ssize_t generic_file_write_iter(struct kiocb *, struct iov_iter *);
 extern ssize_t generic_file_direct_write(struct kiocb *, struct iov_iter *);
 extern ssize_t generic_perform_write(struct file *, struct iov_iter *, loff_t);
 
-ssize_t vfs_iter_read(struct file *file, struct iov_iter *iter, loff_t *ppos);
-ssize_t vfs_iter_write(struct file *file, struct iov_iter *iter, loff_t *ppos);
+ssize_t vfs_iter_read(struct file *file, struct iov_iter *iter, loff_t *ppos,
+		int flags);
+ssize_t vfs_iter_write(struct file *file, struct iov_iter *iter, loff_t *ppos,
+		int flags);
 
 /* fs/block_dev.c */
 extern ssize_t blkdev_read_iter(struct kiocb *iocb, struct iov_iter *to);
@@ -3149,6 +3168,11 @@ static inline int iocb_flags(struct file *file)
 	if (file->f_flags & __O_SYNC)
 		res |= IOCB_SYNC;
 	return res;
+}
+
+static inline int iocb_to_rw_flags(int ifl, int iocb_mask)
+{
+	return ifl & iocb_mask;
 }
 
 static inline ino_t parent_ino(struct dentry *dentry)
