@@ -29,6 +29,7 @@
 #include "fmp_fips_info.h"
 #include "fmp_fips_integrity.h"
 
+#define FIPS_CHECK_INTEGRITY
 #undef FIPS_DEBUG_INTEGRITY
 
 /* Same as build time */
@@ -62,6 +63,10 @@ int do_fmp_integrity_check(struct exynos_fmp *fmp)
 	unsigned int num_addresses = 0;
 #endif
 	struct exynos_fmp_fips_test_vops *test_vops;
+
+#ifndef FIPS_CHECK_INTEGRITY
+	return 0;
+#endif
 
 	if (!fmp || !fmp->dev) {
 		pr_err("%s: invalid fmp device\n", __func__);

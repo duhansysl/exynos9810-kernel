@@ -12,18 +12,6 @@
 #ifndef _FMP_FIPS_FOPS_INFO_
 #define _FMP_FIPS_FOPS_INFO_
 
-#define FMP_BLK_SIZE	(4096)
-
-#define BYPASS_MODE	0
-#define CBC_MODE	1
-#define XTS_MODE	2
-
-#define ENCRYPT		1
-#define DECRYPT		2
-
-#define WRITE_MODE	1
-#define READ_MODE	2
-
 /* API extensions for linux */
 #define FMP_HMAC_MAX_KEY_LEN	512
 #define FMP_CIPHER_MAX_KEY_LEN	64

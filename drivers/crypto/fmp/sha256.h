@@ -40,18 +40,18 @@ struct shash_desc {
 typedef struct shash_desc SHA256_CTX;
 
 typedef void (sha256_block_fn)(struct sha256_state *sst, u8 const *src,
-			       int blocks);
+			int blocks);
 
 /* Initialises desc
  * Returns 0 at success, nonzero otherwise
- * */
+ */
 int sha256_init(struct shash_desc *desc);
 
 /* Adds len bytes from data to desc.
  * Returns 0 at success, nonzero otherwise
- * */
+ */
 int sha256_update(struct shash_desc *desc, const u8 *data,
-                          unsigned int len);
+			unsigned int len);
 
 /* Adds the final padding to desc and writes the resulting digest
  * to out, which must have at least SHA256_DIGEST_SIZE bytes of space.
@@ -67,7 +67,7 @@ int sha256(const u8 *data, unsigned int len, u8 *out);
 
 /* desc dup
  * Returns 0 at success, nonzero otherwise
- *  */
+ */
 int sha256_desc_copy(struct shash_desc *dst, const struct shash_desc *src);
 
 #endif  /* SHA256_FMP_H */
