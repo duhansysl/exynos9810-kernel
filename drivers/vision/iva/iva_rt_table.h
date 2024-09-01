@@ -12,6 +12,8 @@
 
 #include "iva_ctrl.h"
 
+typedef struct _rt_iva_table_t *	rt_iva_table;
+
 extern void	iva_rt_print_iva_entries(struct iva_dev_data *iva,
 			void *iva_tbl_ptr, int8_t *num_deps_list);
 
