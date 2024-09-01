@@ -8295,6 +8295,8 @@
 		ufs-rx-min-activate-time-cap = <0x3>;
 		ufs-rx-hibern8-time-cap = <0x2>;
 		ufs-tx-hibern8-time-cap = <0x2>;
+		fmp-id = <0x0>;
+		smu-id = <0x0>;		
 		brd-for-cal = <0x0>;
 		ufs-exynos-smu = <0x102>;
 		linux,phandle = <0xfe>;
