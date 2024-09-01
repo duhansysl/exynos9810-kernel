@@ -38,11 +38,6 @@
 #include <linux/magic.h>
 #include "ecryptfs_kernel.h"
 
-#ifdef CONFIG_SDP
-#include "mm.h"
-#include "ecryptfs_sdp_chamber.h"
-#endif
-
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #include <linux/ctype.h>
 #endif
@@ -170,11 +165,6 @@ void ecryptfs_put_lower_file(struct inode *inode)
 	if (atomic_dec_and_mutex_lock(&inode_info->lower_file_count,
 				      &inode_info->lower_file_mutex)) {
 		filemap_write_and_wait(inode->i_mapping);
-#ifdef CONFIG_SDP
-		if (inode_info->crypt_stat.flags & ECRYPTFS_DEK_IS_SENSITIVE) {
-			ecryptfs_mm_do_sdp_cleanup(inode);
-		}
-#endif
 		fput(inode_info->lower_file);
 		inode_info->lower_file = NULL;
 		mutex_unlock(&inode_info->lower_file_mutex);
@@ -189,21 +179,13 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
        ecryptfs_opt_fn_cipher, ecryptfs_opt_fn_cipher_key_bytes,
        ecryptfs_opt_unlink_sigs, ecryptfs_opt_mount_auth_tok_only,
        ecryptfs_opt_check_dev_ruid,
-
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 	ecryptfs_opt_enable_filtering,
 #endif
-
 	ecryptfs_opt_enable_cc,
 
 	ecryptfs_opt_base, ecryptfs_opt_type, ecryptfs_opt_label,
-#ifdef CONFIG_SDP
-	ecryptfs_opt_userid, ecryptfs_opt_sdp, ecryptfs_opt_chamber_dirs, ecryptfs_opt_partition_id,
-#endif
-#ifdef CONFIG_DLP
-	   ecryptfs_opt_dlp,
-#endif
-	ecryptfs_opt_err };
+       ecryptfs_opt_err };
 
 static const match_table_t tokens = {
 	{ecryptfs_opt_sig, "sig=%s"},
@@ -220,7 +202,6 @@ static const match_table_t tokens = {
 	{ecryptfs_opt_unlink_sigs, "ecryptfs_unlink_sigs"},
 	{ecryptfs_opt_mount_auth_tok_only, "ecryptfs_mount_auth_tok_only"},
 	{ecryptfs_opt_check_dev_ruid, "ecryptfs_check_dev_ruid"},
-
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 	{ecryptfs_opt_enable_filtering, "ecryptfs_enable_filtering=%s"},
 #endif
@@ -230,15 +211,6 @@ static const match_table_t tokens = {
 	{ecryptfs_opt_base, "base=%s"},
 	{ecryptfs_opt_type, "type=%s"},
 	{ecryptfs_opt_label, "label=%s"},
-#ifdef CONFIG_SDP
-	{ecryptfs_opt_chamber_dirs, "chamber=%s"},
-	{ecryptfs_opt_userid, "userid=%s"},
-	{ecryptfs_opt_sdp, "sdp_enabled"},
-	{ecryptfs_opt_partition_id, "partition_id=%u"},
-#endif
-#ifdef CONFIG_DLP
-	{ecryptfs_opt_dlp, "dlp_enabled"},
-#endif
 	{ecryptfs_opt_err, NULL}
 };
 
@@ -278,13 +250,6 @@ static void ecryptfs_init_mount_crypt_stat(
 	INIT_LIST_HEAD(&mount_crypt_stat->global_auth_tok_list);
 	mutex_init(&mount_crypt_stat->global_auth_tok_list_mutex);
 	mount_crypt_stat->flags |= ECRYPTFS_MOUNT_CRYPT_STAT_INITIALIZED;
-
-#ifdef CONFIG_SDP
-	spin_lock_init(&mount_crypt_stat->chamber_dir_list_lock);
-	INIT_LIST_HEAD(&mount_crypt_stat->chamber_dir_list);
-
-	mount_crypt_stat->partition_id = -1;
-#endif
 }
 
 static void ecryptfs_init_propagate_stat(
@@ -561,55 +526,6 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 
 			strncpy(label_dst, label_src, ECRYPTFS_LABEL_SIZE);
 			break;
-#ifdef CONFIG_SDP
-		case ecryptfs_opt_userid: {
-			char *userid_src = args[0].from;
-			int userid =
-				(int)simple_strtol(userid_src,
-						&userid_src, 0);
-			sbi->userid = userid;
-			mount_crypt_stat->userid = userid;
-			/*
-			 * Enabling SDP by default for Knox container.
-			 */
-			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_SDP_ENABLED;
-			}
-			break;
-		case ecryptfs_opt_sdp:
-			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_SDP_ENABLED;
-			break;
-		case ecryptfs_opt_chamber_dirs: {
-			char *chamber_dirs = args[0].from;
-			char *token = NULL;
-
-			/**
-			 * chamber directories by mount-option.
-			 * The userid in the mount option is used as engine_id
-			 *
-			 * TODO : This won't work when chamber_dirs mount option comes before
-			 * user_id option.
-			 */
-			printk("%s : chamber dirs : %s\n", __func__, chamber_dirs);
-			while ((token = strsep(&chamber_dirs, "|")) != NULL)
-				if (!is_chamber_directory(mount_crypt_stat, (const unsigned char *)token, NULL))
-					add_chamber_directory(mount_crypt_stat,
-					mount_crypt_stat->userid, (const unsigned char *)token);
-		}
-		break;
-		case ecryptfs_opt_partition_id: {
-			char *partition_id_str = args[0].from;
-			mount_crypt_stat->partition_id =
-				(int)simple_strtol(partition_id_str,
-				&partition_id_str, 0);
-			printk("%s : partition_id : %d", __func__, mount_crypt_stat->partition_id);
-		}
-		break;
-#endif
-#ifdef CONFIG_DLP
-		case ecryptfs_opt_dlp:
-			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_DLP_ENABLED;
-		break;
-#endif
 		case ecryptfs_opt_err:
 		default:
 			printk(KERN_WARNING
@@ -685,17 +601,16 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 
 		if (rc) {
 			printk(KERN_ERR "Error attempting to initialize "
-				   "cipher with name = [%s] and key size = [%td]; "
-				   "rc = [%d]\n",
-				   mount_crypt_stat->global_default_fn_cipher_name,
-				   mount_crypt_stat->global_default_fn_cipher_key_bytes,
-				   rc);
+			       "cipher with name = [%s] and key size = [%td]; "
+			       "rc = [%d]\n",
+			       mount_crypt_stat->global_default_fn_cipher_name,
+			       mount_crypt_stat->global_default_fn_cipher_key_bytes,
+			       rc);
 			rc = -EINVAL;
 			mutex_unlock(&key_tfm_list_mutex);
 			goto out;
 		}
 	}
-
 	mutex_unlock(&key_tfm_list_mutex);
 	rc = ecryptfs_init_global_auth_toks(mount_crypt_stat);
 	if (rc)
@@ -740,10 +655,6 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 		goto out;
 	}	
 
-#ifdef CONFIG_SDP
-	sbi->userid = -1;
-#endif
-
 	rc = ecryptfs_parse_options(sbi, raw_data, &check_ruid);
 	if (rc) {
 		err = "Error parsing options";
@@ -771,6 +682,7 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 
 	/* ->kill_sb() will take care of sbi after that point */
 	sbi = NULL;
+	s->s_op = &ecryptfs_sops;
 	s->s_xattr = ecryptfs_xattr_handlers;
 	s->s_d_op = &ecryptfs_dops;
 
