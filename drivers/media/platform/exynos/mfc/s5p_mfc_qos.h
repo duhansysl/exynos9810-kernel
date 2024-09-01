@@ -49,7 +49,7 @@ void s5p_mfc_qos_update_last_framerate(struct s5p_mfc_ctx *ctx, u64 timestamp);
 static inline void s5p_mfc_qos_reset_framerate(struct s5p_mfc_ctx *ctx)
 {
 	if (ctx->type == MFCINST_DECODER)
-		ctx->framerate = 60000; // 60fps*1000;
+		ctx->framerate = DEC_DEFAULT_FPS;
 	else if (ctx->type == MFCINST_ENCODER)
 		ctx->framerate = ENC_DEFAULT_FPS;
 }

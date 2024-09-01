@@ -1147,7 +1147,7 @@ struct s5p_mfc_ctrls_ops {
 			struct list_head *head, EncoderInputStr *pInStr);
 	int (*get_buf_ctrls_val_nal_q_enc) (struct s5p_mfc_ctx *ctx,
 			struct list_head *head, EncoderOutputStr *pOutStr);
-	int (*recover_buf_ctrls_nal_q) (struct s5p_mfc_ctx *ctx,
+	int (*restore_buf_ctrls) (struct s5p_mfc_ctx *ctx,
 			struct list_head *head);
 };
 

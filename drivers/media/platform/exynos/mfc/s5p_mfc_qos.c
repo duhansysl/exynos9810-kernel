@@ -816,6 +816,5 @@ void s5p_mfc_qos_update_last_framerate(struct s5p_mfc_ctx *ctx, u64 timestamp)
 	ctx->last_framerate = mfc_qos_get_fps_by_timestamp(ctx, &time);
 	if (ctx->last_framerate > MFC_MAX_FPS)
 		ctx->last_framerate = MFC_MAX_FPS;
-	if (!(ctx->type == MFCINST_DECODER && !IS_UHD_RES(ctx)))
-		ctx->last_framerate = (ctx->qos_ratio * ctx->last_framerate) / 100;
+	ctx->last_framerate = (ctx->qos_ratio * ctx->last_framerate) / 100;
 }

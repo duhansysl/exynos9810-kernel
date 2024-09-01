@@ -1692,7 +1692,7 @@ static int s5p_mfc_enc_recover_buf_ctrls_val(struct s5p_mfc_ctx *ctx,
 	return 0;
 }
 
-static int s5p_mfc_enc_recover_buf_ctrls_nal_q(struct s5p_mfc_ctx *ctx,
+static int s5p_mfc_enc_restore_buf_ctrls(struct s5p_mfc_ctx *ctx,
 		struct list_head *head)
 {
 	struct s5p_mfc_buf_ctrl *buf_ctrl;
@@ -1704,7 +1704,7 @@ static int s5p_mfc_enc_recover_buf_ctrls_nal_q(struct s5p_mfc_ctx *ctx,
 
 		buf_ctrl->has_new = 1;
 		buf_ctrl->updated = 0;
-		mfc_debug(5, "recover has_new, id: 0x%08x val: %d\n",
+		mfc_debug(5, "Restore buffer control, id: 0x%08x val: %d\n",
 				buf_ctrl->id, buf_ctrl->val);
 	}
 
@@ -1725,5 +1725,5 @@ struct s5p_mfc_ctrls_ops encoder_ctrls_ops = {
 	.get_buf_update_val		= s5p_mfc_enc_get_buf_update_val,
 	.set_buf_ctrls_val_nal_q_enc	= s5p_mfc_enc_set_buf_ctrls_val_nal_q_enc,
 	.get_buf_ctrls_val_nal_q_enc	= s5p_mfc_enc_get_buf_ctrls_val_nal_q_enc,
-	.recover_buf_ctrls_nal_q	= s5p_mfc_enc_recover_buf_ctrls_nal_q,
+	.restore_buf_ctrls		= s5p_mfc_enc_restore_buf_ctrls,
 };
