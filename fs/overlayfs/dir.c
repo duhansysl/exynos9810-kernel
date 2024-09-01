@@ -482,7 +482,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 			      struct dentry *hardlink)
 {
 	int err;
-	const struct cred *old_cred, *hold_cred = NULL;
+	const struct cred *old_cred;
 	struct cred *override_cred;
 
 	err = ovl_copy_up(dentry->d_parent);
@@ -505,7 +505,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 				goto out_revert_creds;
 			}
 		}
-		hold_cred = override_creds(override_cred);
+		put_cred(override_creds(override_cred));
 		put_cred(override_cred);
 
 		if (!ovl_dentry_is_opaque(dentry))
@@ -516,9 +516,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 							link, hardlink);
 	}
 out_revert_creds:
-	ovl_revert_creds(old_cred ?: hold_cred);
-	if (old_cred && hold_cred)
-		put_cred(hold_cred);
+	ovl_revert_creds(old_cred);
 	if (!err) {
 		struct inode *realinode = d_inode(ovl_dentry_upper(dentry));
 
