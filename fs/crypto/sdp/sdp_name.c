@@ -12,7 +12,7 @@ struct fscrypt_sdp_renament {
 	struct inode *inode;
 };
 
-static int fscrypt_sdp_get_storage_type(struct dentry *target_dentry)
+int fscrypt_sdp_get_storage_type(struct dentry *target_dentry)
 {
 	if (!target_dentry)
 		return FSCRYPT_SDP_NAME_FUNC_ERROR;
@@ -48,6 +48,7 @@ static int fscrypt_sdp_get_storage_type(struct dentry *target_dentry)
 		return p_type;
 	}
 }
+EXPORT_SYMBOL(fscrypt_sdp_get_storage_type);
 
 void fscrypt_sdp_check_chamber_event(struct inode *old_dir, struct dentry *old_dentry,
 					struct inode *new_dir, struct dentry *new_dentry)
@@ -81,13 +82,13 @@ void fscrypt_sdp_check_chamber_event(struct inode *old_dir, struct dentry *old_d
 			cmd = sdp_fs_command_alloc(FSOP_SDP_SET_SENSITIVE, current->pid,
 								fscrypt_sdp_get_engine_id(new.dir),
 								fscrypt_sdp_get_storage_type(new.dentry->d_parent),
-								old.inode->i_ino,
+								old.inode->i_ino, 0,
 								GFP_NOFS);
 		} else if (rename_event & FSCRYPT_EVT_RENAME_OUT_OF_CHAMBER) {//Sensitive dir to Protected area
 			cmd = sdp_fs_command_alloc(FSOP_SDP_SET_PROTECTED, current->pid,
 								fscrypt_sdp_get_engine_id(old.dir),
 								fscrypt_sdp_get_storage_type(new.dentry->d_parent),
-								old.inode->i_ino,
+								old.inode->i_ino, 0,
 								GFP_NOFS);
 		}
 

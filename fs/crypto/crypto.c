@@ -29,13 +29,6 @@
 #include <crypto/aes.h>
 #include <crypto/skcipher.h>
 #include "fscrypt_private.h"
-#ifdef CONFIG_FS_CRYPTO_SEC_EXTENSION
-#include "crypto_sec.h"
-#else
-static inline int __init fscrypt_sec_crypto_init(void) { return 0; }
-static inline void __exit fscrypt_sec_crypto_exit(void) {}
-#endif
-#include <crypto/fmp.h>
 
 #ifdef CONFIG_FSCRYPT_SDP
 #include "sdp/sdp_crypto.h"
@@ -178,12 +171,8 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
 	fscrypt_generate_iv(&iv, lblk_num, ci);
 
 	req = skcipher_request_alloc(tfm, gfp_flags);
-	if (!req) {
-		printk_ratelimited(KERN_ERR
-				"%s: crypto_request_alloc() failed\n",
-				__func__);
+	if (!req)
 		return -ENOMEM;
-	}
 
 	skcipher_request_set_callback(
 		req, CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
@@ -200,9 +189,10 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
 		res = crypto_wait_req(crypto_skcipher_encrypt(req), &wait);
 	skcipher_request_free(req);
 	if (res) {
-		printk_ratelimited(KERN_ERR
-			"%s: crypto_skcipher_encrypt() returned %d\n",
-			__func__, res);
+		fscrypt_err(inode->i_sb,
+			    "%scryption failed for inode %lu, block %llu: %d",
+			    (rw == FS_DECRYPT ? "de" : "en"),
+			    inode->i_ino, lblk_num, res);
 		return res;
 	}
 	return 0;
@@ -211,11 +201,22 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
 struct page *fscrypt_alloc_bounce_page(struct fscrypt_ctx *ctx,
 				       gfp_t gfp_flags)
 {
-	ctx->w.bounce_page = mempool_alloc(fscrypt_bounce_page_pool, gfp_flags);
-	if (ctx->w.bounce_page == NULL)
+	void *pool = mempool_alloc(fscrypt_bounce_page_pool, gfp_flags);
+
+	if (pool == NULL)
 		return ERR_PTR(-ENOMEM);
-	ctx->flags |= FS_CTX_HAS_BOUNCE_BUFFER_FL;
-	return ctx->w.bounce_page;
+
+	if (ctx) {
+		ctx->w.bounce_page = pool;
+		ctx->flags |= FS_CTX_HAS_BOUNCE_BUFFER_FL;
+	}
+
+	return pool;
+}
+
+void fscrypt_free_bounce_page(void *pool)
+{
+	mempool_free(pool, fscrypt_bounce_page_pool);
 }
 
 /**
@@ -261,6 +262,13 @@ struct page *fscrypt_encrypt_page(const struct inode *inode,
 	int err;
 
 	BUG_ON(len % FS_CRYPTO_BLOCK_SIZE != 0);
+
+#ifdef CONFIG_DDAR
+	if (fscrypt_dd_encrypted_inode(inode)) {
+		// Invert crypto order. OEM crypto must perform after 3rd party crypto
+		return NULL;
+	}
+#endif
 
 	if (inode->i_sb->s_cop->flags & FS_CFLG_OWN_PAGES) {
 		/* with inplace-encryption we just encrypt the page */
@@ -324,6 +332,13 @@ int fscrypt_decrypt_page(const struct inode *inode, struct page *page,
 	if (!(inode->i_sb->s_cop->flags & FS_CFLG_OWN_PAGES))
 		BUG_ON(!PageLocked(page));
 
+#ifdef CONFIG_DDAR
+	if (fscrypt_dd_encrypted_inode(inode)) {
+		// Invert crypto order. OEM crypto must perform after 3rd party crypto
+		return 0;
+	}
+#endif
+
 	return fscrypt_do_page_crypto(inode, FS_DECRYPT, lblk_num, page, page,
 				      len, offs, GFP_NOFS);
 }
@@ -348,7 +363,6 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 		return 0;
 	}
 
-	/* this should eventually be an flag in d_flags */
 	spin_lock(&dentry->d_lock);
 	cached_with_key = dentry->d_flags & DCACHE_ENCRYPTED_WITH_KEY;
 	spin_unlock(&dentry->d_lock);
@@ -383,7 +397,6 @@ const struct dentry_operations fscrypt_d_ops = {
 	.d_delete     = fscrypt_sdp_d_delete,
 #endif
 };
-EXPORT_SYMBOL(fscrypt_d_ops);
 
 void fscrypt_restore_control_page(struct page *page)
 {
@@ -478,8 +491,6 @@ void fscrypt_msg(struct super_block *sb, const char *level,
  */
 static int __init fscrypt_init(void)
 {
-	int res = -ENOMEM;
-
 	/*
 	 * Use an unbound workqueue to allow bios to be decrypted in parallel
 	 * even when they happen to complete on the same CPU.  This sacrifices
@@ -507,12 +518,7 @@ static int __init fscrypt_init(void)
 		goto fail_free_info;
 #endif
 
-	res = fscrypt_sec_crypto_init();
-	if (res)
-		goto fail_free_info;
-
 	return 0;
-
 fail_free_info:
 	kmem_cache_destroy(fscrypt_info_cachep);
 fail_free_ctx:
@@ -520,7 +526,7 @@ fail_free_ctx:
 fail_free_queue:
 	destroy_workqueue(fscrypt_read_workqueue);
 fail:
-	return res;
+	return -ENOMEM;
 }
 module_init(fscrypt_init)
 
@@ -530,7 +536,6 @@ module_init(fscrypt_init)
 static void __exit fscrypt_exit(void)
 {
 	fscrypt_destroy();
-	fscrypt_sec_crypto_exit();
 
 	if (fscrypt_read_workqueue)
 		destroy_workqueue(fscrypt_read_workqueue);
@@ -540,7 +545,6 @@ static void __exit fscrypt_exit(void)
 	sdp_crypto_exit();
 	fscrypt_sdp_release_sdp_info_cachep();
 #endif
-
 	fscrypt_essiv_cleanup();
 }
 module_exit(fscrypt_exit);

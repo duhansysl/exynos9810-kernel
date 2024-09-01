@@ -14,27 +14,6 @@ config FS_ENCRYPTION
 	  efficient since it avoids caching the encrypted and
 	  decrypted pages in the page cache.
 
-config FS_PRIVATE_ENCRYPTION
-	tristate "FS Private Encryption"
-	depends on FS_ENCRYPTION && EXYNOS_FMP
-	help
-	  Enable private encryption of ext4 files and directories.
-
-config FS_CRYPTO_SEC_EXTENSION
-	bool "FS crypto extension for Samsung Mobile"
-	default n
-	depends on FS_ENCRYPTION
-	help
-	  This option enable the cc certification logic for file based encryption.
-
-config CRYPTO_FIPS
-	bool "FIPS 200 compliance"
-	depends on (CRYPTO_ANSI_CPRNG || CRYPTO_DRBG) && !CRYPTO_MANAGER_DISABLE_TESTS
-	help
-	  This options enables the fips boot option which is
-	  required if you want to system to operate in a FIPS 200
-	  certification.  You should say no unless you know what
-	  this is.
 config FSCRYPT_SDP
 	bool "Sensitive Data Protection for Per-file-encryption"
 	depends on FS_ENCRYPTION
