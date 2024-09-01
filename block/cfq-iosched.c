@@ -388,8 +388,8 @@ struct cfq_data {
 	unsigned int cfq_back_max;
 	unsigned int cfq_slice_async_rq;
 	unsigned int cfq_latency;
-	unsigned int cfq_rt_idle_only;
 	unsigned int cfq_max_async_dispatch;
+	unsigned int cfq_rt_idle_only;
 	u64 cfq_fifo_expire[2];
 	u64 cfq_slice[2];
 	u64 cfq_slice_idle;

@@ -267,10 +267,3 @@ config CMDLINE_PARTITION
 	help
 	  Say Y here if you want to read the partition table from bootargs.
 	  The format for the command line is just like mtdparts.
-
-config EFI_PARTITION_DEBUG
-	bool "Samsung EFI parition debug feature"
-	depends on EFI_PARTIION
-	help
-	  Say Y here if you want to debug the partition read information.
-	  It can check UFS read partition table or not.
