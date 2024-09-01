@@ -111,8 +111,8 @@ void blk_queue_congestion_threshold(struct request_queue *q)
  * @bdev:	device
  *
  * Locates the passed device's request queue and returns the address of its
- * backing_dev_info.  This function can only be called while there is an
- * active reference against the parent gendisk.
+ * backing_dev_info.  This function can only be called if @bdev is opened
+ * and the return value is never NULL.
  */
 struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
@@ -1659,10 +1659,6 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 	req->cmd_flags |= bio->bi_opf & REQ_COMMON_MASK;
 	if (bio->bi_opf & REQ_RAHEAD)
 		req->cmd_flags |= REQ_FAILFAST_MASK;
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (bio_flagged(bio, BIO_JOURNAL))
-		req->cmd_flags |= REQ_META;
-#endif
 
 	req->errors = 0;
 	req->__sector = bio->bi_iter.bi_sector;
@@ -2332,6 +2328,7 @@ void blk_account_io_done(struct request *req)
 
 	if (req->cmd_flags & REQ_FLUSH_SEQ)
 		req->q->flush_ios++;
+
 }
 
 #ifdef CONFIG_PM

@@ -139,7 +139,7 @@ efi_crc32(const void *buf, unsigned long len)
 /**
  * last_lba(): return number of last logical block of device
  * @bdev: block device
- *
+ * 
  * Description: Returns last LBA value on success, 0 on error.
  * This is stored (by sd and ide-geometry) in
  *  the part[0] entry for this disk, and is the number of
@@ -616,22 +616,11 @@ static int find_valid_gpt(struct parsed_partitions *state, gpt_header **gpt,
 
 		read_lba(state, 0, (u8 *)legacymbr, sizeof(*legacymbr));
 		good_pmbr = is_pmbr_valid(legacymbr, total_sectors);
-
-		if (!good_pmbr) {
-#if defined (CONFIG_EFI_PARTITION_DEBUG)
-			if (!memcmp(state->name, "sd", 2)) {
-				if (!legacymbr && !legacymbr->signature)
-					pr_err("ufs %s mbr is null\n", state->name);
-				else
-					pr_err("ufs %s good_pmbr: %d signature: 0x%x\n",
-						state->name, good_pmbr,
-						le16_to_cpu(legacymbr->signature));
-			}
-#endif
-			kfree(legacymbr);
-			goto fail;
-		}
 		kfree(legacymbr);
+
+		if (!good_pmbr)
+			goto fail;
+
 		pr_debug("Device has a %s MBR\n",
 			 good_pmbr == GPT_MBR_PROTECTIVE ?
 						"protective" : "hybrid");
@@ -708,13 +697,6 @@ int efi_partition(struct parsed_partitions *state)
 	unsigned ssz = bdev_logical_block_size(state->bdev) / 512;
 
 	if (!find_valid_gpt(state, &gpt, &ptes) || !gpt || !ptes) {
-#if defined(CONFIG_EFI_PARTITION_DEBUG)
-		if (!memcmp(state->name, "sd", 2))
-			pr_err("UFS %s valid gpt: %d, gpt is %s ptes is %s\n",
-				state->name, find_valid_gpt(state, &gpt, &ptes),
-				gpt ? "not Null" : "Null",
-				ptes ? "not Null" : "Null");
-#endif
 		kfree(gpt);
 		kfree(ptes);
 		return 0;
