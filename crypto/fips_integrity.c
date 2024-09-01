@@ -9,7 +9,6 @@
 #include <linux/scatterlist.h>
 #include <crypto/hash.h>
 #include "internal.h"
-
 /*
  * This function return kernel offset.
  * If CONFIG_RELOCATABLE_KERNEL is set
@@ -210,5 +209,6 @@ do_integrity_check(void)
 		return 0;
 	else
 		return -1;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(do_integrity_check);
