@@ -2235,6 +2235,7 @@ static struct file *do_sync_mmap_readahead(struct vm_area_struct *vma,
 {
 	struct file *fpin = NULL;
 	struct address_space *mapping = file->f_mapping;
+	unsigned int ra_pages;	
 
 	/* If we don't want any read-ahead, don't bother */
 	if (vma->vm_flags & VM_RAND_READ)
