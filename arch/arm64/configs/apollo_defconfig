@@ -46,3 +46,7 @@ CONFIG_IKHEADERS=y
 
 # Enable power efficient workqueues
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+#
+# Incremental Filesystem
+#
+CONFIG_INCREMENTAL_FS=y
