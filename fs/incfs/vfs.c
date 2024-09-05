@@ -2273,7 +2273,7 @@ struct dentry *incfs_mount_fs(struct file_system_type *type, int flags,
 		goto err_put_path;
 
 	path_put(&backing_dir_path);
-//	sb->s_flags |= SB_ACTIVE; // The flag SB_ACTIVE was removed in later versions of the Linux kernel.
+	sb->s_flags |= MS_ACTIVE; // The flag SB_ACTIVE was not removed in later versions of the Linux kernel. - Electric Scooter
 
 	pr_debug("incfs: mount\n");
 	return dget(sb->s_root);
