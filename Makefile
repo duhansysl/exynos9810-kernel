@@ -717,33 +717,6 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, format-overflow)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, int-in-bool-context)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, address-of-packed-member)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, attribute-alias)
-# Disable noisy GCC 9.1 / Clang warnings
-KBUILD_CFLAGS	+= $(call cc-disable-warning, misleading-indentation)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, sizeof-pointer-memaccess)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, switch-unreachable)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, duplicate-decl-specifier)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, logical-not-parentheses)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, memset-elt-size)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, pointer-compare)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, switch-bool)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, bool-operation)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, sizeof-pointer-div)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, psabi)
-KBUILD_CFLAGS   += $(call cc-disable-warning, incompatible-pointer-types)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, array-compare)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, address)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, stringop-overread)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, unused-but-set-variable)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, enum-conversion)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, parentheses-equality)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, void-pointer-to-enum-cast)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, sizeof-array-div)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, bitwise-instead-of-logical)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, strict-prototypes)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, pointer-bool-conversion)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, literal-conversion)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, constant-logical-operand)
-KBUILD_CFLAGS	+= $(call cc-disable-warning, single-bit-bitfield-constant-conversion)
 
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
@@ -948,9 +921,9 @@ KBUILD_CFLAGS += $(stackp-flag)
 
 ifeq ($(cc-name),clang)
 KBUILD_CPPFLAGS += $(call cc-option,-Qunused-arguments,)
+KBUILD_CFLAGS += $(call cc-disable-warning, format-invalid-specifier)
 KBUILD_CFLAGS += $(call cc-disable-warning, gnu)
 KBUILD_CFLAGS += $(call cc-disable-warning, duplicate-decl-specifier)
-KBUILD_CFLAGS += $(call cc-disable-warning, compound-token-split-by-space)
 # Quiet clang warning: comparison of unsigned expression < 0 is always false
 KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
 # CLANG uses a _MergedGlobals as optimization, but this breaks modpost, as the
@@ -963,18 +936,8 @@ endif
 # These warnings generated too much noise in a regular build.
 # Use make W=1 to enable them (see scripts/Makefile.extrawarn)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
-KBUILD_CFLAGS += $(call cc-disable-warning, attribute-alias)
-KBUILD_CFLAGS += $(call cc-disable-warning, packed-not-aligned)
-KBUILD_CFLAGS += $(call cc-disable-warning, stringop-truncation)
-KBUILD_CFLAGS += $(call cc-disable-warning, misleading-indentation)
-KBUILD_CFLAGS += $(call cc-disable-warning, stringop-overflow)
-KBUILD_CFLAGS += $(call cc-disable-warning, maybe-uninitialized)
-KBUILD_CFLAGS += $(call cc-disable-warning, address-of-packed-member)
-KBUILD_CFLAGS += $(call cc-disable-warning, sizeof-pointer-memaccess)
-KBUILD_CFLAGS += $(call cc-disable-warning, unused-function)
-KBUILD_CFLAGS += $(call cc-disable-warning, implicit-function-declaration)
-
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-const-variable)
+
 ifdef CONFIG_FRAME_POINTER
 KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
 else
