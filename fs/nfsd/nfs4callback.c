@@ -451,7 +451,7 @@ static int decode_cb_sequence4res(struct xdr_stream *xdr,
 	if (cb->cb_clp->cl_minorversion == 0)
 		return 0;
 
-	status = decode_cb_op_status(xdr, OP_CB_SEQUENCE, &cb->cb_seq_status);
+	status = decode_cb_op_status(xdr, (enum nfs_opnum4)OP_CB_SEQUENCE, &cb->cb_seq_status);
 	if (unlikely(status || cb->cb_seq_status))
 		return status;
 
@@ -530,7 +530,7 @@ static int nfs4_xdr_dec_cb_recall(struct rpc_rqst *rqstp,
 			return status;
 	}
 
-	return decode_cb_op_status(xdr, OP_CB_RECALL, &cb->cb_status);
+	return decode_cb_op_status(xdr, (enum nfs_opnum4)OP_CB_RECALL, &cb->cb_status);
 }
 
 #ifdef CONFIG_NFSD_PNFS
@@ -619,7 +619,7 @@ static int nfs4_xdr_dec_cb_layout(struct rpc_rqst *rqstp,
 		if (unlikely(status || cb->cb_seq_status))
 			return status;
 	}
-	return decode_cb_op_status(xdr, OP_CB_LAYOUTRECALL, &cb->cb_status);
+	return decode_cb_op_status(xdr, (enum nfs_opnum4)OP_CB_LAYOUTRECALL, &cb->cb_status);
 }
 #endif /* CONFIG_NFSD_PNFS */
 
@@ -676,7 +676,7 @@ static int nfs4_xdr_dec_cb_notify_lock(struct rpc_rqst *rqstp,
 		if (unlikely(status || cb->cb_seq_status))
 			return status;
 	}
-	return decode_cb_op_status(xdr, OP_CB_NOTIFY_LOCK, &cb->cb_status);
+	return decode_cb_op_status(xdr, (enum nfs_opnum4)OP_CB_NOTIFY_LOCK, &cb->cb_status);
 }
 
 /*
