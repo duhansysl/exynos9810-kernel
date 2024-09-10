@@ -76,16 +76,7 @@ VDSO_CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
                -Werror-implicit-function-declaration \
                -Wno-format-security \
                -std=gnu89
-ifdef CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3
-VDSO_CFLAGS += -O3
-VDSO_LDFLAGS += -O3
-else ifdef CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_UNSAFE
-VDSO_CFLAGS += -Ofast -ffast-math -funsafe-math-optimizations
-VDSO_LDFLAGS += -Ofast -ffast-math -funsafe-math-optimizations
-else
-VDSO_CFLAGS += -O2
-VDSO_LDFLAGS += -O2
-endif
+VDSO_CFLAGS  += -O2
 # Some useful compiler-dependent flags from top-level Makefile
 VDSO_CFLAGS += $(call cc32-option,-Wdeclaration-after-statement,)
 VDSO_CFLAGS += $(call cc32-option,-Wno-pointer-sign)
