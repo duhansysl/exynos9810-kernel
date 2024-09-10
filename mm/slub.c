@@ -1789,7 +1789,7 @@ out:
 
 	mod_zone_page_state(page_zone(page),
 		(s->flags & SLAB_RECLAIM_ACCOUNT) ?
-		NR_SLAB_RECLAIMABLE : NR_SLAB_UNRECLAIMABLE,
+		(enum zone_stat_item)NR_SLAB_RECLAIMABLE : (enum zone_stat_item)NR_SLAB_UNRECLAIMABLE,
 		1 << oo_order(oo));
 
 	inc_slabs_node(s, page_to_nid(page), page->objects);
@@ -1882,7 +1882,7 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 
 	mod_zone_page_state(page_zone(page),
 		(s->flags & SLAB_RECLAIM_ACCOUNT) ?
-		NR_SLAB_RECLAIMABLE : NR_SLAB_UNRECLAIMABLE,
+		(enum zone_stat_item)NR_SLAB_RECLAIMABLE : (enum zone_stat_item)NR_SLAB_UNRECLAIMABLE,
 		-pages);
 
 	__ClearPageSlabPfmemalloc(page);
