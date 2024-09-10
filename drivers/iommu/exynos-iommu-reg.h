@@ -9,7 +9,7 @@
  */
 #include "exynos-iommu.h"
 #include <dt-bindings/sysmmu/sysmmu.h>
-#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
+#ifdef CONFIG_SEC_DEBUG
 #include <linux/sec_debug.h>
 #endif
 
