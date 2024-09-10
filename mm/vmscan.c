@@ -3709,7 +3709,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 	finish_wait(&pgdat->kswapd_wait, &wait);
 }
 
-#ifdef CONFIG_KSWAPD_CPU
+#if CONFIG_KSWAPD_CPU
 static struct cpumask kswapd_cpumask;
 static void init_kswapd_cpumask(void)
 {
@@ -3745,7 +3745,7 @@ static int kswapd(void *p)
 	struct reclaim_state reclaim_state = {
 		.reclaimed_slab = 0,
 	};
-#ifdef CONFIG_KSWAPD_CPU
+#if CONFIG_KSWAPD_CPU
 	const struct cpumask *cpumask = &kswapd_cpumask;
 #else
 	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
@@ -3923,7 +3923,7 @@ static int kswapd_cpu_online(unsigned int cpu)
 		pg_data_t *pgdat = NODE_DATA(nid);
 		const struct cpumask *mask;
 
-#ifdef CONFIG_KSWAPD_CPU
+#if CONFIG_KSWAPD_CPU
 		mask = &kswapd_cpumask;
 #else
 		mask = cpumask_of_node(pgdat->node_id);
@@ -3977,7 +3977,7 @@ static int __init kswapd_init(void)
 {
 	int nid, ret;
 
-#ifdef CONFIG_KSWAPD_CPU
+#if CONFIG_KSWAPD_CPU
 	init_kswapd_cpumask();
 #endif
 	swap_setup();
