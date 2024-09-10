@@ -23,6 +23,7 @@
 #include "format.h"
 #include "integrity.h"
 #include "internal.h"
+#include <linux/stat.h>
 
 #define INCFS_PENDING_READS_INODE 2
 #define INCFS_LOG_INODE 3
@@ -1732,8 +1733,7 @@ static int dir_unlink(struct inode *dir, struct dentry *dentry)
 		goto out;
 	}
 
-	err = vfs_getattr(&backing_path, &stat, STATX_NLINK,
-			  AT_STATX_SYNC_AS_STAT);
+	err = vfs_getattr(&backing_path, &stat);
 	if (err)
 		goto out;
 
@@ -2273,7 +2273,7 @@ struct dentry *incfs_mount_fs(struct file_system_type *type, int flags,
 		goto err_put_path;
 
 	path_put(&backing_dir_path);
-	sb->s_flags |= SB_ACTIVE;
+	sb->s_flags |= MS_ACTIVE;
 
 	pr_debug("incfs: mount\n");
 	return dget(sb->s_root);

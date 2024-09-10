@@ -684,7 +684,7 @@ ssize_t incfs_kread(struct backing_file_context *bfc, void *buf, size_t size,
 		    loff_t pos)
 {
 	const struct cred *old_cred = override_creds(bfc->bc_cred);
-	int ret = kernel_read(bfc->bc_file, buf, size, &pos);
+	int ret = kernel_read(bfc->bc_file, pos, buf, size);
 
 	revert_creds(old_cred);
 	return ret;
@@ -694,7 +694,7 @@ ssize_t incfs_kwrite(struct backing_file_context *bfc, const void *buf,
 		     size_t size, loff_t pos)
 {
 	const struct cred *old_cred = override_creds(bfc->bc_cred);
-	int ret = kernel_write(bfc->bc_file, buf, size, &pos);
+	int ret = kernel_write(bfc->bc_file, buf, size, pos);
 
 	revert_creds(old_cred);
 	return ret;
