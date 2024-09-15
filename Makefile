@@ -548,14 +548,12 @@ ifneq ($(filter install,$(MAKECMDGOALS)),)
         endif
 endif
 
-KBUILD_CFLAGS   += -march=armv8.2-a+crypto+fp16 -mcpu=exynos-m3 -mtune=exynos-m3
-KBUILD_AFLAGS   += -march=armv8.2-a+crypto+fp16 -mcpu=exynos-m3 -mtune=exynos-m3
-KBUILD_LDFLAGS  += -mllvm -march=armv8.2-a+crypto+fp16 \
-				-mllvm -mcpu=exynos-m3 \
-
+ifeq ($(CONFIG_SOC_EXYNOS9810), y)
+KBUILD_CFLAGS	+= -march=armv8-a -mcpu=exynos-m3 -mtune=exynos-m3
+KBUILD_LDFLAGS	+= -march=armv8-a -mcpu=exynos-m3 -mtune=exynos-m3
 KBUILD_CFLAGS	+= -mfloat-abi=hard
-KBUILD_AFLAGS	+= -mfloat-abi=hard
-KBUILD_LDFLAGS	+= -mllvm -float-abi=hard
+KBUILD_LDFLAGS	+= -mfloat-abi=hard
+endif
 
 ifeq ($(cc-name),clang)
 include scripts/Makefile.clang
