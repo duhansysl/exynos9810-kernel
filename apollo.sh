@@ -118,7 +118,7 @@ CR_CLANG_URL=https://github.com/Neutron-Toolchains/clang-build-catalogue/release
 CR_CLANG=$CR_TC/neutron-clang-19.0.0
 fi
 if [ $CR_COMPILER = "7" ]; then
-CR_CLANG=$CR_TC/neutron-clang20-26.07.24
+CR_CLANG=$CR_TC/neutron-clang-20.0.0
 fi
 if [ $CR_COMPILER = "8" ]; then
 CR_CLANG=$CR_TC/clang-custom
