@@ -1,0 +1,6 @@
+config SEC_VIBRATOR
+	tristate "sec vibrator"
+	default n
+	help
+	  If you say yes here you will get support for the
+	  sec vibrator driver

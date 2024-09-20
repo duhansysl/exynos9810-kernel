@@ -17,7 +17,7 @@
 #define DSIM_LP_RX_TIMEOUT		0xffff
 #define DSIM_MULTI_PACKET_CNT		0xffff
 #define DSIM_PLL_STABLE_TIME		0x682A
-#define DSIM_FIFOCTRL_THRESHOLD		0x1 /* 1 ~ 32 */
+#define DSIM_FIFOCTRL_THRESHOLD		10 /* 1 ~ 32 */
 
 /* If below values depend on panel. These values wil be move to panel file.
  * And these values are valid in case of video mode only.
@@ -299,7 +299,11 @@ const u32 dphy_timing[][10] = {
 	{670, 26, 9, 15, 41, 28, 3, 34, 20, 3},
 	{660, 26, 9, 15, 40, 27, 3, 33, 19, 3},
 	{650, 26, 8, 15, 40, 27, 2, 33, 19, 3},
+#if defined(CONFIG_EXYNOS_DECON_LCD_HX83102E_GTACTIVE3)
+	{640, 25, 8, 15, 40, 19, 2, 33, 16, 3},
+#else
 	{640, 25, 8, 15, 40, 26, 2, 33, 19, 3},
+#endif
 	{630, 25, 8, 15, 39, 26, 2, 32, 18, 3},
 	{620, 24, 8, 15, 39, 26, 2, 32, 18, 3},
 	{610, 24, 8, 15, 39, 25, 2, 32, 18, 3},
@@ -2217,7 +2221,7 @@ void dsim_reg_stop(u32 id, u32 lanes)
 	dsim_reg_set_link_clock(id, 0);
 	dsim_reg_set_lanes(id, lanes, 0);
 	dsim_reg_set_esc_clk_on_lane(id, 0, lanes);
-	dsim_reg_enable_word_clock(id, 0);
+//	dsim_reg_enable_word_clock(id, 0);
 	dsim_reg_set_clocks(id, NULL, NULL, 0);
 	dsim_reg_sw_reset(id);
 }

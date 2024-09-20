@@ -295,7 +295,7 @@ int fimc_is_lib_vra_invoke_contol_event(struct fimc_is_lib_vra *lib_vra)
 
 	dbg_lib(3, "lib_vra_invoke_contol_event: type(%d)\n", lib_vra->ctl_task_type);
 
-	if (in_interrupt()) {
+	if (in_irq()) {
 		spin_lock(&lib_vra->ctl_lock);
 		status = CALL_VRAOP(lib_vra, on_control_task_event,
 					lib_vra->fr_work_heap);
@@ -331,7 +331,7 @@ int fimc_is_lib_vra_invoke_fwalgs_event(struct fimc_is_lib_vra *lib_vra)
 
 	dbg_lib(3, "lib_vra_invoke_fwalgs_event: type(%d)\n", lib_vra->algs_task_type);
 
-	if (in_interrupt()) {
+	if (in_irq()) {
 		spin_lock(&lib_vra->algs_lock);
 		status = CALL_VRAOP(lib_vra, on_fw_algs_task_event,
 					lib_vra->fr_work_heap);
@@ -828,6 +828,9 @@ int fimc_is_lib_vra_set_orientation(struct fimc_is_lib_vra *lib_vra,
 			vra_orientation = VRA_ORIENT_TOP_LEFT_TO_RIGHT;
 			break;
 		}
+	} else {
+		err_lib("[%d]%s: wrong direction(%#x)", instance, __func__, status);
+		return -EINVAL;
 	}
 
 	dbg_lib(3, "[%d]scaler_orientation(%d), vra_orientation(%d)\n", instance,
@@ -853,7 +856,7 @@ int fimc_is_lib_vra_new_frame(struct fimc_is_lib_vra *lib_vra,
 {
 	enum api_vra_type status = VRA_NO_ERROR;
 	unsigned char *input_dma_buf_kva = NULL;
-	ulong input_dma_buf_dva;
+	dma_addr_t input_dma_buf_dva;
 
 	if (unlikely(!lib_vra)) {
 		err_lib("lib_vra is NULL");
@@ -865,7 +868,7 @@ int fimc_is_lib_vra_new_frame(struct fimc_is_lib_vra *lib_vra,
 	fimc_is_dva_vra((ulong)lib_vra->test_input_buffer, (u32 *)&input_dma_buf_dva);
 #else
 	input_dma_buf_kva = buffer_kva;
-	input_dma_buf_dva = (ulong)buffer_dva;
+	input_dma_buf_dva = (dma_addr_t)buffer_dva;
 #endif
 
 	status = CALL_VRAOP(lib_vra, on_new_frame,
@@ -1293,7 +1296,7 @@ void fimc_is_lib_vra_os_funcs(void)
 	funcs.spin_lock_irqsave      = fimc_is_spin_lock_irqsave;
 	funcs.spin_unlock_irqrestore = fimc_is_spin_unlock_irqrestore;
 	funcs.lib_assert       = fimc_is_lib_vra_assert;
-	funcs.lib_in_interrupt = fimc_is_lib_in_interrupt;
+	funcs.lib_in_irq       = fimc_is_lib_in_irq;
 
 #ifdef ENABLE_FPSIMD_FOR_USER
 	fpsimd_get();

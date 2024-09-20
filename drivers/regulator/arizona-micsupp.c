@@ -47,7 +47,6 @@ struct arizona_micsupp {
 	struct regulator_init_data init_data;
 
 	struct work_struct check_cp_work;
-	struct arizona_micsupp_forced_bypass forced_bypass;
 };
 
 static void arizona_micsupp_check_cp(struct work_struct *work)
@@ -55,41 +54,33 @@ static void arizona_micsupp_check_cp(struct work_struct *work)
 	struct arizona_micsupp *micsupp =
 		container_of(work, struct arizona_micsupp, check_cp_work);
 	struct snd_soc_dapm_context *dapm = *micsupp->dapm;
-	struct arizona_micsupp_forced_bypass *bypass = &micsupp->forced_bypass;
-	bool sync = false;
+	unsigned int val;
+	int ret;
+
+	ret = regmap_read(micsupp->regmap, micsupp->enable_reg, &val);
+	if (ret != 0) {
+		dev_err(micsupp->dev,
+			"Failed to read CP state: %d\n", ret);
+		return;
+	}
 
 	if (dapm) {
-		snd_soc_dapm_mutex_lock(dapm);
-		mutex_lock(&bypass->lock);
+		if ((val & (ARIZONA_CPMIC_ENA | ARIZONA_CPMIC_BYPASS)) ==
+		    ARIZONA_CPMIC_ENA)
+			snd_soc_dapm_force_enable_pin(dapm, "MICSUPP");
+		else
+			snd_soc_dapm_disable_pin(dapm, "MICSUPP");
 
-		if (!bypass->forced) {
-			if (bypass->enabled && bypass->regulated)
-				snd_soc_dapm_force_enable_pin_unlocked(dapm,
-								"MICSUPP");
-			else
-				snd_soc_dapm_disable_pin_unlocked(dapm,
-								  "MICSUPP");
-			sync = true;
-		}
-
-		mutex_unlock(&bypass->lock);
-		snd_soc_dapm_mutex_unlock(dapm);
-
-		if (sync)
-			snd_soc_dapm_sync(dapm);
+		snd_soc_dapm_sync(dapm);
 	}
 }
 
 static int arizona_micsupp_enable(struct regulator_dev *rdev)
 {
 	struct arizona_micsupp *micsupp = rdev_get_drvdata(rdev);
-	struct arizona_micsupp_forced_bypass *bypass = &micsupp->forced_bypass;
 	int ret;
 
-	mutex_lock(&bypass->lock);
-	bypass->enabled = true;
 	ret = regulator_enable_regmap(rdev);
-	mutex_unlock(&bypass->lock);
 
 	if (ret == 0)
 		schedule_work(&micsupp->check_cp_work);
@@ -100,14 +91,9 @@ static int arizona_micsupp_enable(struct regulator_dev *rdev)
 static int arizona_micsupp_disable(struct regulator_dev *rdev)
 {
 	struct arizona_micsupp *micsupp = rdev_get_drvdata(rdev);
-	struct arizona_micsupp_forced_bypass *bypass = &micsupp->forced_bypass;
 	int ret;
 
-	mutex_lock(&bypass->lock);
-	bypass->enabled = false;
 	ret = regulator_disable_regmap(rdev);
-	mutex_unlock(&bypass->lock);
-
 	if (ret == 0)
 		schedule_work(&micsupp->check_cp_work);
 
@@ -117,15 +103,9 @@ static int arizona_micsupp_disable(struct regulator_dev *rdev)
 static int arizona_micsupp_set_bypass(struct regulator_dev *rdev, bool ena)
 {
 	struct arizona_micsupp *micsupp = rdev_get_drvdata(rdev);
-	struct arizona_micsupp_forced_bypass *bypass = &micsupp->forced_bypass;
-	int ret = 0;
+	int ret;
 
-	mutex_lock(&bypass->lock);
-	bypass->regulated = !ena;
-	if (!bypass->forced)
-		ret = regulator_set_bypass_regmap(rdev, ena);
-	mutex_unlock(&bypass->lock);
-
+	ret = regulator_set_bypass_regmap(rdev, ena);
 	if (ret == 0)
 		schedule_work(&micsupp->check_cp_work);
 
@@ -282,7 +262,6 @@ static int arizona_micsupp_common_init(struct platform_device *pdev,
 	int ret;
 
 	INIT_WORK(&micsupp->check_cp_work, arizona_micsupp_check_cp);
-	mutex_init(&micsupp->forced_bypass.lock);
 
 	micsupp->init_data.consumer_supplies = &micsupp->supply;
 	micsupp->supply.supply = "MICVDD";
@@ -310,7 +289,6 @@ static int arizona_micsupp_common_init(struct platform_device *pdev,
 	/* Default to regulated mode */
 	regmap_update_bits(micsupp->regmap, micsupp->enable_reg,
 			   ARIZONA_CPMIC_BYPASS, 0);
-	micsupp->forced_bypass.regulated = true;
 
 	micsupp->regulator = devm_regulator_register(&pdev->dev,
 						     desc,
@@ -378,7 +356,6 @@ static int madera_micsupp_probe(struct platform_device *pdev)
 	micsupp->dapm = &madera->dapm;
 	micsupp->dev = madera->dev;
 	micsupp->init_data = arizona_micsupp_ext_default;
-	madera->micsupp_forced_bypass = &micsupp->forced_bypass;
 
 	return arizona_micsupp_common_init(pdev, micsupp, &madera_micsupp,
 					   &madera->pdata.micvdd);
@@ -395,7 +372,6 @@ static struct platform_driver madera_micsupp_driver = {
 	.probe = madera_micsupp_probe,
 	.driver		= {
 		.name	= "madera-micsupp",
-		.suppress_bind_attrs = true,
 	},
 };
 

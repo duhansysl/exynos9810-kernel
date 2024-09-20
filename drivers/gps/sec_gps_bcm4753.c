@@ -5,7 +5,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 
 static struct device *gps_dev;
 static unsigned int gps_pwr_on;

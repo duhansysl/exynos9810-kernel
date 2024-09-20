@@ -1367,10 +1367,6 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 			hid_err(intf, "can't add hid device: %d\n", ret);
 		goto err_free;
 	}
-#if !defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
-	if (dev->do_remote_wakeup)
-		usb_enable_autosuspend(dev);
-#endif
 
 	return 0;
 err_free:

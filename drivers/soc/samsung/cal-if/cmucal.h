@@ -184,11 +184,6 @@ enum margin_id {
 	MAX_MARGIN_ID,
 };
 
-#if defined(CONFIG_SAMSUNG_VST_CAL)
-#define NAD_CRC_MAGIC           (0x95252A)
-#define NAD_VST_CAL_VOLT	25000
-#endif
-
 #define IS_FIXED_RATE(_id)	((_id & MASK_OF_TYPE) == FIXED_RATE_TYPE)
 #define IS_FIXED_FACTOR(_id)	((_id & MASK_OF_TYPE) == FIXED_FACTOR_TYPE)
 #define IS_PLL(_id)		((_id & MASK_OF_TYPE) == PLL_TYPE)
@@ -332,11 +327,11 @@ struct pll_spec {
  * @pdiv, @mdiv, @sdiv, @kdiv: for rate
  */
 struct cmucal_pll_table {
-	unsigned int		rate;
+	unsigned long		rate;
 	unsigned short		pdiv;
 	unsigned short		mdiv;
 	unsigned short		sdiv;
-	signed short		kdiv;
+	signed int		kdiv;
 };
 
 /*
@@ -411,8 +406,8 @@ struct cmucal_clkout {
 	.lut		= _lut,						\
 	.list		= _list,					\
 	.seq		= _seq,						\
-	.num_rates	= (sizeof(_lut) / sizeof((_lut)[0])),		\
-	.num_list	= (sizeof(_list) / sizeof((_list)[0])),		\
+	.num_rates	= (sizeof(_lut) / sizeof(struct vclk_lut)),		\
+	.num_list	= (sizeof(_list) / sizeof(enum clk_id)),		\
 	.switch_info	= _switch,					\
 	.ops		= NULL,						\
 }
@@ -424,8 +419,8 @@ struct cmucal_clkout {
 	.lut		= _lut,						\
 	.list		= _list,					\
 	.seq		= _seq,						\
-	.num_rates	= (sizeof(_lut) / sizeof((_lut)[0])),		\
-	.num_list	= (sizeof(_list) / sizeof((_list)[0])),		\
+	.num_rates	= (sizeof(_lut) / sizeof(struct vclk_lut)),		\
+	.num_list	= (sizeof(_list) / sizeof(enum clk_id)),		\
 	.switch_info	= _switch,					\
 	.ops		= NULL,						\
 	.margin_id	= _margin_id,					\
@@ -483,7 +478,7 @@ struct cmucal_clkout {
 	.clk.status_idx	= _so,				\
 	.clk.enable_idx	= _eo,				\
 	.pid		= _pids,			\
-	.num_parents	= (sizeof(_pids) / sizeof((_pids)[0])), \
+	.num_parents	= (sizeof(_pids) / sizeof(enum clk_id)), \
 }
 
 #define CLK_DIV(_id, _pid, _o, _so, _eo)		\

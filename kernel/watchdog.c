@@ -26,12 +26,10 @@
 #include <asm/irq_regs.h>
 #include <linux/kvm_para.h>
 #include <linux/kthread.h>
+
 #ifdef CONFIG_SEC_DEBUG
 #include <linux/sec_debug.h>
 #endif
-
-#include <linux/exynos-ss.h>
-#include <linux/irqflags.h>
 
 #ifdef CONFIG_SEC_DEBUG
 static const char * const hl_to_name[] = {
@@ -384,7 +382,7 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 			}
 		}
 
-		pr_auto(ASL1, "BUG: soft lockup - CPU#%d stuck for %us! [%s:%d]\n",
+		pr_emerg("BUG: soft lockup - CPU#%d stuck for %us! [%s:%d]\n",
 			smp_processor_id(), duration,
 			current->comm, task_pid_nr(current));
 #ifdef CONFIG_SEC_DEBUG
@@ -997,7 +995,7 @@ static void watchdog_check_hardlockup_other_cpu(void)
 	if (is_hardlockup_other_cpu(next_cpu)) {
 #ifdef CONFIG_SEC_DEBUG
 		check_hardlockup_type(next_cpu);
-#endif	
+#endif
 		/* only warn once */
 		if (per_cpu(hard_watchdog_warn, next_cpu) == true)
 			return;
@@ -1147,7 +1145,7 @@ void update_hardlockup_type(unsigned int cpu)
 
 	if (hl_info->hl_type == HL_TASK_STUCK && !irqs_disabled()) {
 		hl_info->hl_type = HL_UNKNOWN_STUCK;
-		pr_info("Unknown stuck because IRQ was enabled but IRQ was not generated\n");
+		pr_auto(ASL9, "Unknown stuck because IRQ was enabled but IRQ was not generated\n");
 	}
 }
 EXPORT_SYMBOL(update_hardlockup_type);

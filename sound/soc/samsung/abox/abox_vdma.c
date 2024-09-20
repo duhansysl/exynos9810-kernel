@@ -13,7 +13,6 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/memblock.h>
-#include <linux/iommu.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
@@ -308,7 +307,7 @@ static int abox_vdma_ack(struct snd_pcm_substream *substream)
 	pcmtask_msg->msgtype = PCM_PLTDAI_ACK;
 	pcmtask_msg->param.pointer = (unsigned int)appl_bytes;
 
-	return abox_vdma_request_ipc(&msg, 0, 0);
+	return abox_vdma_request_ipc(&msg, 1, 0);
 }
 
 static struct snd_pcm_ops abox_vdma_platform_ops = {

@@ -1,0 +1,29 @@
+Samsung DC vibrator
+
+Required properties:
+
+ - compatible: must be "samsung,dc_vibrator".
+
+ - dc_vib,motor_type: must be "COINDC".
+
+Optional properties:
+
+ - dc_vib,gpio_en: GPIO used for enable motor.
+
+ - dc_vib,regulator_name: Regulator name used for enable motor.
+
+ - dc_vib,use_qc_regulator: If DC vibraotr VCC is connected with special QCOM
+   pmic ldo, use this property.
+
+ - pinctrl variants.
+
+Examples:
+
+ dc_vibrator {
+	 compatible = "samsung,dc_vibrator";
+	 status = "okay";
+	 dc_vib,gpio_en = <&gpio 1 0>;
+	 dc_vib,regulator_name = "VDD_LDO";
+	 dc_vib,use_qc_regulator;
+	 dc_vib,motor_type = "COINDC";
+ };

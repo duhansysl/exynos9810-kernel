@@ -12,11 +12,8 @@ config VENDER_DEFAULT
         bool "Default"
 config VENDER_MCD
         bool "MCD"
-config VENDER_PSV
-        bool "PSV"
 endchoice
 
 source "drivers/media/platform/exynos/fimc-is2/vendor/default/Kconfig"
-source "drivers/media/platform/exynos/fimc-is2/vendor/psv/Kconfig"
 source "drivers/media/platform/exynos/fimc-is2/vendor/mcd/Kconfig"
 endmenu

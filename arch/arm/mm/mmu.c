@@ -1620,7 +1620,6 @@ void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
-	set_memsize_kernel_type(MEMSIZE_KERNEL_PAGING);
 	build_mem_type_table();
 	prepare_page_table();
 	map_lowmem();
@@ -1640,5 +1639,4 @@ void __init paging_init(const struct machine_desc *mdesc)
 
 	empty_zero_page = virt_to_page(zero_page);
 	__flush_dcache_page(NULL, empty_zero_page);
-	set_memsize_kernel_type(MEMSIZE_KERNEL_OTHERS);
 }

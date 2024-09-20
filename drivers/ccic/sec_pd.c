@@ -17,6 +17,7 @@
 #include <linux/battery/battery_notifier.h>
 #endif
 
+/*
 struct pdic_notifier_struct pd_noti;
 void (*fp_select_pdo)(int num);
 
@@ -25,3 +26,4 @@ void select_pdo(int num)
 	if (fp_select_pdo)
 		fp_select_pdo(num);
 }
+*/

@@ -520,6 +520,10 @@ int vps_find_attached_dev(muic_data_t *pmuic, muic_attached_dev_t *pdev, int *pi
 		break;
 	}
 
+	/* do nothing */
+	if (ret < 0)
+		return -1;
+
 	/* Check Undefined range */
 	if (pmuic->undefined_range) {
 		if ((pmsr->t.vbvolt == VB_HIGH) &&

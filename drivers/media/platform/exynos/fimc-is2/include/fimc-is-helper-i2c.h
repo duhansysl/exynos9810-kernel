@@ -56,4 +56,6 @@ int fimc_is_sensor_write16_array(struct i2c_client *client,
 	u16 addr, u16 *val, u32 num);
 int fimc_is_sensor_write16_burst(struct i2c_client *client,
 	u16 addr, u16 *val, u32 num);
+int fimc_is_sensor_write8_sequential(struct i2c_client *client,
+	u16 addr, u8 *val, u16 num);
 #endif

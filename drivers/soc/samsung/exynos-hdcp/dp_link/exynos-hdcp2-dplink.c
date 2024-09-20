@@ -240,7 +240,7 @@ int hdcp_dplink_authenticate(void)
 			hdcp_clear_session(ss_info.ss_id);
 			if (hdcp_session_open(&ss_info))
 				return -ENOMEM;
-			else 
+			else
 				hdcp_err("session open ss_id %d\n", ss_info.ss_id);
 
 			lk_info.ss_id = ss_info.ss_id;

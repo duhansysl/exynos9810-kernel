@@ -49,6 +49,9 @@ static struct xhci_segment *xhci_segment_alloc(struct xhci_hcd *xhci,
 	if (!seg)
 		return NULL;
 
+#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+	flags |= __GFP_NOWARN;
+#endif
 	seg->trbs = dma_pool_zalloc(xhci->segment_pool, flags, &dma);
 	if (!seg->trbs) {
 		kfree(seg);
@@ -530,6 +533,9 @@ static struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci
 	if (type == XHCI_CTX_TYPE_INPUT)
 		ctx->size += CTX_SIZE(xhci->hcc_params);
 
+#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+	flags |= __GFP_NOWARN;
+#endif
 	ctx->bytes = dma_pool_zalloc(xhci->device_pool, flags, &ctx->dma);
 	if (!ctx->bytes) {
 		kfree(ctx);

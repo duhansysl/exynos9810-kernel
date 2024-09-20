@@ -54,6 +54,17 @@ config SENSORS_SSP_ICM20610
 	  To compile this driver as a module, choose M here: the
 	  module will be called ssp.
 
+config SENSORS_SSP_ICM42605M
+	tristate "Sensors ssp icm42605m"
+	default n
+	depends on SPI
+	help
+	  icm42605m file for factory test in ssp driver.
+          If you say yes here you get icm42605m support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
 config SENSORS_SSP_BMI058
 	tristate "Sensors ssp bmi058"
 	default n
@@ -285,6 +296,13 @@ config SENSOR_SSP_PROXIMTY_FOR_WINDOW_TYPE
 	help
 	  If you say yes here you get support for the proximity threshold
 	  This threshold is changed by window type.
+
+config SENSORS_SSP_TMD3725
+	tristate "Sensors ssp tmd3725"
+	default n
+	depends on SPI
+	help
+	  This option enables tmd3725 proxitmity sensor.
 
 config SENSORS_SSP_TMD4905
 	tristate "Sensors ssp tmd4905"
@@ -675,5 +693,94 @@ config SSP_SUPPORT_MAGNETIC_OVERFLOW
 	default n
 	help
 	  If you want to use Register RW sysfs, it should be set.
+
+config SENSORS_A96T3X6
+	tristate "a96t3x6 Grip sensor"
+	default n
+	help
+	  Say Y here if you use a96t3x6.
+	  This option enables grip sensors using
+	  SemTech a96t3x6 device driver.
+	  Say N here if you do not use a96t3x6.
+
+config SENSORS_A96T3X6_WIFI
+	depends on I2C
+	tristate "A96T3X6 driver for grip"
+	default n
+	help
+	  Say Y here if you use A96T3X6 for grip.
+	  This option enables grip sensors using
+	  Above A96T3X6 device driver for grip.
+
+config SENSORS_A96T3X6_2CH
+	depends on I2C
+	tristate "SENSORS_A96T3X6_2CH driver for grip"
+	default n
+	help
+	  Say Y here if you use SENSORS_A96T3X6_2CH for grip.
+	  This option enables grip sensors using
+	  Above SENSORS_A96T3X6_2CH device driver for grip.
+
+config SENSORS_A96T3X6_WIFI_2CH
+	depends on I2C
+	tristate "SENSORS_A96T3X6_WIFI_2CH driver for grip"
+	default n
+	help
+	  Say Y here if you use SENSORS_A96T3X6_WIFI_2CH for grip.
+	  This option enables grip sensors using
+	  Above SENSORS_A96T3X6_WIFI_2CH device driver for grip.
+
+config SENSORS_FW_VENDOR
+	bool "Locate the Firmware on Vendor"
+	default n
+	help
+	  To use the module automatic system, 
+	  locate the firmware on vendor side.
+
+config SENSORS_A96T3X6_CRC_CHECK
+	bool "check crc check instead of checksum compare"
+	default n
+	help
+	  Say Y here if you use crc check instead of checksum compare
+
+config SENSORS_A96T365IF
+	tristate "a96t365IF Grip sensor"
+	default n
+	help
+	  Say Y here if you use a96t365IF.
+	  This option enables grip sensors using
+	  ABOV a96t365IF device driver.
+	  Say N here if you do not use a96t365IF.
+
+config SENSORS_TABLET_CONCEPT
+	bool "Grip sensonr tablet model concept"
+	default n
+	help
+	  Say Y here if you use the tablet model concept.
+
+config SENSORS_SSP_VCNL36811S
+	bool "vcnl36811s proximity sensor"
+	default n
+	help
+	  Say Y here if you use vcnl36811s.
+
+config SENSORS_SSP_GTACTIVE3
+	tristate "GTACTIVE3 Project"
+	default n
+	depends on SPI
+	help
+	  Binary file for ssp driver.
+          If you say yes here you get gtactive3 project support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SABC
+	tristate "sABC Algorithm"
+	default n
+	depends on SPI
+	help
+		If you have to use sABC alogorithm, 
+		it should be set, it use camera lux.
 
 source "drivers/sensorhub/brcm/bbdpl/Kconfig"

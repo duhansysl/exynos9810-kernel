@@ -335,6 +335,10 @@ int fimc_is_hw_group_open(void *group_data)
 	return ret;
 }
 
+void fimc_is_hw_camif_init(void)
+{
+}
+
 int fimc_is_hw_camif_cfg(void *sensor_data)
 {
 	int ret = 0;
@@ -521,7 +525,7 @@ int fimc_is_hw_ischain_cfg(void *ischain_data)
 	csi = (struct fimc_is_device_csi *)v4l2_get_subdevdata(sensor->subdev_csi);
 
 	/* checked single/dual camera */
-	for (i = 0; i < FIMC_IS_STREAM_COUNT; i++)
+	for (i = 0; i < FIMC_IS_SENSOR_COUNT; i++)
 		if (test_bit(FIMC_IS_SENSOR_OPEN, &(core->sensor[i].state)))
 			sensor_cnt++;
 

@@ -23,7 +23,6 @@
 #include <linux/mount.h>
 #include <linux/mman.h>
 #include <linux/slab.h>
-#include <linux/xattr.h>
 #include <crypto/hash_info.h>
 #include <linux/ptrace.h>
 #include <linux/task_integrity.h>
@@ -31,6 +30,7 @@
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/shmem_fs.h>
+#include <linux/version.h>
 
 #include "five.h"
 #include "five_audit.h"
@@ -41,8 +41,13 @@
 #include "five_cache.h"
 #include "five_dmverity.h"
 #include "five_dsms.h"
+#include "five_testing.h"
 
-static const bool unlink_on_error;	// false
+/* crash_dump in Android 12 uses this request even if Kernel doesn't
+ * support it */
+#ifndef PTRACE_PEEKMTETAGS
+#define PTRACE_PEEKMTETAGS 33
+#endif
 
 static const bool check_dex2oat_binary = true;
 static const bool check_memfd_file = true;
@@ -212,6 +217,7 @@ static void work_handler(struct work_struct *in_data)
 	kfree(context);
 }
 
+__mockable
 const char *five_d_path(const struct path *path, char **pathbuf, char *namebuf)
 {
 	char *pathname = NULL;
@@ -320,16 +326,17 @@ static int push_file_event_bunch(struct task_struct *task, struct file *file,
 		return -ENOMEM;
 	}
 
-	spin_lock(&task->integrity->list_lock);
+	spin_lock(&TASK_INTEGRITY(task)->list_lock);
 
-	if (list_empty(&(task->integrity->events.list))) {
-		task_integrity_get(task->integrity);
-		task_integrity_processing(task->integrity);
+	if (list_empty(&(TASK_INTEGRITY(task)->events.list))) {
+		task_integrity_get(TASK_INTEGRITY(task));
+		task_integrity_processing(TASK_INTEGRITY(task));
 
-		context->tint = task->integrity;
+		context->tint = TASK_INTEGRITY(task);
 
-		list_add_tail(&five_file->list, &task->integrity->events.list);
-		spin_unlock(&task->integrity->list_lock);
+		list_add_tail(&five_file->list,
+			      &TASK_INTEGRITY(task)->events.list);
+		spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 		INIT_WORK(&context->data_work, work_handler);
 		rc = queue_work(g_five_workqueue, &context->data_work) ? 0 : 1;
 	} else {
@@ -337,12 +344,13 @@ static int push_file_event_bunch(struct task_struct *task, struct file *file,
 
 		INIT_LIST_HEAD(&dead_list);
 		if ((function == BPRM_CHECK) &&
-			(!list_is_singular(&(task->integrity->events.list)))) {
-			list_cut_tail(&task->integrity->events.list,
+		    (!list_is_singular(&(TASK_INTEGRITY(task)->events.list)))) {
+			list_cut_tail(&TASK_INTEGRITY(task)->events.list,
 					&dead_list);
 		}
-		list_add_tail(&five_file->list, &task->integrity->events.list);
-		spin_unlock(&task->integrity->list_lock);
+		list_add_tail(&five_file->list,
+			      &TASK_INTEGRITY(task)->events.list);
+		spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 		free_files_list(&dead_list);
 		kfree(context);
 	}
@@ -360,7 +368,7 @@ static int push_reset_event(struct task_struct *task,
 		return 0;
 
 	INIT_LIST_HEAD(&dead_list);
-	current_tint = task->integrity;
+	current_tint = TASK_INTEGRITY(task);
 	task_integrity_get(current_tint);
 
 	task_integrity_set_reset_reason(current_tint, cause, file);
@@ -441,7 +449,7 @@ void five_file_free(struct file *file)
 
 void five_task_free(struct task_struct *task)
 {
-	task_integrity_put(task->integrity);
+	task_integrity_put(TASK_INTEGRITY(task));
 }
 
 /* Returns string representation of input function */
@@ -465,8 +473,12 @@ static inline bool is_dex2oat_binary(const struct file *file)
 	const char *pathname = NULL;
 	char *pathbuf = NULL;
 	const char * const dex2oat_full_path[] = {
-		"/apex/com.android.art/bin/dex2oat",	/* R OS */
-		"/apex/com.android.runtime/bin/dex2oat"	/* Q OS */
+		/* R OS */
+		"/apex/com.android.art/bin/dex2oat",
+		"/apex/com.android.art/bin/dex2oat32",
+		"/apex/com.android.art/bin/dex2oat64",
+		/* Q OS */
+		"/apex/com.android.runtime/bin/dex2oat"
 	};
 	char filename[NAME_MAX];
 	bool res = false;
@@ -476,7 +488,11 @@ static inline bool is_dex2oat_binary(const struct file *file)
 		return false;
 
 	if (strncmp(file->f_path.dentry->d_iname, "dex2oat",
-			sizeof("dex2oat")))
+			sizeof("dex2oat")) &&
+	    strncmp(file->f_path.dentry->d_iname, "dex2oat32",
+			sizeof("dex2oat32")) &&
+	    strncmp(file->f_path.dentry->d_iname, "dex2oat64",
+			sizeof("dex2oat64")))
 		return false;
 
 	pathname = five_d_path(&file->f_path, &pathbuf, filename);
@@ -555,19 +571,24 @@ static void process_file(struct task_struct *task,
 
 	xattr_len = five_read_xattr(d_real_comp(file->f_path.dentry),
 			&xattr_value);
-	if (xattr_value && xattr_len) {
-		rc = five_cert_fillout(&cert, xattr_value, xattr_len);
-		if (rc) {
-			pr_err("FIVE: certificate is incorrect inode=%lu\n",
+	if (xattr_value) {
+		if (xattr_len) {
+			rc = five_cert_fillout(&cert, xattr_value, xattr_len);
+			if (rc) {
+				pr_err("FIVE: certificate is incorrect inode=%lu\n",
 								inode->i_ino);
-			goto out;
-		}
+				goto out;
+			}
 
-		pcert = &cert;
+			pcert = &cert;
 
-		if (file->f_flags & O_DIRECT) {
-			rc = -EACCES;
-			goto out;
+			if (file->f_flags & O_DIRECT) {
+				rc = -EACCES;
+				goto out;
+			}
+		} else {
+			five_audit_info(task, file, "zero length", 0, 0,
+						"Found a dummy-cert", rc);
 		}
 	}
 
@@ -596,7 +617,7 @@ out:
 static void process_measurement(const struct processing_event_list *params)
 {
 	struct task_struct *task = params->task;
-	struct task_integrity *integrity = params->task->integrity;
+	struct task_integrity *integrity = TASK_INTEGRITY(task);
 	struct file *file = params->file;
 	struct inode *inode = file_inode(file);
 	int function = params->function;
@@ -656,7 +677,7 @@ int five_file_mmap(struct file *file, unsigned long prot)
 {
 	int rc = 0;
 	struct task_struct *task = current;
-	struct task_integrity *tint = task->integrity;
+	struct task_integrity *tint = TASK_INTEGRITY(task);
 
 	if (five_check_params(task, file))
 		return 0;
@@ -692,20 +713,22 @@ int five_file_mmap(struct file *file, unsigned long prot)
  *
  * On success return 0.
  */
-int five_bprm_check(struct linux_binprm *bprm)
+int __five_bprm_check(struct linux_binprm *bprm, int depth)
 {
 	int rc = 0;
 	struct task_struct *task = current;
-	struct task_integrity *old_tint = task->integrity;
+	struct task_integrity *old_tint = TASK_INTEGRITY(task);
 
 	if (unlikely(task->ptrace))
 		return rc;
 
-	if (bprm->recursion_depth > 0) {
+	if (depth > 0) {
 		rc = push_file_event_bunch(task, bprm->file, MMAP_CHECK);
 	} else {
-		task->integrity = task_integrity_alloc();
-		if (likely(task->integrity)) {
+		struct task_integrity *tint = task_integrity_alloc();
+
+		task_integrity_assign(task, tint);
+		if (likely(TASK_INTEGRITY(task))) {
 			rc = push_file_event_bunch(task,
 							bprm->file, BPRM_CHECK);
 		} else {
@@ -717,39 +740,17 @@ int five_bprm_check(struct linux_binprm *bprm)
 	return rc;
 }
 
-/* Does `unlink' of the `file'.
- * This function breaks delegation (drops file's leases. See
- * man 2 fcntl "Leases"). do_unlinkat function in fs/namei.c was used
- * as an example.
- */
-static int five_unlink(struct file *file)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+int five_bprm_check(struct linux_binprm *bprm, int depth)
 {
-	int rc;
-	struct dentry *dentry = file->f_path.dentry;
-	struct inode *inode = d_backing_inode(dentry->d_parent);
-	struct inode *delegated_inode = NULL;
-	bool retry;
-
-	do {
-		delegated_inode = NULL;
-		retry = false;
-		inode_lock_nested(inode, I_MUTEX_PARENT);
-		ihold(inode);
-		rc = vfs_unlink(inode, dentry, &delegated_inode);
-		inode_unlock(inode);
-		iput(inode);
-		if (rc == -EWOULDBLOCK && delegated_inode) {
-			rc = break_deleg_wait(&delegated_inode);
-			if (!rc)
-				retry = true;
-		}
-	} while (retry);
-
-	five_audit_info(current, file, "five_unlink", 0, 0,
-			"Unlink a file", rc);
-
-	return rc;
+	return __five_bprm_check(bprm, depth);
 }
+#else
+int five_bprm_check(struct linux_binprm *bprm)
+{
+	return __five_bprm_check(bprm, bprm->recursion_depth);
+}
+#endif
 
 /**
  * This function handles two situations:
@@ -776,30 +777,8 @@ int five_file_open(struct file *file)
 	xattr_len = vfs_getxattr(file->f_path.dentry, XATTR_NAME_FIVE,
 					NULL, 0);
 	if (xattr_len == 0) {
-		struct integrity_iint_cache *iint;
-		bool is_signing = false;
-
-		if (!unlink_on_error) {
-			five_audit_info(current, file, "five_unlink", 0, 0,
+		five_audit_verbose(current, file, "dummy-cert", 0, 0,
 					"Found a dummy-cert", 0);
-			return 0;
-		}
-
-		inode_lock(inode);
-		iint = integrity_iint_find(inode);
-		if (iint)
-			is_signing = iint->five_signing;
-		inode_unlock(inode);
-
-		if (!is_signing) {
-			int rc;
-
-			rc = five_unlink(file);
-			rc = rc ?: -ENOENT;
-
-			return rc;
-		}
-		return -EPERM;
 	}
 
 	return 0;
@@ -816,7 +795,7 @@ int five_file_open(struct file *file)
 int five_file_verify(struct task_struct *task, struct file *file)
 {
 	int rc = 0;
-	struct task_integrity *tint = task->integrity;
+	struct task_integrity *tint = TASK_INTEGRITY(task);
 
 	if (file && task_integrity_user_read(tint))
 		rc = push_file_event_bunch(task, file, FILE_CHECK);
@@ -845,7 +824,7 @@ static int __init hash_setup(const char *str)
 	return 1;
 }
 
-static int __init init_five(void)
+int __init init_five(void)
 {
 	int error;
 
@@ -896,7 +875,7 @@ static int fcntl_verify(struct file *file)
 {
 	int rc = 0;
 	struct task_struct *task = current;
-	struct task_integrity *tint = task->integrity;
+	struct task_integrity *tint = TASK_INTEGRITY(task);
 
 	if (task_integrity_user_read(tint))
 		rc = push_file_event_bunch(task, file, FILE_CHECK);
@@ -919,9 +898,9 @@ int five_fork(struct task_struct *task, struct task_struct *child_task)
 {
 	int rc = 0;
 
-	spin_lock(&task->integrity->list_lock);
+	spin_lock(&TASK_INTEGRITY(task)->list_lock);
 
-	if (!list_empty(&task->integrity->events.list)) {
+	if (!list_empty(&TASK_INTEGRITY(task)->events.list)) {
 		/*copy the list*/
 		struct list_head *tmp;
 		struct processing_event_list *from_entry;
@@ -929,11 +908,11 @@ int five_fork(struct task_struct *task, struct task_struct *child_task)
 
 		context = kmalloc(sizeof(struct worker_context), GFP_ATOMIC);
 		if (unlikely(!context)) {
-			spin_unlock(&task->integrity->list_lock);
+			spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 			return -ENOMEM;
 		}
 
-		list_for_each(tmp, &task->integrity->events.list) {
+		list_for_each(tmp, &TASK_INTEGRITY(task)->events.list) {
 			struct processing_event_list *five_file;
 
 			from_entry = list_entry(tmp,
@@ -947,27 +926,27 @@ int five_fork(struct task_struct *task, struct task_struct *child_task)
 					GFP_ATOMIC);
 			if (unlikely(!five_file)) {
 				kfree(context);
-				spin_unlock(&task->integrity->list_lock);
+				spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 				return -ENOMEM;
 			}
 
 			list_add_tail(&five_file->list,
-					&child_task->integrity->events.list);
+				      &TASK_INTEGRITY(child_task)->events.list);
 		}
 
-		context->tint = child_task->integrity;
+		context->tint = TASK_INTEGRITY(child_task);
 
-		rc = task_integrity_copy(task->integrity,
-				child_task->integrity);
-		spin_unlock(&task->integrity->list_lock);
+		rc = task_integrity_copy(TASK_INTEGRITY(task),
+				TASK_INTEGRITY(child_task));
+		spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 		task_integrity_get(context->tint);
-		task_integrity_processing(child_task->integrity);
+		task_integrity_processing(TASK_INTEGRITY(child_task));
 		INIT_WORK(&context->data_work, work_handler);
 		rc = queue_work(g_five_workqueue, &context->data_work) ? 0 : 1;
 	} else {
-		rc = task_integrity_copy(task->integrity,
-				child_task->integrity);
-		spin_unlock(&task->integrity->list_lock);
+		rc = task_integrity_copy(TASK_INTEGRITY(task),
+				TASK_INTEGRITY(child_task));
+		spin_unlock(&TASK_INTEGRITY(task)->list_lock);
 	}
 
 	if (!rc)
@@ -993,7 +972,8 @@ int five_ptrace(struct task_struct *task, long request)
 	case PTRACE_PEEKSIGINFO:
 	case PTRACE_GETSIGMASK:
 	case PTRACE_GETEVENTMSG:
-#ifdef CONFIG_ARM64
+	case PTRACE_PEEKMTETAGS:
+#if defined(CONFIG_ARM64) || defined(KUNIT_UML)
 	case COMPAT_PTRACE_GETREGS:
 	case COMPAT_PTRACE_GET_THREAD_AREA:
 	case COMPAT_PTRACE_GETVFPREGS:
@@ -1006,7 +986,7 @@ int five_ptrace(struct task_struct *task, long request)
 #endif
 		break;
 	default: {
-		struct task_integrity *tint = task->integrity;
+		struct task_integrity *tint = TASK_INTEGRITY(task);
 
 		if (task_integrity_user_read(tint) == INTEGRITY_NONE)
 			break;
@@ -1024,7 +1004,7 @@ int five_ptrace(struct task_struct *task, long request)
 int five_process_vm_rw(struct task_struct *task, int write)
 {
 	if (write) {
-		struct task_integrity *tint = task->integrity;
+		struct task_integrity *tint = TASK_INTEGRITY(task);
 
 		if (task_integrity_user_read(tint) == INTEGRITY_NONE)
 			goto exit;

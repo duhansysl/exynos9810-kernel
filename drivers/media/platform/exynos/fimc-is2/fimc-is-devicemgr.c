@@ -166,19 +166,10 @@ int fimc_is_devicemgr_open(struct fimc_is_devicemgr *devicemgr,
 		FIMC_BUG(!GET_VIDEO(sensor->vctx));
 
 		/* get the stream id */
-		if (sensor->instance == 3) {
-			/*
-			 * HACK: sensor stand alone such as secure camera
-			 * TODO: A ischain should not be used at sensor stand alone scenario.
-			 */
-			ischain = &core->ischain[3];
-			stream = 3;
-		} else {
-			for (stream = 0; stream < FIMC_IS_STREAM_COUNT; ++stream) {
-				ischain = &core->ischain[stream];
-				if (!test_bit(FIMC_IS_ISCHAIN_OPEN, &ischain->state))
-					break;
-			}
+		for (stream = 0; stream < FIMC_IS_STREAM_COUNT; ++stream) {
+			ischain = &core->ischain[stream];
+			if (!test_bit(FIMC_IS_ISCHAIN_OPEN, &ischain->state))
+				break;
 		}
 
 		FIMC_BUG(stream >= FIMC_IS_STREAM_COUNT);
@@ -439,7 +430,10 @@ int fimc_is_devicemgr_shot_callback(struct fimc_is_group *group,
 			       group, frame, frame->index, child_group ? "OTF" : "M2M");
 
 		/* OTF */
-		if (child_group) {
+		/* FIMC_IS_SENSOR_OTF_OUTPUT bit needs to check also.
+		 * because this bit can be cleared for not operate child_group_shot at remosaic sensor mode
+		 */
+		if (child_group && test_bit(FIMC_IS_SENSOR_OTF_OUTPUT, &group->device->sensor->state)) {
 			child_group->shot_callback(child_group->device, frame);
 		/* M2M */
 		} else {
@@ -463,9 +457,8 @@ int fimc_is_devicemgr_shot_callback(struct fimc_is_group *group,
 	case FIMC_IS_DEVICE_ISCHAIN:
 		/* Only for sensor group with OTF */
 		if (group->head->device_type != FIMC_IS_DEVICE_SENSOR ||
-			frame->type != SHOT_TYPE_EXTERNAL) {
+			frame->type != SHOT_TYPE_EXTERNAL)
 			break;
-		}
 
 		devicemgr = group->device->devicemgr;
 		stream = group->instance;

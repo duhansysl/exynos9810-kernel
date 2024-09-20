@@ -49,9 +49,11 @@
 #define DECLARE_EXTERN_DVFS_DT(SIZE) \
 	extern struct fimc_is_dvfs_dt_t fimc_is_dvfs_dt_arr[SIZE];
 
+#define SIZE_HD (720 * 480)
 #define SIZE_FHD (1920 * 1080)
 #define SIZE_WHD (2560 * 1440)
 #define SIZE_UHD (3840 * 2160)
+#define SIZE_16MP_FHD_BDS (3072 * 2304) /* based a 4:3 */
 #define SIZE_12MP_FHD_BDS (2688 * 2016) /* based a 4:3 */
 #define SIZE_12MP_QHD_BDS (3072 * 2304)
 #define SIZE_12MP_UHD_BDS (4032 * 3024)
@@ -97,4 +99,6 @@ void fimc_is_dual_mode_update(struct fimc_is_device_ischain *device,
 void fimc_is_dual_dvfs_update(struct fimc_is_device_ischain *device,
 	struct fimc_is_group *group,
 	struct fimc_is_frame *frame);
+
+unsigned int fimc_is_get_bit_count(unsigned long bits);
 #endif

@@ -109,7 +109,7 @@ enum ipc_layer {
 	MAX_SIPC_LAYER
 };
 
-static const char *sipc_layer_string[] = {
+static const char const *sipc_layer_string[] = {
 	[LINK] = "LNK",
 	[IODEV] = "IOD",
 	[APP] = "APP",
@@ -124,7 +124,7 @@ static const inline char *layer_str(enum ipc_layer layer)
 		return sipc_layer_string[layer];
 }
 
-static const char *dev_format_string[] = {
+static const char const *dev_format_string[] = {
 	[IPC_FMT]	= "FMT",
 	[IPC_RAW]	= "RAW",
 	[IPC_RFS]	= "RFS",
@@ -148,7 +148,7 @@ static inline enum direction opposite(enum direction dir)
 	return (dir == TX) ? RX : TX;
 }
 
-static const char *direction_string[] = {
+static const char const *direction_string[] = {
 	[TX] = "TX",
 	[RX] = "RX"
 };
@@ -161,7 +161,7 @@ static const inline char *dir_str(enum direction dir)
 		return direction_string[dir];
 }
 
-static const char *udl_string[] = {
+static const char const *udl_string[] = {
 	[UL] = "UL",
 	[DL] = "DL"
 };
@@ -174,7 +174,7 @@ static const inline char *udl_str(enum direction dir)
 		return udl_string[dir];
 }
 
-static const char *q_direction_string[] = {
+static const char const *q_direction_string[] = {
 	[TX] = "TXQ",
 	[RX] = "RXQ"
 };
@@ -187,7 +187,7 @@ static const inline char *q_dir(enum direction dir)
 		return q_direction_string[dir];
 }
 
-static const char *ipc_direction_string[] = {
+static const char const *ipc_direction_string[] = {
 	[TX] = "AP->CP",
 	[RX] = "AP<-CP"
 };
@@ -200,7 +200,7 @@ static const inline char *ipc_dir(enum direction dir)
 		return ipc_direction_string[dir];
 }
 
-static const char *arrow_direction[] = {
+static const char const *arrow_direction[] = {
 	[TX] = "->",
 	[RX] = "<-"
 };
@@ -213,7 +213,7 @@ static const inline char *arrow(enum direction dir)
 		return arrow_direction[dir];
 }
 
-static const char *modem_state_string[] = {
+static const char const *modem_state_string[] = {
 	[STATE_OFFLINE]		= "OFFLINE",
 	[STATE_CRASH_RESET]	= "CRASH_RESET",
 	[STATE_CRASH_EXIT]	= "CRASH_EXIT",

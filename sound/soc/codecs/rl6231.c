@@ -99,17 +99,18 @@ struct pll_calc_map {
 	int n;
 	int m;
 	bool m_bp;
+	bool k_bp;
 };
 
 static const struct pll_calc_map pll_preset_table[] = {
-	{19200000,  24576000,  3, 30, 3, false},
+	{19200000,  24576000,  3, 30, 3, false, false},
 };
 
 /**
  * rl6231_pll_calc - Calcualte PLL M/N/K code.
  * @freq_in: external clock provided to codec.
  * @freq_out: target clock which codec works on.
- * @pll_code: Pointer to structure with M, N, K and bypass flag.
+ * @pll_code: Pointer to structure with M, N, K, M bypass and K bypass flag.
  *
  * Calcualte M/N/K code to configure PLL for codec.
  *
@@ -122,7 +123,7 @@ int rl6231_pll_calc(const unsigned int freq_in,
 	int i, k, red, n_t, pll_out, in_t, out_t;
 	int n = 0, m = 0, m_t = 0;
 	int red_t = abs(freq_out - freq_in);
-	bool bypass = false;
+	bool m_bypass = false, k_bypass = false;
 
 	if (RL6231_PLL_INP_MAX < freq_in || RL6231_PLL_INP_MIN > freq_in)
 		return -EINVAL;
@@ -133,7 +134,8 @@ int rl6231_pll_calc(const unsigned int freq_in,
 			k = pll_preset_table[i].k;
 			m = pll_preset_table[i].m;
 			n = pll_preset_table[i].n;
-			bypass = pll_preset_table[i].m_bp;
+			m_bypass = pll_preset_table[i].m_bp;
+			k_bypass = pll_preset_table[i].k_bp;
 			pr_debug("Use preset PLL parameter table\n");
 			goto code_find;
 		}
@@ -142,19 +144,23 @@ int rl6231_pll_calc(const unsigned int freq_in,
 	k = 100000000 / freq_out - 2;
 	if (k > RL6231_PLL_K_MAX)
 		k = RL6231_PLL_K_MAX;
+	if (k < 0) {
+		k = 0;
+		k_bypass = true;
+	}
 	for (n_t = 0; n_t <= max_n; n_t++) {
-		in_t = freq_in / (k + 2);
+		in_t = freq_in / (k_bypass ? 1 : (k + 2));
 		pll_out = freq_out / (n_t + 2);
 		if (in_t < 0)
 			continue;
 		if (in_t == pll_out) {
-			bypass = true;
+			m_bypass = true;
 			n = n_t;
 			goto code_find;
 		}
 		red = abs(in_t - pll_out);
 		if (red < red_t) {
-			bypass = true;
+			m_bypass = true;
 			n = n_t;
 			m = m_t;
 			if (red == 0)
@@ -165,7 +171,7 @@ int rl6231_pll_calc(const unsigned int freq_in,
 			out_t = in_t / (m_t + 2);
 			red = abs(out_t - pll_out);
 			if (red < red_t) {
-				bypass = false;
+				m_bypass = false;
 				n = n_t;
 				m = m_t;
 				if (red == 0)
@@ -178,7 +184,8 @@ int rl6231_pll_calc(const unsigned int freq_in,
 
 code_find:
 
-	pll_code->m_bp = bypass;
+	pll_code->m_bp = m_bypass;
+	pll_code->k_bp = k_bypass;
 	pll_code->m_code = m;
 	pll_code->n_code = n;
 	pll_code->k_code = k;

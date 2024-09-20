@@ -1,0 +1,45 @@
+Texas Instruments TAS2562 Smart PA
+
+Required properties:
+
+ - compatible:		Should contain "ti,tas2562".
+ - reg:			The i2c address. Should contain <0x4c>, <0x4d>,
+            <0x4e>, or <0x4f>.
+
+Optional properties:
+
+ - ti,left-channel: The i2c address of left device.
+
+ - ti,right-channel: The i2c address of right device. 
+            It can be NULL for mono design.
+
+
+ - ti,channels:	This property is channels number from 1 to 2.
+            If given 1, it is mono design.
+            If given 2, it is stereo design.
+
+ - ti,reset-gpio:	Reset GPIO number of left device.
+
+ - ti,reset-gpio2:	Reset GPIO number of right device.
+            It can be NULL for mono design.
+
+ - irq-gpio:  IRQ GPIO number of left device.
+
+ - irq-gpio2: IRQ GPIO number of right device.
+            It can be NULL for mono design.
+
+Examples:
+
+	tas2562:tas2562@4c {
+		#sound-dai-cells = <0>;
+		compatible = "ti,tas2562";
+		reg = <0x4c>;
+		ti,left-channel = <0x4c>;
+		ti,right-channel = <0x4d>;
+		ti,channels = <2>; /* channel number */
+		ti,reset-gpio = <&gpio1 17 0>;
+		ti,reset-gpio2 = <&gpio1 16 0>;
+		ti,irq-gpio = <&gpio1 15 0>;
+		ti,irq-gpio2 = <&gpio1 14 0>;
+		status = "ok";
+	};

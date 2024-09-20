@@ -40,9 +40,6 @@
 #include <mali_kbase_hwcnt_reader.h>
 #include <mali_kbase_mem_linux.h>
 #include <mali_kbase_tlstream.h>
-//SRUK-START
-#include <mali_kbase_hwaccess_time.h>
-//SRUK-END
 
 /*****************************************************************************/
 
@@ -1548,49 +1545,6 @@ static long kbasep_vinstr_hwcnt_reader_ioctl_get_hwver(
 	return put_user(ver, hwver);
 }
 
-//SRUK-START
-
-/* The number of nanoseconds in a second. */
-#define NSECS_IN_SEC            1000000000ull /* ns */
-
-static int kbase_vinstr_get_cpu_gpu_time(struct kbase_vinstr_client *cli, void __user *buffer, int size)
-{
-	int                         rcode = 0;
-	struct kbase_vinstr_context *vinstr_ctx;
-	u64 cycle_counter = 0;
-	u64 system_time = 0;
-	struct timespec ts;
-	struct kbase_hwcnt_reader_cpu_gpu_time cpuGpuTime;
-
-	if (!cli)
-		return -EINVAL;
-
-	if (sizeof(struct kbase_hwcnt_reader_cpu_gpu_time) != size) {
-		printk(KERN_ERR "Error: Invalid size=%d %s %d %s \n", size, __func__, __LINE__, __FILE__);
-		return -EINVAL;
-	}
-
-	vinstr_ctx = cli->vinstr_ctx;
-	KBASE_DEBUG_ASSERT(vinstr_ctx);
-	mutex_lock(&vinstr_ctx->lock);
-
-	kbase_backend_get_gpu_time(vinstr_ctx->kbdev, &cycle_counter, &system_time, &ts);
-	cpuGpuTime.gpu_time_tick = system_time;
-	cpuGpuTime.cpu_timestamp = (u64)(ts.tv_sec) * NSECS_IN_SEC + ts.tv_nsec;
-
-	printk(KERN_INFO "Info: cpuGpuTime.gpu_time_tick = %llu cpuGpuTime.cpu_timestamp=%llu %s %d %s \n",
-		cpuGpuTime.gpu_time_tick, cpuGpuTime.cpu_timestamp,  __func__, __LINE__, __FILE__);
-
-	/* Copy timestamps to user. */
-	if (copy_to_user(buffer, &cpuGpuTime, size)) {
-		rcode = -EFAULT;
-	}
-	mutex_unlock(&vinstr_ctx->lock);
-
-	return rcode;
-}
-//SRUK-END
-
 /**
  * kbasep_vinstr_hwcnt_reader_ioctl - hwcnt reader's ioctl
  * @filp:   pointer to file structure
@@ -1654,13 +1608,6 @@ static long kbasep_vinstr_hwcnt_reader_ioctl(struct file *filp,
 		rcode = kbasep_vinstr_hwcnt_reader_ioctl_disable_event(
 				cli, (enum base_hwcnt_reader_event)arg);
 		break;
-//SRUK-START
-	case KBASE_HWCNT_READER_GET_CPU_GPU_TIME:
-		rcode = kbase_vinstr_get_cpu_gpu_time(
-			cli, (void __user *)arg, _IOC_SIZE(cmd));
-		break;
-//SRUK-END
-
 	default:
 		rcode = -EINVAL;
 		break;

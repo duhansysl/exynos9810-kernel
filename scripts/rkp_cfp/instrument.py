@@ -133,6 +133,16 @@ ADDIMM_RN_MASK = bitmask(9, 5)
 ADDIMM_RD_MASK = bitmask(4, 0)
 ADDIMM_SF_MASK = bitmask(31, 31)
 
+class NOPSTPClass(object):
+    def __init__(self, curfunc='', good=False, loc=-1, insnfirst='', insnsecond=''):
+        self.curfunc = curfunc
+        self.good = good
+        self.loc = loc
+        self.insn1st = insnfirst
+        self.insn2nd = insnsecond
+
+nopStpInfo = NOPSTPClass()
+
 def skip_func(func, skip, skip_asm):
     # Don't instrument the springboard itself.
     # Don't instrument functions in asm files we skip.
@@ -144,7 +154,7 @@ def skip_func(func, skip, skip_asm):
 def parse_last_insn(objdump, i, n):
     return [objdump.parse_insn(j) if objdump.is_insn(j) else None for j in xrange(i-n, i)]
 
-def instrument(objdump, func=None, skip=set([]), skip_stp=set([]), skip_asm=set([]), skip_blr=set([]), skip_magic=set([]), threads=1):
+def instrument(objdump, func=None, skip=set([]), skip_stp=set([]), skip_asm=set([]), skip_blr=set([]), keep_magic=set([]), threads=1):
     """
     Replace:
         BLR rX
@@ -193,10 +203,12 @@ def instrument(objdump, func=None, skip=set([]), skip_stp=set([]), skip_asm=set(
             # eor RRX, x30, RRK
             eor = eor_insn(last_insn[0],
                     reg1=objdump.RRX, reg2=REG_LR, reg3=objdump.RRK)
-            objdump.write(i-1, objdump.encode_insn(eor))
+            #objdump.write(i-1, objdump.encode_insn(eor))
             # stp x29, RRX, ...
             stp = new_stp_insn(insn, insn)
-            objdump.write(i, objdump.encode_insn(stp))
+            #objdump.write(i, objdump.encode_insn(stp))
+            global nopStpInfo
+            nopStpInfo = NOPSTPClass(curfunc, True, i-1, objdump.encode_insn(eor), objdump.encode_insn(stp))
 
         def _skip_func(func):
             return skip_func(func, skip, skip_asm)
@@ -211,31 +223,43 @@ def instrument(objdump, func=None, skip=set([]), skip_stp=set([]), skip_asm=set(
                 last_func_i[0] = func_i
 
         for curfunc, func_i, i, insn, last_insns in each_insn():
-            if objdump.JOPP and func_i != last_func_i[0] and are_nop_insns(ins[1] for ins in last_insns) and curfunc not in skip_magic:
+            if objdump.JOPP and func_i != last_func_i[0] and are_nop_insns(ins[1] for ins in last_insns):
                 # Instrument the nop just before the function.
                 magic_i, magic_insn = last_insns[0]
                 objdump.write(magic_i, objdump.JOPP_MAGIC)
 
-            if objdump.JOPP and insn['type'] == 'blr' and curfunc not in skip_blr :
+            if objdump.JOPP and insn['type'] == 'blr' and insn['args']['dst_reg'] < 31 and curfunc not in skip_blr :
                 springboard_blr = 'jopp_springboard_blr_x{register}'.format(register=insn['args']['dst_reg'])
                 insn = bl_insn(insn,
                         offset=objdump.func_offset(springboard_blr) - objdump.insn_offset(i))
                 objdump.write(i, objdump.encode_insn(insn))
                 continue
-            elif objdump.ROPP and insn['type'] == 'ldp' and \
+            elif objdump.ROPP and curfunc not in skip_stp \
+                    and insn['type'] == 'ldp' and \
                     insn['args']['reg1'] == REG_FP and \
                     insn['args']['reg2'] == REG_LR:
                 forward_insn = parse_insn_range(i+1, i+2)
                 if not are_nop_insns(forward_insn):
                     continue
+                '''
+                Note that for the new compiler, in same rare case
+                nop is not immediate before stp x29, x30 or immediate
+                after ldp x29, x30, so instrument BOTH only stp nop 
+                and ldp nop are good
+                '''
+                global nopStpInfo
+                if (nopStpInfo.curfunc != curfunc) or (nopStpInfo.good != True):
+                    continue
+                objdump.write(nopStpInfo.loc, nopStpInfo.insn1st)
+                objdump.write(nopStpInfo.loc+1, nopStpInfo.insn2nd)
 
-                # stp x29, RRX, ...
+                # ldp x29, RRX, ...
                 insn['args']['reg2'] = objdump.RRX
-                stp = ((hexint(insn['binary']) >> 15) << 15) | \
+                ldp = ((hexint(insn['binary']) >> 15) << 15) | \
                        (insn['args']['reg2'] << 10) | \
                        ((insn['args']['base_reg']) << 5) | \
                        (insn['args']['reg1'])
-                objdump.write(i, stp)
+                objdump.write(i, ldp)
 
                 # eor x30, RRX, RRK
                 eor = eor_insn(forward_insn[0],
@@ -663,6 +687,10 @@ class Objdump(object):
             upper_11_bits =0b11001010000
             return (upper_11_bits << 21) | (insn['args']['reg3'] << 16) | (0b000000<<10) | \
                     (insn['args']['reg2'] << 5) |(insn['args']['reg1'])
+        elif insn['type'] == 'eor_imm':
+            upper_10_bits =0b1101001001
+            return (upper_10_bits << 22) | (0b010001<<16) | (0b000000<<10) | \
+                    (insn['args']['reg2'] << 5) |(insn['args']['reg1'])
         elif insn['type'] == 'ldp':
             return (0b1010100111 << 22) | (insn['args']['reg2'] << 10) | \
                     (insn['args']['base_reg'] << 5) | (insn['args']['reg1'])
@@ -947,6 +975,14 @@ def eor_insn(insn, reg1, reg2, reg3):
     }
     return insn
 
+def eor_imm_insn(insn, reg1, reg2):
+    insn['type'] = 'eor_imm'
+    insn['args'] = {
+        'reg1':reg1,
+        'reg2':reg2,
+    }
+    return insn
+
 def stp_insn(insn, reg1, reg2, base_reg, imm, mode):
     insn['type'] = 'stp'
     insn['args'] = {
@@ -1142,7 +1178,7 @@ def main():
     # instrument and validate
     with _load_objdump() as objdump:
         instrument(objdump, func=None, skip=common.skip, skip_stp=common.skip_stp,
-                skip_asm=common.skip_asm, skip_blr=common.skip_blr, skip_magic=common.skip_magic, threads=args.threads)
+                skip_asm=common.skip_asm, skip_blr=common.skip_blr, keep_magic=common.keep_magic, threads=args.threads)
         #objdump.save_instr_copy()
         return
 

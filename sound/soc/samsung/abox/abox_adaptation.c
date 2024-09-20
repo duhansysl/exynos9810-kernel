@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
-
+#include <sound/smart_amp.h>
 #include <sound/sec_adaptation.h>
 #include "abox.h"
 
@@ -38,144 +38,165 @@ struct maxim_dsm *read_maxdsm;
 bool abox_ipc_irq_read_avail;
 bool abox_ipc_irq_write_avail;
 int dsm_offset;
-int dsm_param_size;
+#ifdef SMART_AMP
+#define SMARTPA_ABOX_ERROR	0xF0F0F0F0
+struct ti_smartpa_data *ti_smartpa_rd_data;
+struct ti_smartpa_data ti_smartpa_rd_data_tmp;
+struct ti_smartpa_data *ti_smartpa_wr_data;
+struct ti_smartpa_data ti_smartpa_wr_data_tmp;
+#endif /* SMART_AMP */
 
-int maxim_dsm_read(int offset, int size, void *dsm_data)
+#ifdef SMART_AMP
+int ti_smartpa_read(void *prm_data, int offset, int size)
 {
 	ABOX_IPC_MSG msg;
 	int ret = 0;
 	struct IPC_ERAP_MSG *erap_msg = &msg.msg.erap;
 
-	read_maxdsm = (struct maxim_dsm *)dsm_data;
+	ti_smartpa_rd_data = (struct ti_smartpa_data *)prm_data;
 
 	msg.ipcid = IPC_ERAP;
 	erap_msg->msgtype = REALTIME_EXTRA;
-	erap_msg->param.raw.params[0] = 0;
-	erap_msg->param.raw.params[1] = offset;
-	erap_msg->param.raw.params[2] = size;
+	erap_msg->param.raw.params[0] = TI_SMARTPA_VENDOR_ID;
+	erap_msg->param.raw.params[1] = RD_DATA;
+	erap_msg->param.raw.params[2] = offset;
+	erap_msg->param.raw.params[3] = size;
 
 	dbg_abox_adaptation("");
 	abox_ipc_irq_read_avail = false;
-	if (offset >= 185)
-		dsm_offset = offset % 185;
-	else
-		dsm_offset = offset;
-	dsm_param_size = size;
+
+	if(!data)
+	{
+		pr_err("[TI-SmartPA:%s] data is NULL", __func__);
+		goto error;
+	}
 
 	ret = abox_request_ipc(&data->pdev_abox->dev, IPC_ERAP,
 					 &msg, sizeof(msg), 0, 0);
 	if (ret) {
 		pr_err("%s: abox_request_ipc is failed: %d\n", __func__, ret);
-		return ret;
+		goto error;
 	}
 
 	ret = wait_event_interruptible_timeout(wq_read,
 		abox_ipc_irq_read_avail != false, msecs_to_jiffies(TIMEOUT_MS));
-	if (!ret)
+	if (ret == 0) {
 		pr_err("%s: wait_event timeout\n", __func__);
+		goto error;
+	} else if (ret < 0) {
+		pr_err("%s: wait_event error(%d)\n", __func__, ret);
+		goto error;
+	} else {
+		memcpy(&ti_smartpa_rd_data->payload[0],
+				&ti_smartpa_rd_data_tmp.payload[0],
+				size);
+	}
 
-	return ret;
+	if(((int32_t*)&ti_smartpa_rd_data->payload[0])[0] == SMARTPA_ABOX_ERROR)
+		goto error;
+	return 0;
+error:
+	return -1;
 }
-EXPORT_SYMBOL_GPL(maxim_dsm_read);
+EXPORT_SYMBOL_GPL(ti_smartpa_read);
 
-int maxim_dsm_write(uint32_t *dsm_data, int offset, int size)
+int ti_smartpa_write(void *prm_data, int offset, int size)
 {
 	ABOX_IPC_MSG msg;
 	int ret = 0;
 	struct IPC_ERAP_MSG *erap_msg = &msg.msg.erap;
+	ti_smartpa_wr_data = (struct ti_smartpa_data *)prm_data;
 
 	msg.ipcid = IPC_ERAP;
 	erap_msg->msgtype = REALTIME_EXTRA;
-	erap_msg->param.raw.params[0] = 1;
-	erap_msg->param.raw.params[1] = offset;
-	erap_msg->param.raw.params[2] = size;
+	erap_msg->param.raw.params[0] = TI_SMARTPA_VENDOR_ID;
+	erap_msg->param.raw.params[1] = WR_DATA;
+	erap_msg->param.raw.params[2] = offset;
+	erap_msg->param.raw.params[3] = size;
 
-	memcpy(&erap_msg->param.raw.params[3],
-		dsm_data,
+	memcpy(&erap_msg->param.raw.params[4],
+		prm_data,
 		min((sizeof(uint32_t) * size)
 		, sizeof(erap_msg->param.raw)));
 
 	dbg_abox_adaptation("");
 	abox_ipc_irq_write_avail = false;
-	dsm_offset = READ_WRITE_ALL_PARAM;
+
+	if(!data)
+	{
+		pr_err("[TI-SmartPA:%s] data is NULL", __func__);
+		goto error;
+	}
 
 	ret = abox_request_ipc(&data->pdev_abox->dev, IPC_ERAP,
 					 &msg, sizeof(msg), 0, 0);
 	if (ret) {
 		pr_err("%s: abox_request_ipc is failed: %d\n", __func__, ret);
-		return ret;
+		goto error;
 	}
 
 	ret = wait_event_interruptible_timeout(wq_write,
 		abox_ipc_irq_write_avail != false, msecs_to_jiffies(TIMEOUT_MS));
-	if (!ret)
+	if (ret == 0)
+	{
 		pr_err("%s: wait_event timeout\n", __func__);
+		goto error;
+	} else if (ret < 0) {
+		pr_err("%s: wait_event err(%d)\n", __func__, ret);
+		goto error;
+	} else {
+		memcpy(&ti_smartpa_wr_data->payload[0],
+				&ti_smartpa_wr_data_tmp.payload[0],
+				size);
+	}
 
-	return ret;
+	if(((int32_t*)&ti_smartpa_wr_data->payload[0])[0] == SMARTPA_ABOX_ERROR)
+		goto error;
+	return 0;
+error:
+	return -1;
 }
-EXPORT_SYMBOL_GPL(maxim_dsm_write);
+EXPORT_SYMBOL_GPL(ti_smartpa_write);
+#endif /* SMART_AMP */
 
 static irqreturn_t abox_adaptation_irq_handler(int irq,
 					void *dev_id, ABOX_IPC_MSG *msg)
 {
 	struct IPC_ERAP_MSG *erap_msg = &msg->msg.erap;
 
-	dbg_abox_adaptation("irq=%d, param[0]=%d",
-				irq, erap_msg->param.raw.params[0]);
+	dbg_abox_adaptation("irq=%d, param[0]=%d avail(%d,%d)",
+				irq, erap_msg->param.raw.params[0], abox_ipc_irq_read_avail, abox_ipc_irq_write_avail);
 
 	switch (irq) {
 	case IPC_ERAP:
 		switch (erap_msg->msgtype) {
 		case REALTIME_EXTRA:
-			if ((dsm_offset != READ_WRITE_ALL_PARAM) &&
-				(dsm_offset != PARAM_DSM_5_0_ABOX_GET_LOGGING) &&
-				(dsm_offset != PARAM_DSM_5_0_ABOX_GET_LOGGING_R)) {
-
-				if ((dsm_offset + dsm_param_size) > read_maxdsm->param_size)
-					dsm_param_size = read_maxdsm->param_size - dsm_offset;
-
-				memcpy(&read_maxdsm->param[dsm_offset],
-					&erap_msg->param.raw.params[0],
-					sizeof(uint32_t) * dsm_param_size);
-
-				abox_ipc_irq_read_avail = true;
-
-				dbg_abox_adaptation("read_avail after parital read[%d]",
-					abox_ipc_irq_read_avail);
-
-				if (abox_ipc_irq_read_avail && waitqueue_active(&wq_read))
-					wake_up_interruptible(&wq_read);
-
-			} else if ((erap_msg->param.raw.params[0] > 0)
-				&& (erap_msg->param.raw.params[0]
-					<= sizeof(erap_msg->param.raw.params))) {
-
-				if (erap_msg->param.raw.params[0] > read_maxdsm->param_size)
-					erap_msg->param.raw.params[0] = read_maxdsm->param_size;
-
-				memcpy(&read_maxdsm->param[0],
-					&erap_msg->param.raw.params[0],
-					sizeof(uint32_t) * erap_msg->param.raw.params[0]);
-
-				abox_ipc_irq_read_avail = true;
-
-				dbg_abox_adaptation("read_avail after full read[%d]",
-					abox_ipc_irq_read_avail);
-
-				if (abox_ipc_irq_read_avail && waitqueue_active(&wq_read))
-					wake_up_interruptible(&wq_read);
-
-			} else if (erap_msg->param.raw.params[0]
-				== PARAM_DSM_5_0_ABOX_WRITE_CB) {
-
-				abox_ipc_irq_write_avail = true;
-
-				dbg_abox_adaptation("write_avail[%d]",
-					abox_ipc_irq_write_avail);
-
-				if (abox_ipc_irq_write_avail && waitqueue_active(&wq_write))
-					wake_up_interruptible(&wq_write);
+#ifdef SMART_AMP
+			if(erap_msg->param.raw.params[0] == TI_SMARTPA_VENDOR_ID) {
+				if(erap_msg->param.raw.params[1] == RD_DATA) {
+					memcpy(&ti_smartpa_rd_data_tmp.payload[0], &erap_msg->param.raw.params[4],
+						min(sizeof(struct ti_smartpa_data), sizeof(erap_msg->param.raw)));
+					abox_ipc_irq_read_avail = true;
+					dbg_abox_adaptation("read_avail after parital read[%d]",
+						abox_ipc_irq_read_avail);
+					if (abox_ipc_irq_read_avail && waitqueue_active(&wq_read))
+						wake_up_interruptible(&wq_read);
+				}
+				else if(erap_msg->param.raw.params[1] == WR_DATA) {
+					memcpy(&ti_smartpa_wr_data_tmp.payload[0], &erap_msg->param.raw.params[4],
+						min(sizeof(struct ti_smartpa_data), sizeof(erap_msg->param.raw)));
+					abox_ipc_irq_write_avail = true;
+					dbg_abox_adaptation("write_avail after parital read[%d]",
+						abox_ipc_irq_write_avail);
+					if (abox_ipc_irq_write_avail && waitqueue_active(&wq_write))
+						wake_up_interruptible(&wq_write);
+				}
+				else {
+					pr_err("[TI-SmartPA] %s: Invalid callback, %d", __func__,
+						erap_msg->param.raw.params[1]);
+				}
 			}
+#endif /* SMART_AMP */
 		break;
 		default:
 			pr_err("%s: unknown message type\n", __func__);
@@ -257,3 +278,4 @@ MODULE_AUTHOR("SeokYoung Jang, <quartz.jang@samsung.com>");
 MODULE_DESCRIPTION("Samsung ASoC A-Box Adaptation Driver");
 MODULE_ALIAS("platform:samsung-abox-adaptation");
 MODULE_LICENSE("GPL");
+

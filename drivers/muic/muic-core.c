@@ -60,12 +60,6 @@ static struct switch_dev switch_dock = {
 struct switch_dev switch_uart3 = {
 	.name = "uart3", /* sys/class/switch/uart3/state */
 };
-
-#ifdef CONFIG_SEC_FACTORY
-struct switch_dev switch_attached_muic_cable = {
-	.name = "attached_muic_cable", /* sys/class/switch/attached_muic_cable/state */
-};
-#endif
 #endif /* CONFIG_ANDROID_SWITCH */
 
 #if defined(CONFIG_MUIC_NOTIFIER)
@@ -79,16 +73,6 @@ void muic_send_dock_intent(int type)
 	switch_set_state(&switch_dock, type);
 #endif
 }
-
-#ifdef CONFIG_SEC_FACTORY
-void muic_send_attached_muic_cable_intent(int type)
-{
-	pr_info("%s: MUIC attached_muic_cable type(%d)\n", __func__, type);
-#ifdef CONFIG_ANDROID_SWITCH
-	switch_set_state(&switch_attached_muic_cable, type);
-#endif
-}
-#endif
 
 static int muic_dock_attach_notify(int type, const char *name)
 {
@@ -318,15 +302,6 @@ static void muic_init_switch_dev_cb(void)
 		return;
 	}
 
-#ifdef CONFIG_SEC_FACTORY
-	/* for cable type event */
-	ret = switch_dev_register(&switch_attached_muic_cable);
-	if (ret < 0) {
-		pr_err("%s: Failed to register attached_muic_cable switch(%d)\n",
-				__func__, ret);
-		return;
-	}
-#endif
 #endif /* CONFIG_ANDROID_SWITCH */
 
 #if defined(CONFIG_MUIC_NOTIFIER)
@@ -342,10 +317,6 @@ static void muic_init_switch_dev_cb(void)
 static void muic_cleanup_switch_dev_cb(void)
 {
 #ifdef CONFIG_ANDROID_SWITCH
-#ifdef CONFIG_SEC_FACTORY
-	/* for cable type event */
-	switch_dev_unregister(&switch_attached_muic_cable);
-#endif
 	/* for UART event */
 	switch_dev_unregister(&switch_uart3);
 	/* for DockObserver */
@@ -501,6 +472,17 @@ int muic_afc_set_voltage(int voltage)
 	return -ENODEV;
 }
 
+int muic_afc_get_voltage(void)
+{
+	struct muic_platform_data *pdata = &muic_pdata;
+
+	if (pdata && pdata->muic_afc_get_voltage_cb)
+		return pdata->muic_afc_get_voltage_cb();
+
+	pr_err("%s: cannot supported\n", __func__);
+	return -ENODEV;
+}
+
 int muic_hv_charger_init(void)
 {
 	struct muic_platform_data *pdata = &muic_pdata;
@@ -518,6 +500,17 @@ int muic_set_hiccup_mode(int on_off)
 
 	if (pdata && pdata->muic_set_hiccup_mode_cb)
 		return pdata->muic_set_hiccup_mode_cb(on_off);
+
+	pr_err("%s: cannot supported\n", __func__);
+	return -ENODEV;
+}
+
+int muic_set_pogo_adc(int adc)
+{
+	struct muic_platform_data *pdata = &muic_pdata;
+
+	if (pdata && pdata->muic_set_pogo_adc_cb)
+		return pdata->muic_set_pogo_adc_cb(adc);
 
 	pr_err("%s: cannot supported\n", __func__);
 	return -ENODEV;

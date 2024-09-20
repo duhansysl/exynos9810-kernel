@@ -196,6 +196,10 @@ int fimc_is_hw_group_open(void *group_data)
 	return ret;
 }
 
+void fimc_is_hw_camif_init(void)
+{
+}
+
 int fimc_is_hw_camif_cfg(void *sensor_data)
 {
 	return 0;

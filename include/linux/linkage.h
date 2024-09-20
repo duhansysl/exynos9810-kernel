@@ -79,33 +79,26 @@
 #define ALIGN_STR __ALIGN_STR
 
 #ifndef ENTRY
-#ifdef CONFIG_RKP_CFP_JOPP
 #define ENTRY(name) \
+	.globl name ASM_NL \
+	ALIGN ASM_NL \
+	name:
+
+#ifdef CONFIG_RKP_CFP_JOPP
+#define NOP_ENTRY(name) \
 	.globl name ASM_NL \
 	nop; \
 	ALIGN ASM_NL \
 	name :
 
-#define VECTOR_ENTRY(name) \
-	.globl name ASM_NL \
-	ALIGN ASM_NL \
-	name :
-
 /*
- * Fallthrough assembly coding pattern won't work anymore once you start putting data
- * words above FUNC_ENTRY(...).
+ * Fallthrough won't work anymore once you start putting MAGIC in ENTRY(...).
  */
 #define FALLTHROUGH(target) \
 	b target
 
-#else
-#define ENTRY(name) \
-	.globl name ASM_NL \
-	ALIGN ASM_NL \
-	name :
+#endif /* CONFIG_RKP_CFP_JOPP */
 #endif
-#endif
-
 #endif /* LINKER_SCRIPT */
 
 #ifndef WEAK

@@ -95,8 +95,6 @@ int debug_hw;
 module_param(debug_hw, int, 0644);
 int debug_device;
 module_param(debug_device, int, 0644);
-int debug_psv;
-module_param(debug_psv, int, 0644);
 int debug_irq;
 module_param(debug_irq, int, 0644);
 int debug_csi;
@@ -174,20 +172,172 @@ static int fimc_is_resume(struct device *dev)
 	return 0;
 }
 
-#ifdef ENABLE_FAULT_HANDLER
-static void fimc_is_print_target_dva(struct camera2_shot *shot)
+#if defined(SECURE_CAMERA_IRIS)
+static int fimc_is_secure_iris(struct fimc_is_device_sensor *device,
+	u32 type, u32 scenario, ulong smc_cmd)
 {
-	u32 *target;
-	u32 target_index, plane_index;
+	int ret = 0;
 
-	target = shot->uctl.scalerUd.sourceAddress;
-	for (target_index = 0; target_index < 14; target_index++) {
-		for (plane_index = 0; plane_index < FIMC_IS_MAX_PLANES; plane_index++) {
-			if (target[plane_index])
-				pr_err("[%d] target[%d] = 0x%08X\n",
-					target_index, plane_index, target[plane_index]);
+	if (scenario != SENSOR_SCENARIO_SECURE)
+		return ret;
+
+	switch (smc_cmd) {
+	case SMC_SECCAM_PREPARE:
+		ret = exynos_smc(SMC_SECCAM_PREPARE, 0, 0, 0);
+		if (ret) {
+			merr("[SMC] SMC_SECURE_CAMERA_PREPARE fail(%d)\n", device, ret);
+		} else {
+			minfo("[SMC] Call SMC_SECURE_CAMERA_PREPARE ret(%d) / smc_state(%d->%d)\n",
+				device, ret, device->smc_state, FIMC_IS_SENSOR_SMC_PREPARE);
+			device->smc_state = FIMC_IS_SENSOR_SMC_PREPARE;
 		}
-		target = target + FIMC_IS_MAX_PLANES;
+		break;
+	case SMC_SECCAM_UNPREPARE:
+		if (device->smc_state != FIMC_IS_SENSOR_SMC_PREPARE)
+			break;
+
+		ret = exynos_smc(SMC_SECCAM_UNPREPARE, 0, 0, 0);
+		if (ret != 0) {
+			merr("[SMC] SMC_SECURE_CAMERA_UNPREPARE fail(%d)\n", device, ret);
+		} else {
+			minfo("[SMC] Call SMC_SECURE_CAMERA_UNPREPARE ret(%d) / smc_state(%d->%d)\n",
+				device, ret, device->smc_state, FIMC_IS_SENSOR_SMC_UNPREPARE);
+			device->smc_state = FIMC_IS_SENSOR_SMC_UNPREPARE;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+#endif
+
+#if defined(SECURE_CAMERA_FACE)
+static int fimc_is_secure_face(struct fimc_is_core *core,
+	u32 type, u32 scenario, ulong smc_cmd)
+{
+	int ret = 0;
+
+	if (scenario != FIMC_IS_SCENARIO_SECURE)
+		return ret;
+
+	mutex_lock(&core->secure_state_lock);
+	switch (smc_cmd) {
+	case SMC_SECCAM_PREPARE:
+		if (core->secure_state == FIMC_IS_STATE_UNSECURE) {
+#if defined(SECURE_CAMERA_FACE_SEQ_CHK)
+			ret = 0;
+#else
+			ret = exynos_smc(SMC_SECCAM_PREPARE, 0, 0, 0);
+#endif
+			if (ret != 0) {
+				err("[SMC] SMC_SECCAM_PREPARE fail(%d)", ret);
+			} else {
+				info("[SMC] Call SMC_SECCAM_PREPARE ret(%d) / state(%ld->%d)\n",
+					ret, core->secure_state, FIMC_IS_STATE_SECURED);
+				core->secure_state = FIMC_IS_STATE_SECURED;
+			}
+		}
+		break;
+	case SMC_SECCAM_UNPREPARE:
+		if (core->secure_state == FIMC_IS_STATE_SECURED) {
+#if defined(SECURE_CAMERA_FACE_SEQ_CHK)
+			ret = 0;
+#else
+			ret = exynos_smc(SMC_SECCAM_UNPREPARE, 0, 0, 0);
+#endif
+			if (ret != 0) {
+				err("[SMC] SMC_SECCAM_UNPREPARE fail(%d)\n", ret);
+			} else {
+				info("[SMC] Call SMC_SECCAM_UNPREPARE ret(%d) / smc_state(%ld->%d)\n",
+					ret, core->secure_state, FIMC_IS_STATE_UNSECURE);
+				core->secure_state = FIMC_IS_STATE_UNSECURE;
+			}
+		}
+		break;
+	default:
+		break;
+	}
+	mutex_unlock(&core->secure_state_lock);
+
+	return ret;
+}
+#endif
+
+int fimc_is_secure_func(struct fimc_is_core *core,
+	struct fimc_is_device_sensor *device, u32 type, u32 scenario, ulong smc_cmd)
+{
+	int ret = 0;
+
+	switch (type) {
+	case FIMC_IS_SECURE_CAMERA_IRIS:
+#if defined(SECURE_CAMERA_IRIS)
+		ret = fimc_is_secure_iris(device, type, scenario, smc_cmd);
+#endif
+		break;
+	case FIMC_IS_SECURE_CAMERA_FACE:
+#if defined(SECURE_CAMERA_FACE)
+		ret = fimc_is_secure_face(core, type, scenario, smc_cmd);
+#endif
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+#ifdef ENABLE_FAULT_HANDLER
+static void fimc_is_print_target_dva(struct fimc_is_frame *leader_frame)
+{
+	u32 plane_index;
+
+	for (plane_index = 0; plane_index < FIMC_IS_MAX_PLANES; plane_index++) {
+		if (leader_frame->sourceAddress[plane_index])
+			pr_err("sourceAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sourceAddress[plane_index]);
+		if (leader_frame->txcTargetAddress[plane_index])
+			pr_err("txcTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->txcTargetAddress[plane_index]);
+		if (leader_frame->txpTargetAddress[plane_index])
+			pr_err("txpTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->txpTargetAddress[plane_index]);
+		if (leader_frame->ixcTargetAddress[plane_index])
+			pr_err("ixcTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->ixcTargetAddress[plane_index]);
+		if (leader_frame->ixpTargetAddress[plane_index])
+			pr_err("ixpTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->ixpTargetAddress[plane_index]);
+		if (leader_frame->mexcTargetAddress[plane_index])
+			pr_err("mexcTargetAddress[%d] = 0x%16LX\n",
+				plane_index, leader_frame->mexcTargetAddress[plane_index]);
+		if (leader_frame->sccTargetAddress[plane_index])
+			pr_err("sccTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sccTargetAddress[plane_index]);
+		if (leader_frame->scpTargetAddress[plane_index])
+			pr_err("scpTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->scpTargetAddress[plane_index]);
+		if (leader_frame->sc0TargetAddress[plane_index])
+			pr_err("sc0TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc0TargetAddress[plane_index]);
+		if (leader_frame->sc1TargetAddress[plane_index])
+			pr_err("sc1TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc1TargetAddress[plane_index]);
+		if (leader_frame->sc2TargetAddress[plane_index])
+			pr_err("sc2TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc2TargetAddress[plane_index]);
+		if (leader_frame->sc3TargetAddress[plane_index])
+			pr_err("sc3TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc3TargetAddress[plane_index]);
+		if (leader_frame->sc4TargetAddress[plane_index])
+			pr_err("sc4TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc4TargetAddress[plane_index]);
+		if (leader_frame->sc5TargetAddress[plane_index])
+			pr_err("sc5TargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->sc5TargetAddress[plane_index]);
+		if (leader_frame->dxcTargetAddress[plane_index])
+			pr_err("dxcTargetAddress[%d] = 0x%08X\n",
+				plane_index, leader_frame->dxcTargetAddress[plane_index]);
 	}
 }
 
@@ -201,14 +351,14 @@ void fimc_is_print_frame_dva(struct fimc_is_subdev *subdev)
 	if (test_bit(FIMC_IS_SUBDEV_START, &subdev->state) && framemgr) {
 		for (j = 0; j < framemgr->num_frames; ++j) {
 			for (k = 0; k < framemgr->frames[j].planes; k++) {
-				msinfo(" BUF[%d][%d] = 0x%08X(0x%lX)\n",
+				msinfo(" BUF[%d][%d] %pad = (0x%lX)\n",
 					subdev, subdev, j, k,
-					framemgr->frames[j].dvaddr_buffer[k],
+					&framemgr->frames[j].dvaddr_buffer[k],
 					framemgr->frames[j].mem_state);
 
 				shot = framemgr->frames[j].shot;
 				if (shot)
-					fimc_is_print_target_dva(shot);
+					fimc_is_print_target_dva(&framemgr->frames[j]);
 			}
 		}
 	}
@@ -246,8 +396,8 @@ static void __fimc_is_fault_handler(struct device *dev)
 
 				for (j = 0; j < framemgr->num_frames; ++j) {
 					for (k = 0; k < framemgr->frames[j].planes; k++) {
-						pr_err("[SS%d] BUF[%d][%d] = 0x%08X(0x%lX)\n", i, j, k,
-							framemgr->frames[j].dvaddr_buffer[k],
+						pr_err("[SS%d] BUF[%d][%d] = %pad(0x%lX)\n", i, j, k,
+							&framemgr->frames[j].dvaddr_buffer[k],
 							framemgr->frames[j].mem_state);
 					}
 				}
@@ -519,7 +669,7 @@ static ssize_t store_en_dvfs(struct device *dev,
 {
 #ifdef ENABLE_DVFS
 	struct fimc_is_core *core =
-		(struct fimc_is_core *)platform_get_drvdata(to_platform_device(dev));
+		(struct fimc_is_core *)dev_get_drvdata(dev);
 	struct fimc_is_resourcemgr *resourcemgr;
 	int i;
 
@@ -555,7 +705,7 @@ static ssize_t store_en_dvfs(struct device *dev,
 static ssize_t show_pattern_en(struct device *dev, struct device_attribute *attr,
 				  char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%lu\n", sysfs_debug.pattern_en);
+	return snprintf(buf, PAGE_SIZE, "%u\n", sysfs_debug.pattern_en);
 }
 
 static ssize_t store_pattern_en(struct device *dev,
@@ -563,19 +713,24 @@ static ssize_t store_pattern_en(struct device *dev,
 				 const char *buf, size_t count)
 {
 	int ret = 0;
-	unsigned long cmd;
+	unsigned int cmd;
+	struct fimc_is_core *core =
+		(struct fimc_is_core *)platform_get_drvdata(to_platform_device(dev));
 
-	ret = kstrtoul(buf, 0, &cmd);
+	ret = kstrtouint(buf, 0, &cmd);
 	if (ret)
 		return ret;
 
 	switch (cmd) {
 	case 0:
 	case 1:
-		sysfs_debug.pattern_en = cmd;
+		if (atomic_read(&core->rsccount))
+			pr_warn("%s: patter generator cannot be enabled while camera is running.\n", __func__);
+		else
+			sysfs_debug.pattern_en = cmd;
 		break;
 	default:
-		pr_warn("%s: invalid paramter (%lu)\n", __func__, cmd);
+		pr_warn("%s: invalid parameter (%d)\n", __func__, cmd);
 		break;
 	}
 
@@ -585,7 +740,7 @@ static ssize_t store_pattern_en(struct device *dev,
 static ssize_t show_pattern_fps(struct device *dev, struct device_attribute *attr,
 				  char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%lu\n", sysfs_debug.pattern_fps);
+	return snprintf(buf, PAGE_SIZE, "%u\n", sysfs_debug.pattern_fps);
 }
 
 static ssize_t store_pattern_fps(struct device *dev,
@@ -593,9 +748,9 @@ static ssize_t store_pattern_fps(struct device *dev,
 				 const char *buf, size_t count)
 {
 	int ret = 0;
-	unsigned long cmd;
+	unsigned int cmd;
 
-	ret = kstrtoul(buf, 0, &cmd);
+	ret = kstrtouint(buf, 0, &cmd);
 	if (ret)
 		return ret;
 
@@ -654,7 +809,7 @@ static ssize_t show_debug_state(struct device *dev, struct device_attribute *att
 				  char *buf)
 {
 	struct fimc_is_core *core =
-		(struct fimc_is_core *)platform_get_drvdata(to_platform_device(dev));
+		(struct fimc_is_core *)dev_get_drvdata(dev);
 	struct fimc_is_resourcemgr *resourcemgr;
 
 	FIMC_BUG(!core);
@@ -669,7 +824,7 @@ static ssize_t store_debug_state(struct device *dev,
 				 const char *buf, size_t count)
 {
 	struct fimc_is_core *core =
-		(struct fimc_is_core *)platform_get_drvdata(to_platform_device(dev));
+		(struct fimc_is_core *)dev_get_drvdata(dev);
 	struct fimc_is_resourcemgr *resourcemgr;
 
 	FIMC_BUG(!core);
@@ -971,6 +1126,9 @@ static int __init fimc_is_probe(struct platform_device *pdev)
 	u32 channel;
 #endif
 	struct pinctrl_state *s;
+#if defined(SECURE_CAMERA_IRIS) || defined(SECURE_CAMERA_FACE)
+	ulong mem_info_addr, mem_info_size;
+#endif
 
 	probe_info("%s:start(%ld, %ld)\n", __func__,
 		sizeof(struct fimc_is_core), sizeof(struct fimc_is_video_ctx));
@@ -1291,15 +1449,46 @@ static int __init fimc_is_probe(struct platform_device *pdev)
 
 	EXYNOS_MIF_ADD_NOTIFIER(&exynos_fimc_is_mif_throttling_nb);
 
-#if defined(CONFIG_SECURE_CAMERA_USE) && defined(SECURE_CAMERA_EMULATE)
-	ret = exynos_smc(SMC_SECCAM_SETENV, SECURE_CAMERA_CH, ION_EXYNOS_HEAP_ID_SECURE_CAMERA, 0);
+#if defined(SECURE_CAMERA_IRIS) || defined(SECURE_CAMERA_FACE)
+	probe_info("%s: call SMC_SECCAM_SETENV, SECURE_CAMERA_CH(%#x), SECURE_CAMERA_HEAP_ID(%d)\n",
+		__func__, SECURE_CAMERA_CH, SECURE_CAMERA_HEAP_ID);
+
+#if defined(SECURE_CAMERA_FACE_SEQ_CHK)
+	ret = 0;
+#else
+	ret = exynos_smc(SMC_SECCAM_SETENV, SECURE_CAMERA_CH, SECURE_CAMERA_HEAP_ID, 0);
+#endif
 	if (ret) {
 		dev_err(fimc_is_dev, "[SMC] SMC_SECCAM_SETENV fail(%d)\n", ret);
 		goto p_err3;
 	}
-	ret = exynos_smc(SMC_SECCAM_INIT, SECURE_CAMERA_MEM_ADDR, SECURE_CAMERA_MEM_SIZE, 0);
+
+	mem_info_addr = core->secure_mem_info[0] ? core->secure_mem_info[0] : SECURE_CAMERA_MEM_ADDR;
+	mem_info_size = core->secure_mem_info[1] ? core->secure_mem_info[1] : SECURE_CAMERA_MEM_SIZE;
+
+	probe_info("%s: call SMC_SECCAM_INIT, mem_info(%#08lx, %#08lx)\n",
+		__func__, mem_info_addr, mem_info_size);
+#if defined(SECURE_CAMERA_FACE_SEQ_CHK)
+	ret = 0;
+#else
+	ret = exynos_smc(SMC_SECCAM_INIT, mem_info_addr, mem_info_size, 0);
+#endif
 	if (ret) {
 		dev_err(fimc_is_dev, "[SMC] SMC_SECCAM_INIT fail(%d)\n", ret);
+		goto p_err3;
+	}
+	mem_info_addr = core->non_secure_mem_info[0] ? core->non_secure_mem_info[0] : NON_SECURE_CAMERA_MEM_ADDR;
+	mem_info_size = core->non_secure_mem_info[1] ? core->non_secure_mem_info[1] : NON_SECURE_CAMERA_MEM_SIZE;
+
+	probe_info("%s: call SMC_SECCAM_INIT_NSBUF, mem_info(%#08lx, %#08lx)\n",
+		__func__, mem_info_addr, mem_info_size);
+#if defined(SECURE_CAMERA_FACE_SEQ_CHK)
+	ret = 0;
+#else
+	ret = exynos_smc(SMC_SECCAM_INIT_NSBUF, mem_info_addr, mem_info_size, 0);
+#endif
+	if (ret) {
+		dev_err(fimc_is_dev, "[SMC] SMC_SECCAM_INIT_NSBUF fail(%d)\n", ret);
 		goto p_err3;
 	}
 #endif

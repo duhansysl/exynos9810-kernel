@@ -467,7 +467,6 @@ int fimc_is_itf_power_down_wrap(struct fimc_is_interface *interface, u32 instanc
 	}
 
 	fimc_is_itf_sudden_stop_wrap(&core->ischain[instance], instance);
-
 #ifdef USE_DDK_SHUT_DOWN_FUNC
 #ifdef ENABLE_FPSIMD_FOR_USER
 	fpsimd_get();

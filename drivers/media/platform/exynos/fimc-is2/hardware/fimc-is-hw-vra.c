@@ -39,6 +39,11 @@ void fimc_is_hw_vra_save_debug_info(struct fimc_is_hw_ip *hw_ip,
 		index = hw_ip->debug_index[1];
 		hw_ip->debug_info[index].cpuid[DEBUG_POINT_FRAME_END] = raw_smp_processor_id();
 		hw_ip->debug_info[index].time[DEBUG_POINT_FRAME_END] = local_clock();
+
+		dbg_isr("[F:%d][S-E] %05llu us\n", hw_ip, hw_fcount,
+			(hw_ip->debug_info[index].time[DEBUG_POINT_FRAME_END] -
+			hw_ip->debug_info[index].time[DEBUG_POINT_FRAME_START]) / 1000);
+
 		if (!atomic_read(&hardware->streaming[hardware->sensor_position[instance]]))
 			msinfo_hw("[F:%d]F.E\n", instance, hw_ip, hw_fcount);
 
@@ -206,10 +211,11 @@ static int fimc_is_hw_vra_ch1_handle_interrupt(u32 id, void *context)
 					unsigned char *buffer_dva = NULL;
 					mframe->cur_buf_index = hw_ip->cur_s_int;
 					/* TODO: It is required to support other YUV format */
-					buffer_kva = (unsigned char *)(mframe->kvaddr_buffer \
-						[mframe->cur_buf_index * 2]); /* Y-plane index of NV21 */
-					buffer_dva = (unsigned char *)(ulong)(mframe->dvaddr_buffer \
-						[mframe->cur_buf_index * 2]);
+					/* Y-plane index of NV21 */
+					buffer_kva = (unsigned char *)
+						(mframe->kvaddr_buffer[mframe->cur_buf_index * 2]);
+					buffer_dva = (unsigned char *)
+						(mframe->dvaddr_buffer[mframe->cur_buf_index * 2]);
 					ret = fimc_is_lib_vra_new_frame(lib_vra, buffer_kva, buffer_dva, atomic_read(&hw_ip->instance));
 					if (ret)
 						mserr_hw("lib_vra_new_frame is fail (%d)",
@@ -645,8 +651,11 @@ new_frame:
 	/* Add for CH1 DMA input */
 	if (lib_vra->fr_work_init.dram_input) {
 		/* TODO: It is required to support other YUV format */
-		buffer_kva = (unsigned char *)(frame->kvaddr_buffer[frame->cur_buf_index * 2]); /* Y-plane index of NV21 */
-		buffer_dva = (unsigned char *)(u64)(frame->dvaddr_buffer[frame->cur_buf_index * 2]);
+		/* Y-plane index of NV21 */
+		buffer_kva = (unsigned char *)
+			(frame->kvaddr_buffer[frame->cur_buf_index * 2]);
+		buffer_dva = (unsigned char *)
+			(frame->dvaddr_buffer[frame->cur_buf_index * 2]);
 		hw_ip->mframe = frame;
 	}
 	msdbg_hw(2, "[F:%d]lib_vra_new_frame\n", instance, hw_ip, frame->fcount);
@@ -785,7 +794,7 @@ static int fimc_is_hw_vra_frame_ndone(struct fimc_is_hw_ip *hw_ip,
 	output_id = FIMC_IS_HW_CORE_END;
 	if (test_bit_variables(hw_ip->id, &frame->core_flag))
 		ret = fimc_is_hardware_frame_done(hw_ip, frame, wq_id, output_id,
-				done_type, true);
+				done_type, false);
 
 	return ret;
 }
@@ -1131,7 +1140,6 @@ int fimc_is_hw_vra_probe(struct fimc_is_hw_ip *hw_ip, struct fimc_is_interface *
 	hw_ip->itf  = itf;
 	hw_ip->itfc = itfc;
 	atomic_set(&hw_ip->fcount, 0);
-	hw_ip->internal_fcount = 0;
 	hw_ip->is_leader = true;
 	atomic_set(&hw_ip->status.Vvalid, V_BLANK);
 	atomic_set(&hw_ip->rsccount, 0);

@@ -107,13 +107,6 @@ static ssize_t sec_ts_regread_show(struct device *dev, struct device_attribute *
 
 	mutex_lock(&ts->device_mutex);
 
-	if ((lv1_readsize <= 0) || (lv1_readsize > PAGE_SIZE)) {
-		input_err(true, &ts->client->dev, "%s: invalid lv1_readsize = %d\n",
-						__func__, lv1_readsize);
-		lv1_readsize = 0;
-		goto malloc_err;
-	}
-
 	read_lv1_buff = kzalloc(lv1_readsize, GFP_KERNEL);
 	if (!read_lv1_buff)
 		goto malloc_err;
@@ -272,12 +265,10 @@ int sec_ts_raw_device_init(struct sec_ts_data *ts)
 {
 	int ret;
 
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	ts->dev = sec_device_create(ts, "sec_ts");
-#elif defined(CONFIG_DRV_SAMSUNG)
-	ts->dev = sec_device_create(9, ts, "sec_ts");
 #else
-	ts->dev = device_create(sec_class, NULL, 9, ts, "sec_ts");
+	ts->dev = device_create(sec_class, NULL, 0, ts, "sec_ts");
 #endif
 	ret = IS_ERR(ts->dev);
 	if (ret) {

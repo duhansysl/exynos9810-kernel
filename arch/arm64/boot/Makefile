@@ -28,15 +28,6 @@ DTB_LIST := $(dtb-y) $(dtbo-y)
 endif
 DTB_OBJS := $(addprefix $(obj)/dts/,$(DTB_LIST))
 
-ifeq ($(CONFIG_EXYNOS_DTBTOOL),y)
-targets += dtb.img
-
-DTB_OBJS += $(shell find -L $(obj)/dts/ -name \*.dtb)
-
-$(obj)/dtb.img: $(DTB_OBJS) FORCE
-	$(call if_changed,dtbtool_exynos)
-endif
-
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
 

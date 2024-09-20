@@ -972,8 +972,8 @@ void max77705_send_dex_fan_unstructured_vdm_message(void *data, int cmd)
 	SS_DEX_UNSTRUCTURED_VDM.byte_data.BITS.Num_Of_VDO = 2;
 	SS_DEX_UNSTRUCTURED_VDM.byte_data.BITS.Cmd_Type = ACK;
 	SS_DEX_UNSTRUCTURED_VDM.byte_data.BITS.Reserved = 0;
-	SS_DEX_UNSTRUCTURED_VDM.VDO_MSG.VDO[0] = SWAP_UINT32(0x0000E804);
-	SS_DEX_UNSTRUCTURED_VDM.VDO_MSG.VDO[1] = SWAP_UINT32(0x100120A0);
+	SS_DEX_UNSTRUCTURED_VDM.VDO_MSG.VDO[0] = 0x04E80000;
+	SS_DEX_UNSTRUCTURED_VDM.VDO_MSG.VDO[1] = 0xA0200110;
 	pr_info("%s: cmd : 0x%x\n", __func__, cmd);
 	memcpy(SendMSG, &SS_DEX_UNSTRUCTURED_VDM, len);
 

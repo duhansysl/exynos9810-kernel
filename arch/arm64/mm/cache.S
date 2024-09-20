@@ -157,7 +157,7 @@ ENTRY(__flush_cache_user_range)
 #ifndef	CONFIG_SOC_EXYNOS9810
 user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
 #else
-user_alt 9f, "dc cvac, x4",  "dc cvac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+user_alt 9f, "dc civac, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
 #endif
 	add	x4, x4, x2
 	cmp	x4, x1
@@ -213,7 +213,7 @@ ENTRY(__clean_dcache_area_pou)
 #ifndef	CONFIG_SOC_EXYNOS9810
 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
 #else
-	dcache_by_line_op cvac, ish, x0, x1, x2, x3
+	dcache_by_line_op civac, ish, x0, x1, x2, x3
 #endif
 	ret
 ENDPROC(__clean_dcache_area_pou)

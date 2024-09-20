@@ -1365,52 +1365,6 @@ static void max77865_set_full_value(struct max77865_fuelgauge_data *fuelgauge,
 }
 #endif
 
-#define FULL_CAPACITY 850
-static int calc_ttf_to_full_capacity(struct max77865_fuelgauge_data *fuelgauge,
-		    union power_supply_propval *val)
-{
-	struct cv_slope *cv_data = fuelgauge->cv_data;
-	int i, cc_time = 0, cv_time = 0;
-	int soc = FULL_CAPACITY;
-	int charge_current = val->intval;
-	int design_cap = fuelgauge->ttf_capacity;
-
-	if (!cv_data || (val->intval <= 0)) {
-		pr_info("%s: no cv_data or val: %d\n", __func__, val->intval);
-		return -1;
-	}
-	for (i = 0; i < fuelgauge->cv_data_lenth; i++) {
-		if (charge_current >= cv_data[i].fg_current)
-			break;
-	}
-	i = i >= fuelgauge->cv_data_lenth ? fuelgauge->cv_data_lenth - 1 : i;
-	if (cv_data[i].soc < soc) {
-		for (i = 0; i < fuelgauge->cv_data_lenth; i++) {
-			if (soc <= cv_data[i].soc)
-				break;
-		}
-		cv_time =
-		    ((cv_data[i - 1].time - cv_data[i].time) * (cv_data[i].soc - soc)
-		     / (cv_data[i].soc - cv_data[i - 1].soc)) + cv_data[i].time;
-	} else {		/* CC mode || NONE */
-		cv_time = cv_data[i].time;
-		cc_time =
-			design_cap * (cv_data[i].soc - soc) / val->intval * 3600 / 1000;
-		pr_debug("%s: cc_time: %d\n", __func__, cc_time);
-		if (cc_time < 0)
-			cc_time = 0;
-	}
-
-	pr_debug("%s: cap: %d, soc: %4d, T: %6d, avg: %4d, cv soc: %4d, i: %4d, val: %d\n",
-	     __func__, design_cap, soc, cv_time + cc_time,
-	     fuelgauge->current_avg, cv_data[i].soc, i, val->intval);
-
-	if (cv_time + cc_time >= 0)
-		return cv_time + cc_time;
-	else
-		return 0;
-}
-
 static int calc_ttf(struct max77865_fuelgauge_data *fuelgauge, union power_supply_propval *val)
 {
 	int i;
@@ -1465,7 +1419,7 @@ static int max77865_fg_get_property(struct power_supply *psy,
 	static int abnormal_current_cnt = 0;
 	union power_supply_propval value;
 	u8 data[2] = {0, 0};
-    enum power_supply_ext_property ext_psp = psp;
+    enum power_supply_property ext_psp = psp;
 
 	switch (psp) {
 		/* Cell voltage (VCELL, mV) */
@@ -1696,9 +1650,6 @@ static int max77865_fg_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_MAX ... POWER_SUPPLY_EXT_PROP_MAX:
 		switch (ext_psp) {
-		case POWER_SUPPLY_EXT_PROP_TTF_FULL_CAPACITY:
-			val->intval = calc_ttf_to_full_capacity(fuelgauge, val);
-			break;
 			default:
 				return -EINVAL;
 		}
@@ -1719,7 +1670,7 @@ static int max77865_fg_set_property(struct power_supply *psy,
 	struct max77865_fuelgauge_data *fuelgauge = power_supply_get_drvdata(psy);
 	u8 data[2] = {0, 0};
 	static bool low_temp_wa = false;
-	enum power_supply_ext_property ext_psp = psp;
+	enum power_supply_property ext_psp = psp;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
@@ -2321,7 +2272,6 @@ static int max77865_fuelgauge_probe(struct platform_device *pdev)
 		}
 	}
 
-	fuelgauge->err_cnt = 0;
 	fuelgauge->initial_update_of_soc = true;
 #if defined(CONFIG_BATTERY_CISD)
 	fuelgauge->valert_count_flag = false;

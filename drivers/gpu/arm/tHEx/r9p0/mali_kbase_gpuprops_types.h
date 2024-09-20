@@ -35,7 +35,7 @@
 #include "mali_base_kernel.h"
 
 #define KBASE_GPU_SPEED_MHZ    123
-#define KBASE_GPU_PC_SIZE_LOG2 25U
+#define KBASE_GPU_PC_SIZE_LOG2 24U
 
 struct kbase_gpuprops_regdump {
 	u32 gpu_id;

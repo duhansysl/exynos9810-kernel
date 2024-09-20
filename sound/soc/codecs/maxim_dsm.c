@@ -8,8 +8,6 @@
 #include <sound/soc.h>
 #include <sound/tlv.h>
 #include <sound/maxim_dsm.h>
-#include <sound/maxim_dsm_power.h>
-#include <sound/maxim_dsm_cal.h>
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif /* CONFIG_COMPAT */
@@ -23,27 +21,11 @@ pr_info("[MAXIM_DSM] %s: " format "\n", __func__, ## args)
 #define dbg_maxdsm(format, args...)
 #endif /* DEBUG_MAXIM_DSM */
 
-int coil_temp_max_keep;
-int coil_temp_max_keep_r;
-
 #define V30_SIZE	(PARAM_DSM_3_0_MAX >> 1)
 #define V35_SIZE	((PARAM_DSM_3_5_MAX - PARAM_DSM_3_0_MAX) >> 1)
 #define V40_SIZE	((PARAM_DSM_4_0_MAX - PARAM_DSM_3_5_MAX) >> 1)
 #define A_V35_SIZE	(PARAM_A_DSM_3_5_MAX >> 1)
 #define A_V40_SIZE	((PARAM_A_DSM_4_0_MAX - PARAM_A_DSM_3_5_MAX) >> 1)
-
-/* MAX98512 one stop mode */
-enum one_stop_mode {
-	MAX98512_OSM_STEREO = 0,
-	MAX98512_OSM_STEREO_MODE2,
-	MAX98512_OSM_MONO_L,
-	MAX98512_OSM_MONO_R,
-	MAX98512_OSM_RCV_L,
-	MAX98512_OSM_RCV_R,
-	MAX98512_OSM_STEREO_L,
-	MAX98512_OSM_STEREO_R,
-	MAX98512_OSM_MAX,
-};
 
 static struct maxim_dsm maxdsm = {
 	.regmap = NULL,
@@ -61,10 +43,9 @@ static struct maxim_dsm maxdsm = {
 		MAXDSM_IGNORE_MASK_VOICE_COIL |
 		MAXDSM_IGNORE_MASK_AMBIENT_TEMP,
 	.sub_reg = 0,
-	.param_offset = 0,
-	.osm_mode = 0,
 };
-module_param_named(ignore_mask, maxdsm.ignore_mask, uint, 0644);
+module_param_named(ignore_mask, maxdsm.ignore_mask, uint,
+		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
 static struct param_set_data maxdsm_spt_saved_params[] = {
 	{
@@ -635,19 +616,18 @@ static DEFINE_MUTEX(dsm_dsp_lock);
 #ifdef USE_DSM_LOG
 static DEFINE_MUTEX(maxdsm_log_lock);
 
-static uint32_t ex_seq_count_temp[LOG_CHANNELS];
-static uint32_t ex_seq_count_excur[LOG_CHANNELS];
-static uint32_t new_log_avail[LOG_CHANNELS];
+static uint32_t ex_seq_count_temp;
+static uint32_t ex_seq_count_excur;
+static uint32_t new_log_avail;
 
-static int maxdsm_log_present[LOG_CHANNELS];
-static int maxdsm_log_max_present[LOG_CHANNELS];
-static struct tm maxdsm_log_timestamp[LOG_CHANNELS];
-static uint8_t maxdsm_byte_log_array[LOG_CHANNELS][BEFORE_BUFSIZE];
-static uint32_t maxdsm_int_log_array[LOG_CHANNELS][BEFORE_BUFSIZE];
-static uint8_t maxdsm_after_prob_byte_log_array[LOG_CHANNELS][AFTER_BUFSIZE];
-static uint32_t maxdsm_after_prob_int_log_array[LOG_CHANNELS][AFTER_BUFSIZE];
-static uint32_t maxdsm_int_log_max_array[LOG_CHANNELS][LOGMAX_BUFSIZE];
-static uint32_t maxdsm_channel;
+static int maxdsm_log_present;
+static int maxdsm_log_max_present;
+static struct tm maxdsm_log_timestamp;
+static uint8_t maxdsm_byte_log_array[BEFORE_BUFSIZE];
+static uint32_t maxdsm_int_log_array[BEFORE_BUFSIZE];
+static uint8_t maxdsm_after_prob_byte_log_array[AFTER_BUFSIZE];
+static uint32_t maxdsm_after_prob_int_log_array[AFTER_BUFSIZE];
+static uint32_t maxdsm_int_log_max_array[LOGMAX_BUFSIZE];  
 
 static struct param_info g_lbi[MAX_LOG_BUFFER_POS] = {
 	{
@@ -774,14 +754,8 @@ static inline int32_t maxdsm_dsm_open(void *data)
 	int32_t ret;
 
 	if (maxdsm.ignore_mask == MAXDSM_IGNORE_MASK_ALL &&
-			(maxdsm.filter_set == DSM_ID_FILTER_SET_AFE_CNTRLS ||
-			 maxdsm.filter_set == DSM_ID_FILTER_SET_AFE_CNTRLS_R))
+			maxdsm.filter_set == DSM_ID_FILTER_SET_AFE_CNTRLS)
 		return -EPERM;
-
-	if (maxdsm.osm_mode == MAX98512_OSM_RCV_L || maxdsm.osm_mode == MAX98512_OSM_RCV_R) {
-		dbg_maxdsm("maxdsm.osm_mode [%d] rcv no dsm control", maxdsm.osm_mode);
-		return 0;
-	}
 
 	mutex_lock(&dsm_dsp_lock);
 	ret = dsm_read_write(data);
@@ -846,8 +820,7 @@ static void maxdsm_read_all(void)
 			while (pbi_idx++ < (maxdsm.param_size >> 1)) {
 				param_idx = (pbi_idx - 1) << 1;
 				data = 0;
-				maxdsm_regmap_read(g_pbi[pbi_idx - 1].addr,
-									&data);
+				maxdsm_regmap_read(g_pbi[pbi_idx - 1].addr, &data);
 				maxdsm.param[param_idx] = data;
 				maxdsm.param[param_idx + 1] =
 					(1 << maxdsm.binfo[pbi_idx - 1]);
@@ -858,21 +831,17 @@ static void maxdsm_read_all(void)
 						g_pbi[pbi_idx - 1].addr);
 			}
 		} else {
-			dbg_maxdsm("failed regmap read. maxdsm.param_size [%d]",
-					maxdsm.param_size);
+			dbg_maxdsm("failed regmap read...please check the maxdsm.param_size [%d] !!!",maxdsm.param_size);
 		}
 		break;
 		}
 	case PLATFORM_TYPE_B:
+		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
 		maxdsm_dsm_open(&maxdsm);
 		break;
 	case PLATFORM_TYPE_C:
-		if (maxdsm_get_spk_state()) {
-			mutex_lock(&dsm_dsp_lock);
-			maxim_dsm_read(maxdsm.param_offset,
-					PARAM_DSM_5_0_MAX, &maxdsm);
-			mutex_unlock(&dsm_dsp_lock);
-		}
+		if (maxdsm_get_spk_state())
+			maxim_dsm_read(0, PARAM_DSM_5_0_MAX, &maxdsm);
 		break;
 	}
 }
@@ -897,18 +866,16 @@ static void maxdsm_write_all(void)
 						g_pbi[pbi_idx - 1].addr);
 			}
 		} else {
-			dbg_maxdsm("failed regmap write. maxdsm.param_size [%d]",
-						maxdsm.param_size);
+			dbg_maxdsm("failed regmap write...please check the maxdsm.param_size [%d] !!!",maxdsm.param_size);
 		}
 		break;
 		}
 	case PLATFORM_TYPE_B:
+		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
 		maxdsm_dsm_open(&maxdsm);
 		break;
 	case PLATFORM_TYPE_C:
-		if (maxdsm_get_spk_state())
-			maxim_dsm_write(&maxdsm.param[0],
-					maxdsm.param_offset, PARAM_DSM_5_0_MAX);
+		maxim_dsm_write(&maxdsm.param[0], 0, PARAM_DSM_5_0_MAX);
 		break;
 	}
 }
@@ -929,12 +896,8 @@ static int maxdsm_read_wrapper(unsigned int reg,
 		}
 		break;
 	case PLATFORM_TYPE_C:
-		if (maxdsm_get_spk_state()) {
-			mutex_lock(&dsm_dsp_lock);
+		if (maxdsm_get_spk_state() && (reg < PARAM_DSM_5_0_MAX)) {
 			maxim_dsm_read(reg, 1, &maxdsm);
-			mutex_unlock(&dsm_dsp_lock);
-			if (reg > PARAM_DSM_5_0_MAX)
-				reg = reg % PARAM_DSM_5_0_MAX;
 			*val = maxdsm.param[reg];
 		}
 		break;
@@ -954,7 +917,7 @@ static int maxdsm_write_wrapper(unsigned int reg,
 		maxdsm_regmap_read(reg, &ret);
 		break;
 	case PLATFORM_TYPE_B:
-		if (reg > (maxdsm.param_size - 1))
+		if (reg > maxdsm.param_size)
 			pr_err("%s: Unknown parameter index. %d\n",
 					__func__, reg);
 		else {
@@ -966,15 +929,13 @@ static int maxdsm_write_wrapper(unsigned int reg,
 		}
 		break;
 	case PLATFORM_TYPE_C:
-		if (reg > (maxdsm.param_size - 1))
+		if (reg > maxdsm.param_size)
 			pr_err("%s: Unknown parameter index. %d\n",
 					__func__, reg);
 		else {
 			maxdsm.param[reg] = val;
 			maxim_dsm_write(&maxdsm.param[0], reg, 1);
-			mutex_lock(&dsm_dsp_lock);
 			maxim_dsm_read(reg, 1, &maxdsm);
-			mutex_unlock(&dsm_dsp_lock);
 			ret = maxdsm.param[reg];
 		}
 		break;
@@ -998,54 +959,43 @@ void maxdsm_log_update(const void *byte_log_array,
 	mutex_lock(&maxdsm_log_lock);
 
 	for (i = 0; i < 2; i++) {
-		log_max_prev_array[i] = maxdsm_int_log_max_array[maxdsm_channel][i];
-		int_log_overcnt_array[i] = maxdsm_int_log_array[maxdsm_channel][i];
+		log_max_prev_array[i] = maxdsm_int_log_max_array[i];
+		int_log_overcnt_array[i] = maxdsm_int_log_array[i];
 	}
 
-	dbg_maxdsm("@#@# excursion prev max[%d] : %d / now max : %d, temp prev max[%d] : %d / now max : %d",
-		maxdsm_channel, log_max_prev_array[0],maxdsm_int_log_max_array[maxdsm_channel][0], 
-		maxdsm_channel, log_max_prev_array[1],maxdsm_int_log_max_array[maxdsm_channel][1]);
-
-	memcpy(maxdsm_byte_log_array[maxdsm_channel],
-			byte_log_array, sizeof(maxdsm_byte_log_array[maxdsm_channel]));
-	memcpy(maxdsm_int_log_array[maxdsm_channel],
-			int_log_array, sizeof(maxdsm_int_log_array[maxdsm_channel]));
-	memcpy(maxdsm_after_prob_byte_log_array[maxdsm_channel],
+	memcpy(maxdsm_byte_log_array,
+			byte_log_array, sizeof(maxdsm_byte_log_array));
+	memcpy(maxdsm_int_log_array,
+			int_log_array, sizeof(maxdsm_int_log_array));
+	memcpy(maxdsm_after_prob_byte_log_array,
 			after_prob_byte_log_array,
-			sizeof(maxdsm_after_prob_byte_log_array[maxdsm_channel]));
-	memcpy(maxdsm_after_prob_int_log_array[maxdsm_channel],
+			sizeof(maxdsm_after_prob_byte_log_array));
+	memcpy(maxdsm_after_prob_int_log_array,
 			after_prob_int_log_array,
-			sizeof(maxdsm_after_prob_int_log_array[maxdsm_channel]));
-	memcpy(maxdsm_int_log_max_array[maxdsm_channel],
-			int_log_max_array, sizeof(maxdsm_int_log_max_array[maxdsm_channel]));
+			sizeof(maxdsm_after_prob_int_log_array));
+	memcpy(maxdsm_int_log_max_array,
+			int_log_max_array, sizeof(maxdsm_int_log_max_array));
 
 	for (i = 0; i < 2; i++) {
 		/* [0] : excu max, [1] : temp max */
-		if (log_max_prev_array[i] > maxdsm_int_log_max_array[maxdsm_channel][i])
-			maxdsm_int_log_max_array[maxdsm_channel][i] = log_max_prev_array[i];
+		if (log_max_prev_array[i] > maxdsm_int_log_max_array[i]) {
+			maxdsm_int_log_max_array[i] = log_max_prev_array[i];
+		}
 		/* accumulate overcnt [0] : temp overcnt, [1] : excu overcnt */
-		maxdsm_int_log_array[maxdsm_channel][i] += int_log_overcnt_array[i];
+		maxdsm_int_log_array[i] += int_log_overcnt_array[i];
 	}
 
 	do_gettimeofday(&tv);
-	time_to_tm(tv.tv_sec, 0, &maxdsm_log_timestamp[maxdsm_channel]);
+	time_to_tm(tv.tv_sec, 0, &maxdsm_log_timestamp);
 
-	if (maxdsm_byte_log_array[maxdsm_channel][0] & 0x3)
-		maxdsm_log_present[maxdsm_channel] = 1;
+	if (maxdsm_byte_log_array[0] & 0x3)
+		maxdsm_log_present = 1;
 
-	maxdsm_log_max_present[maxdsm_channel] = 1;
+	maxdsm_log_max_present = 1;
 
-	dbg_maxdsm("[CH %d] [MAX|OVCNT] EX [%d|%d] TEMP [%d|%d]", maxdsm_channel,
-		maxdsm_int_log_max_array[maxdsm_channel][0], maxdsm_int_log_array[maxdsm_channel][1],
-		maxdsm_int_log_max_array[maxdsm_channel][1], maxdsm_int_log_array[maxdsm_channel][0]);
-
-	if(maxdsm_channel){
-		/* Right Channel */
-		coil_temp_max_keep_r = maxdsm_int_log_max_array[maxdsm_channel][1];
-	} else {
-		/* Left Channel */
-		coil_temp_max_keep = maxdsm_int_log_max_array[maxdsm_channel][1];
-	}
+	dbg_maxdsm("[MAX|OVCNT] EX [%d|%d] TEMP [%d|%d]",
+		maxdsm_int_log_max_array[0], maxdsm_int_log_array[1],
+		maxdsm_int_log_max_array[1], maxdsm_int_log_array[0]);
 
 	mutex_unlock(&maxdsm_log_lock);
 }
@@ -1068,10 +1018,9 @@ void maxdsm_read_logbuf_reg(void)
 
 	mutex_lock(&maxdsm_log_lock);
 
-	/*
-	 * If the following variables are not initialized,
-	 * these can not have zero data on some linux platform.
-	 */
+	/* If the following variables are not initialized,
+	* these can not have zero data on some linux platform.
+	*/
 	idx = b_idx = i_idx = apb_idx = api_idx = 0;
 
 	while (idx < MAX_LOG_BUFFER_POS) {
@@ -1081,19 +1030,19 @@ void maxdsm_read_logbuf_reg(void)
 			maxdsm_regmap_read(g_lbi[idx].addr + loop, &data);
 			switch (g_lbi[idx].type) {
 			case sizeof(uint8_t):
-				maxdsm_byte_log_array[LOG_LEFT][b_idx++] =
+				maxdsm_byte_log_array[b_idx++] =
 					data & 0xFF;
 				break;
 			case sizeof(uint32_t):
-				maxdsm_int_log_array[LOG_LEFT][i_idx++] =
+				maxdsm_int_log_array[i_idx++] =
 					data & 0xFFFFFFFF;
 				break;
 			case sizeof(uint8_t)*2:
-				maxdsm_after_prob_byte_log_array[LOG_LEFT][apb_idx++] =
+				maxdsm_after_prob_byte_log_array[apb_idx++] =
 					data & 0xFF;
 				break;
 			case sizeof(uint32_t)*2:
-				maxdsm_after_prob_int_log_array[LOG_LEFT][api_idx++] =
+				maxdsm_after_prob_int_log_array[api_idx++] =
 					data & 0xFFFFFFFF;
 				break;
 			}
@@ -1102,8 +1051,8 @@ void maxdsm_read_logbuf_reg(void)
 	}
 
 	do_gettimeofday(&tv);
-	time_to_tm(tv.tv_sec, 0, &maxdsm_log_timestamp[LOG_LEFT]);
-	maxdsm_log_present[LOG_LEFT] = 1;
+	time_to_tm(tv.tv_sec, 0, &maxdsm_log_timestamp);
+	maxdsm_log_present = 1;
 
 	mutex_unlock(&maxdsm_log_lock);
 }
@@ -1115,19 +1064,16 @@ int maxdsm_get_dump_status(void)
 	switch (maxdsm.platform_type) {
 	case PLATFORM_TYPE_A:
 		ret = maxdsm_regmap_read(g_lbi[LOG_AVAILABLE].addr,
-				&new_log_avail[LOG_LEFT]);
+				&new_log_avail);
 		break;
 	}
 
-	return !ret ? (new_log_avail[LOG_LEFT] & 0x03) : ret;
+	return !ret ? (new_log_avail & 0x03) : ret;
 }
 EXPORT_SYMBOL_GPL(maxdsm_get_dump_status);
 
 void maxdsm_update_param(void)
 {
-	int chan;
-
-	memset(maxdsm.param, 0x00, maxdsm.param_size * sizeof(uint32_t));
 	switch (maxdsm.platform_type) {
 	case PLATFORM_TYPE_A:
 		maxdsm_regmap_write(g_lbi[WRITE_PROTECT].addr, 1);
@@ -1135,116 +1081,60 @@ void maxdsm_update_param(void)
 		maxdsm_regmap_write(g_lbi[WRITE_PROTECT].addr, 0);
 		break;
 	case PLATFORM_TYPE_B:
-		switch (maxdsm.osm_mode) {
-		case MAX98512_OSM_STEREO:
-			for (chan = 0 ; chan < LOG_CHANNELS ; chan++) {
-				maxdsm_channel = chan;
-				if (chan == 0)
-					maxdsm.filter_set = DSM_ID_FILTER_GET_LOG_AFE_PARAMS;
-				else
-					maxdsm.filter_set = DSM_ID_FILTER_GET_LOG_AFE_PARAMS_R;
-				maxdsm_dsm_open(&maxdsm);
+		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
+		maxdsm_dsm_open(&maxdsm);
 
-				if (maxdsm.param[PARAM_EXCUR_LIMIT] != 0
-						&& maxdsm.param[PARAM_THERMAL_LIMIT] != 0)
-					new_log_avail[chan] |= 0x1;
-			}
-			break;
-		case MAX98512_OSM_MONO_R:
-			maxdsm_channel = LOG_RIGHT;
+		maxdsm.filter_set = DSM_ID_FILTER_GET_LOG_AFE_PARAMS;
+		maxdsm_dsm_open(&maxdsm);
 
-			maxdsm.filter_set = DSM_ID_FILTER_GET_LOG_AFE_PARAMS;
-			maxdsm_dsm_open(&maxdsm);
-
-			if (maxdsm.param[PARAM_EXCUR_LIMIT] != 0
-					&& maxdsm.param[PARAM_THERMAL_LIMIT] != 0)
-				new_log_avail[LOG_RIGHT] |= 0x1;
-			break;
-		}
+		if (maxdsm.param[PARAM_EXCUR_LIMIT] != 0
+				&& maxdsm.param[PARAM_THERMAL_LIMIT] != 0)
+			new_log_avail |= 0x1;
 		break;
 	case PLATFORM_TYPE_C:
-		switch (maxdsm.osm_mode) {
-		case MAX98512_OSM_STEREO:
-			for (chan = 0 ; chan < LOG_CHANNELS ; chan++) {
-				maxdsm_channel = chan;
-				mutex_lock(&dsm_dsp_lock);
-				maxim_dsm_read(PARAM_DSM_5_0_ABOX_GET_LOGGING + (chan * 185),
-						sizeof(maxdsm_byte_log_array[LOG_LEFT])+
-						sizeof(maxdsm_int_log_array[LOG_LEFT])+
-						sizeof(maxdsm_after_prob_byte_log_array[LOG_LEFT])+
-						sizeof(maxdsm_after_prob_int_log_array[LOG_LEFT])+
-						sizeof(maxdsm_int_log_max_array[LOG_LEFT]),
-						&maxdsm);
-				mutex_unlock(&dsm_dsp_lock);
-
-				dbg_maxdsm("@#@# excursion max[%d] : %d, temp max[%d] : %d",chan,
-					maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+AFTER_BUFSIZE+1],
-					chan,
-					maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+AFTER_BUFSIZE+2]);
-
-				maxdsm_log_update(&maxdsm.param[1],
-						&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+1],
-						&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE+1],
-						&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+1],
-						&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+AFTER_BUFSIZE+1]);
-			}
-			maxdsm_read_all();
-			break;
-		case MAX98512_OSM_MONO_R:
-			maxdsm_channel = LOG_RIGHT;
-			mutex_lock(&dsm_dsp_lock);
-			maxim_dsm_read(PARAM_DSM_5_0_ABOX_GET_LOGGING,
-					sizeof(maxdsm_byte_log_array[LOG_LEFT])+
-					sizeof(maxdsm_int_log_array[LOG_LEFT])+
-					sizeof(maxdsm_after_prob_byte_log_array[LOG_LEFT])+
-					sizeof(maxdsm_after_prob_int_log_array[LOG_LEFT])+
-					sizeof(maxdsm_int_log_max_array[LOG_LEFT]),
-					&maxdsm);
-			mutex_unlock(&dsm_dsp_lock);
-			maxdsm_log_update(&maxdsm.param[1],
-					&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+1],
-					&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE+1],
-					&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+1],
-					&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+AFTER_BUFSIZE+1]);
-			maxdsm_read_all();
-			break;
+		maxdsm_read_all();
+		maxim_dsm_read(PARAM_DSM_5_0_ABOX_GET_LOGGING,
+					sizeof(maxdsm_byte_log_array)+
+					sizeof(maxdsm_int_log_array)+
+					sizeof(maxdsm_after_prob_byte_log_array)+
+					sizeof(maxdsm_after_prob_int_log_array)+
+					sizeof(maxdsm_int_log_max_array)
+					, &maxdsm);
+		maxdsm_log_update(&maxdsm.param[1],
+							&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+1],
+							&maxdsm.param[(BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE+1],
+							&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+1],
+							&maxdsm.param[((BEFORE_BUFSIZE/sizeof(uint32_t))+BEFORE_BUFSIZE)+(AFTER_BUFSIZE/sizeof(uint32_t))+AFTER_BUFSIZE+1]);
+		maxdsm_read_all();
 		break;
-		}
 	}
 }
 EXPORT_SYMBOL_GPL(maxdsm_update_param);
 
-void maxdsm_log_max_prepare(struct maxim_dsm_log_max_values *values, int chan)
+void maxdsm_log_max_prepare(struct maxim_dsm_log_max_values *values)
 {
-	if (maxdsm_log_max_present[chan]) {
-		/* excu log max */
-		values->excursion_max = maxdsm_int_log_max_array[chan][0];
-		/* excu log overshoot cnt */
-		values->excursion_overcnt = maxdsm_int_log_array[chan][1];
-		/* coil temp log max */
-		values->coil_temp_max = maxdsm_int_log_max_array[chan][1];
-		/* coil temp log overshoot cnt */
-		values->coil_temp_overcnt = maxdsm_int_log_array[chan][0];
+
+	if (maxdsm_log_max_present) {
+		values->excursion_max = maxdsm_int_log_max_array[0]; /* excu log max */
+		values->excursion_overcnt = maxdsm_int_log_array[1]; /* excu log overshoot cnt */
+		values->coil_temp_max = maxdsm_int_log_max_array[1]; /* coil temp log max */
+		values->coil_temp_overcnt = maxdsm_int_log_array[0]; /* coil temp log overshoot cnt */
 
 		snprintf(values->dsm_timestamp, PAGE_SIZE,
 				"%4d-%02d-%02d %02d:%02d:%02d (UTC)\n",
-				(int)(maxdsm_log_timestamp[chan].tm_year + 1900),
-				(int)(maxdsm_log_timestamp[chan].tm_mon + 1),
-				(int)(maxdsm_log_timestamp[chan].tm_mday),
-				(int)(maxdsm_log_timestamp[chan].tm_hour),
-				(int)(maxdsm_log_timestamp[chan].tm_min),
-				(int)(maxdsm_log_timestamp[chan].tm_sec));
+				(int)(maxdsm_log_timestamp.tm_year + 1900),
+				(int)(maxdsm_log_timestamp.tm_mon + 1),
+				(int)(maxdsm_log_timestamp.tm_mday),
+				(int)(maxdsm_log_timestamp.tm_hour),
+				(int)(maxdsm_log_timestamp.tm_min),
+				(int)(maxdsm_log_timestamp.tm_sec));
 	} else {
 		dbg_maxdsm("No update the logging data. Need to call the DSM LOG mixer peviously\n");
 
-		/* excu log max */
-		values->excursion_max = 0;
-		/* excu log overshoot cnt */
-		values->excursion_overcnt = 0;
-		/* coil temp log max */
-		values->coil_temp_max = 0;
-		/* coil temp log overshoot cnt */
-		values->coil_temp_overcnt = 0;
+		values->excursion_max = 0; /* excu log max */
+		values->excursion_overcnt = 0; /* excu log overshoot cnt */
+		values->coil_temp_max = 0; /* coil temp log max */
+		values->coil_temp_overcnt = 0; /* coil temp log overshoot cnt */
 
 		snprintf(values->dsm_timestamp, PAGE_SIZE,
 				"No update time\n");
@@ -1252,35 +1142,35 @@ void maxdsm_log_max_prepare(struct maxim_dsm_log_max_values *values, int chan)
 }
 EXPORT_SYMBOL_GPL(maxdsm_log_max_prepare);
 
-void maxdsm_log_max_refresh(int values, int chan)
+void maxdsm_log_max_refresh(int values)
 {
 	switch (values) {
 	case SPK_EXCURSION_MAX:
-		maxdsm_int_log_max_array[chan][0] = 0;
+		maxdsm_int_log_max_array[0] = 0;
 		break;
 	case SPK_TEMP_MAX:
-		maxdsm_int_log_max_array[chan][1] = 0;
+		maxdsm_int_log_max_array[1] = 0;
 		break;
 	case SPK_EXCURSION_OVERCNT:
-		maxdsm_int_log_array[chan][1] = 0;
+		maxdsm_int_log_array[1] = 0;
 		break;
 	case SPK_TEMP_OVERCNT:
-		maxdsm_int_log_array[chan][0] = 0;
+		maxdsm_int_log_array[0] = 0;
 		break;
 	default:
-		dbg_maxdsm("Not proper argument for refresh logging max value[%d].", values);
+		dbg_maxdsm("Not proper argument for refresh logging max value[%d].",values);
 		break;
 	}
 }
 EXPORT_SYMBOL_GPL(maxdsm_log_max_refresh);
 
-ssize_t maxdsm_log_prepare(char *buf, int chan)
+ssize_t maxdsm_log_prepare(char *buf)
 {
-	uint8_t *byte_log_array = maxdsm_byte_log_array[chan];
-	uint32_t *int_log_array = maxdsm_int_log_array[chan];
-	uint8_t *afterbyte_log_array = maxdsm_after_prob_byte_log_array[chan];
-	uint32_t *after_int_log_array = maxdsm_after_prob_int_log_array[chan];
-	uint32_t *int_log_max_array = maxdsm_int_log_max_array[chan];
+	uint8_t *byte_log_array = maxdsm_byte_log_array;
+	uint32_t *int_log_array = maxdsm_int_log_array;
+	uint8_t *afterbyte_log_array = maxdsm_after_prob_byte_log_array;
+	uint32_t *after_int_log_array = maxdsm_after_prob_int_log_array;
+	uint32_t *int_log_max_array = maxdsm_int_log_max_array;
 	int rc = 0;
 
 	uint8_t log_available;
@@ -1314,8 +1204,9 @@ ssize_t maxdsm_log_prepare(char *buf, int chan)
 	int param_lfx_gain = PARAM_A_LFX_GAIN;
 	int param_pilot_gain = PARAM_A_PILOT_GAIN;
 
-	if (unlikely(!maxdsm_log_present[chan]))
+	if (unlikely(!maxdsm_log_present)) {
 		rc = -ENODATA;
+	}
 
 	switch (maxdsm.platform_type) {
 	case PLATFORM_TYPE_A:
@@ -1396,21 +1287,21 @@ ssize_t maxdsm_log_prepare(char *buf, int chan)
 	freq_log_max      = int_log_max_array[3];
 
 	if (log_available > 0 &&
-			(ex_seq_count_temp[chan] != seq_count_temp
-			 || ex_seq_count_excur[chan] != seq_count_excur)) {
-		ex_seq_count_temp[chan] = seq_count_temp;
-		ex_seq_count_excur[chan] = seq_count_excur;
-		new_log_avail[chan] |= 0x2;
+			(ex_seq_count_temp != seq_count_temp
+			 || ex_seq_count_excur != seq_count_excur)) {
+		ex_seq_count_temp = seq_count_temp;
+		ex_seq_count_excur = seq_count_excur;
+		new_log_avail |= 0x2;
 	}
 
 	rc += snprintf(buf+rc, PAGE_SIZE,
 			"DSM LogData saved at %4d-%02d-%02d %02d:%02d:%02d (UTC)\n",
-			(int)(maxdsm_log_timestamp[chan].tm_year + 1900),
-			(int)(maxdsm_log_timestamp[chan].tm_mon + 1),
-			(int)(maxdsm_log_timestamp[chan].tm_mday),
-			(int)(maxdsm_log_timestamp[chan].tm_hour),
-			(int)(maxdsm_log_timestamp[chan].tm_min),
-			(int)(maxdsm_log_timestamp[chan].tm_sec));
+			(int)(maxdsm_log_timestamp.tm_year + 1900),
+			(int)(maxdsm_log_timestamp.tm_mon + 1),
+			(int)(maxdsm_log_timestamp.tm_mday),
+			(int)(maxdsm_log_timestamp.tm_hour),
+			(int)(maxdsm_log_timestamp.tm_min),
+			(int)(maxdsm_log_timestamp.tm_sec));
 
 	if ((log_available & 0x1) == 0x1) {
 		rc += snprintf(buf+rc, PAGE_SIZE,
@@ -1637,15 +1528,12 @@ static int maxdsm_set_param(struct param_set_data *data, int size)
 			maxdsm_regmap_write(data[loop].addr, data[loop].value);
 		break;
 	case PLATFORM_TYPE_B:
+		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
 		ret = maxdsm_dsm_open(&maxdsm);
 		maxdsm.param[PARAM_WRITE_FLAG] = data[0].wflag;
 		for (loop = 0; loop < size; loop++)
 			maxdsm.param[data[loop].name] = data[loop].value;
-		if (maxdsm.filter_set == DSM_ID_FILTER_GET_AFE_PARAMS)
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		else
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-
+		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
 		ret = maxdsm_dsm_open(&maxdsm);
 		break;
 	case PLATFORM_TYPE_C:
@@ -1702,7 +1590,7 @@ EXPORT_SYMBOL_GPL(maxdsm_is_stereo);
 int maxdsm_update_feature_en_adc(int apply)
 {
 	unsigned int val = 0;
-	unsigned int reg = 0, reg_r = 0, ret = 0;
+	unsigned int reg, reg_r, ret = 0;
 	struct param_set_data data = {
 		.name = PARAM_FEATURE_SET,
 		.addr = 0x2A006A,
@@ -1713,8 +1601,9 @@ int maxdsm_update_feature_en_adc(int apply)
 	switch (maxdsm.platform_type) {
 	case PLATFORM_TYPE_A:
 		reg = data.addr;
-		if (maxdsm_is_stereo() && maxdsm.version == VERSION_4_0_A_S)
+		if (maxdsm_is_stereo() && maxdsm.version == VERSION_4_0_A_S) {
 			reg_r = reg + DSM_4_0_LSI_STEREO_OFFSET;
+		}
 		break;
 	case PLATFORM_TYPE_B:
 		reg = data.name;
@@ -1752,56 +1641,20 @@ int maxdsm_update_feature_en_adc(int apply)
 
 		ret = maxdsm_set_param(&data, 1);
 	}
-
-	if (maxdsm_is_stereo()) {
-
-		switch (maxdsm.platform_type) {
-		case PLATFORM_TYPE_A:
-			break;
-		case PLATFORM_TYPE_B:
-			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-			maxdsm_read_wrapper(reg, &val);
-			break;
-		case PLATFORM_TYPE_C:
-			reg = DSM_API_SETGET_PILOT_ENABLE + PARAM_DSM_5_0_MAX;
-			maxdsm_read_wrapper(reg, &val);
-			break;
-		default:
-			dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-			break;
-		}
-		if (apply)
-			data.value = val | data.value;
-		else
-			data.value = val & ~data.value;
-		dbg_maxdsm("apply=%d data.value=0x%x val=0x%x reg=%x",
-				apply, data.value, val, reg_r);
-
-		ret = maxdsm_set_param(&data, 1);
-	}
 	return ret;
 }
 EXPORT_SYMBOL_GPL(maxdsm_update_feature_en_adc);
 
-int maxdsm_set_feature_en(int on, uint32_t wflag)
+int maxdsm_set_feature_en(int on)
 {
 	int index, ret = 0;
-	int i = 0;
 	struct param_set_data data = {
 		.name = PARAM_FEATURE_SET,
 		.value = 0,
-		.wflag = wflag,
+		.wflag = FLAG_WRITE_FEATURE_ONLY,
 	};
 
-	for (i = 0 ; i < 2 ; i++) {
-
-		if (i == 0)
-			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		else if (i == 1 && maxdsm_is_stereo())
-			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-		else
-			break;
-
+	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
 	ret = maxdsm_dsm_open(&maxdsm);
 	if (ret)
 		return ret;
@@ -1838,273 +1691,66 @@ int maxdsm_set_feature_en(int on, uint32_t wflag)
 				index, maxdsm_saved_params[index].value);
 	}
 
-		if (wflag == PARAM_WRITE_V_VALIDATION) {
-			if (i == 0)
-				maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-			else if (i == 1 && maxdsm_is_stereo())
-				maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-			ret = maxdsm_set_param(&data, 1);
-			maxdsm.tx_port_id |= 1 << 31;
-			ret = maxdsm_set_param(&data, 1);
-			maxdsm.tx_port_id &= ~(1 << 31);
-		} else {
-			if (i == 0)
-				maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-			else if (i == 1 && maxdsm_is_stereo())
-				maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-			ret = maxdsm_set_param(&data, 1);
-		}
-	}
-
-	maxdsm.filter_set = 0;
-	return ret;
+	return maxdsm_set_param(&data, 1);
 }
 EXPORT_SYMBOL_GPL(maxdsm_set_feature_en);
-
-int maxdsm_set_amp_screen_mode(unsigned int mode)
-{
-	int i;
-	int ret = 0;
-
-	dbg_maxdsm("platform %d, mode %d",
-			maxdsm.platform_type, mode);
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_A:
-		break;
-	case PLATFORM_TYPE_B:
-		for (i = 0 ; i < 2 ; i++) {
-			if (i == 0)
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-			else if (i == 1 && maxdsm_is_stereo())
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-			else
-				break;
-
-			maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_AMP_SCREEN;
-			maxdsm.param[PARAM_ONOFF] = mode;
-			ret = maxdsm_dsm_open(&maxdsm);
-			/* tx channel */
-			maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_AMP_SCREEN;
-			maxdsm.param[PARAM_ONOFF] = mode;
-			maxdsm.tx_port_id |= 1 << 31;
-			ret = maxdsm_dsm_open(&maxdsm);
-			maxdsm.tx_port_id &= ~(1 << 31);
-		}
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		break;
-	case PLATFORM_TYPE_C:
-		break;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_amp_screen_mode);
 
 int maxdsm_set_cal_mode(int on)
 {
 	int index, ret = 0;
-	int i = 0;
 
-	for (i = 0 ; i < 2 ; i++) {
-		if (i == 0)
-			maxdsm.param_offset = 0;
-		else if (i == 1 && maxdsm_is_stereo())
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		else
-			break;
+	maxdsm_read_all();
 
-		maxdsm_read_all();
+	index = maxdsm_find_index_of_saved_params(
+				maxdsm_spt_saved_params,
+				sizeof(maxdsm_spt_saved_params)
+					/ sizeof(struct param_set_data),
+				DSM_API_SETGET_ENABLE_SMART_PT);
 
-		index = maxdsm_find_index_of_saved_params(
-					maxdsm_spt_saved_params,
-					sizeof(maxdsm_spt_saved_params)
-						/ sizeof(struct param_set_data),
-					DSM_API_SETGET_ENABLE_SMART_PT);
+	if (index < 0 || (maxdsm.platform_type != PLATFORM_TYPE_C))
+		return -ENODATA;
 
-		if (index < 0 || (maxdsm.platform_type != PLATFORM_TYPE_C))
-			return -ENODATA;
+	maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_FEATURE_ONLY;
 
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_FEATURE_ONLY;
+	if (on)
+	{
+		if (maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]) //SPT enabled
+		{
+			maxdsm_spt_saved_params[index].value = maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT];
 
-		if (on)	{
-			if (maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]) { /* SPT enabled */
-				maxdsm_spt_saved_params[index].value = maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT];
-			} else {  /* SPT disabled */
-				if (maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]) {
-					dbg_maxdsm("already Rdc cal mode!!!return!!");
-					return ret;
-				}
+		}else {  //SPT disabled
+			if (maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]) {
+				dbg_maxdsm("already Rdc cal mode!!!return!!");
+				return ret;
 			}
-			maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = 0;
-			maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 1;
-
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for diabled SPT",
-					DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
-			dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
-					index, maxdsm_spt_saved_params[index].value);
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for enabled Rdc cal mode",
-					DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
-
-		} else {
-			maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = maxdsm_spt_saved_params[index].value;
-			maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 0;
-
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for recovering SPT",
-					DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
-			dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
-					index, maxdsm_spt_saved_params[index].value);
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for disabled Rdc cal mode",
-					DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
 		}
+		maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = 0;
+		maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 1;
 
-		maxdsm_write_all();
+		dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for diabled SPT",
+				DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
+		dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
+				index, maxdsm_spt_saved_params[index].value);
+		dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for enabled Rdc cal mode",
+				DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
+
+	} else
+	{
+		maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = maxdsm_spt_saved_params[index].value;
+		maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 0;
+
+		dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for recovering SPT",
+				DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
+		dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
+				index, maxdsm_spt_saved_params[index].value);
+		dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for disabled Rdc cal mode",
+				DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
 	}
 
+	maxdsm_write_all();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(maxdsm_set_cal_mode);
-
-int maxdsm_set_v_validation_mode(int on)
-{
-	int index, ret = 0;
-	int i = 0;
-
-	for (i = 0 ; i < 2 ; i++) {
-		if (i == 0)
-			maxdsm.param_offset = 0;
-		else if (i == 1 && maxdsm_is_stereo())
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		else
-			break;
-
-		maxdsm_read_all();
-
-		index = maxdsm_find_index_of_saved_params(
-					maxdsm_spt_saved_params,
-					sizeof(maxdsm_spt_saved_params)
-						/ sizeof(struct param_set_data),
-					DSM_API_SETGET_ENABLE_SMART_PT);
-
-		if (index < 0 || (maxdsm.platform_type != PLATFORM_TYPE_C))
-			return -ENODATA;
-
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_V_VALIDATION;
-
-		if (on) {
-			if (maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]) { /* SPT enabled */
-				maxdsm_spt_saved_params[index].value = maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT];
-
-			} else {  /* SPT disabled */
-				if (maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]) {
-					dbg_maxdsm("already Rdc cal mode!!!return!!");
-					return ret;
-				}
-			}
-			maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = 0;
-			maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 1;
-
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for diabled SPT",
-					DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
-			dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
-					index, maxdsm_spt_saved_params[index].value);
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for enabled Rdc cal mode",
-					DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
-
-		} else {
-			maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT] = maxdsm_spt_saved_params[index].value;
-			maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL] = 0;
-
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for recovering SPT",
-					DSM_API_SETGET_ENABLE_SMART_PT, maxdsm.param[DSM_API_SETGET_ENABLE_SMART_PT]);
-			dbg_maxdsm("maxdsm_spt_saved_params[%d].value=0x%08x",
-					index, maxdsm_spt_saved_params[index].value);
-			dbg_maxdsm("maxdsm.param[%d]=0x%08x -> for disabled Rdc cal mode",
-					DSM_API_SETGET_ENABLE_RDC_CAL, maxdsm.param[DSM_API_SETGET_ENABLE_RDC_CAL]);
-		}
-
-		maxdsm_write_all();
-	}
-
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_v_validation_mode);
-
-int maxdsm_set_amp_screen_validation_mode(int on)
-{
-	int ret = 0;
-	int i = 0;
-
-	for (i = 0 ; i < 2 ; i++) {
-		if (i == 0)
-			maxdsm.param_offset = 0;
-		else if (i == 1 && maxdsm_is_stereo())
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		else
-			break;
-
-		if (maxdsm.platform_type != PLATFORM_TYPE_C)
-			return -ENODATA;
-
-		maxdsm_read_all();
-
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_AMP_SCREEN;
-		if (on) {
-			maxdsm.param[DSM_API_SETGET_AMP_SCREEN_VALIDATION] = 1;
-			dbg_maxdsm("DSM_API_SETGET_AMP_SCREEN_VALIDATION mode on");
-		} else {
-			maxdsm.param[DSM_API_SETGET_AMP_SCREEN_VALIDATION] = 0;
-			dbg_maxdsm("DSM_API_SETGET_AMP_SCREEN_VALIDATION mode off");
-		}
-
-		maxdsm_write_all();
-	}
-
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_amp_screen_validation_mode);
-
-int maxdsm_set_rdc_temp_ch(int rdc, int temp, int ch)
-{
-	int ret = 0;
-
-	dbg_maxdsm("rdc=0x%08x temp=0x%08x", rdc, temp);
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.param[PARAM_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
-		maxdsm.param[PARAM_VOICE_COIL] = rdc;
-		maxdsm.param[PARAM_AMBIENT_TEMP] = temp << 19;
-		if (ch == 0)
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		else
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-
-		ret = maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
-		maxdsm.param[DSM_API_SETGET_RDC_AT_ROOMTEMP] = rdc<<8;
-		maxdsm.param[DSM_API_SETGET_COLDTEMP] = temp << 19;
-		if (ch == 0)
-			maxdsm.param_offset = 0;
-		else
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm_write_all();
-		maxdsm.param_offset = 0;
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_rdc_temp_ch);
 
 int maxdsm_set_rdc_temp(int rdc, int temp)
 {
@@ -2113,260 +1759,29 @@ int maxdsm_set_rdc_temp(int rdc, int temp)
 	dbg_maxdsm("rdc=0x%08x temp=0x%08x", rdc, temp);
 
 	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.param[PARAM_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
-		maxdsm.param[PARAM_VOICE_COIL] = rdc;
-		maxdsm.param[PARAM_AMBIENT_TEMP] = temp << 19;
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		ret = maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
-		maxdsm.param[DSM_API_SETGET_RDC_AT_ROOMTEMP] = rdc<<8;
-		maxdsm.param[DSM_API_SETGET_COLDTEMP] = temp << 19;
-		maxdsm_write_all();
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
+		case PLATFORM_TYPE_B:
+			maxdsm.tx_port_id |= 1 << 31;
+			maxdsm.param[PARAM_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
+			maxdsm.param[PARAM_VOICE_COIL] = rdc;
+			maxdsm.param[PARAM_AMBIENT_TEMP] = temp << 19;
+			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
+			ret = maxdsm_dsm_open(&maxdsm);
+			maxdsm.tx_port_id &= ~(1 << 31);
+			break;
+		case PLATFORM_TYPE_C:
+			maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_RDC_CAL_ONLY;
+			maxdsm.param[DSM_API_SETGET_RDC_AT_ROOMTEMP] = rdc<<8;
+			maxdsm.param[DSM_API_SETGET_COLDTEMP] = temp << 19;
+			maxdsm_write_all();
+			break;
+		default:
+			dbg_maxdsm("Invalid platform type[%d]!!",maxdsm.platform_type);
+			break;
 	}
 
 	return ret;
 }
 EXPORT_SYMBOL_GPL(maxdsm_set_rdc_temp);
-
-int maxdsm_set_ppr_enable(int on, int freq, int db, int ch)
-{
-	int ret = 0;
-
-	dbg_maxdsm("on=%d freq=0x%08x db=0x%08x ch=0x%08x", on, freq, db, ch);
-
-	if (on == 0) {
-		switch (maxdsm.platform_type) {
-		case PLATFORM_TYPE_B:
-			maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-			maxdsm.param[PARAM_PPR_XOVER_FREQ] = freq;
-			maxdsm.param[PARAM_PPR_ENABLE] = 0;
-			maxdsm.param[PARAM_PPR_THRESHOLD_DB] = db;
-			if (ch == 0)
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-			else
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-			ret = maxdsm_dsm_open(&maxdsm);
-			break;
-		case PLATFORM_TYPE_C:
-			if (maxdsm_get_spk_state()) {
-				if (ch == 0)
-					maxdsm.param_offset = 0;
-				else
-					maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-				maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-				maxdsm.param[DSM_API_SETGET_PPR_XOVER_FREQ_HZ] = freq;
-				maxdsm.param[DSM_API_SETGET_ENABLE_PPR] = 0;
-				maxdsm.param[DSM_API_SETGET_PPR_XOVER_THRSH_DB] = db;
-				maxdsm_write_all();
-			}
-			break;
-		default:
-			dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-			break;
-		}
-	} else {
-		switch (maxdsm.platform_type) {
-		case PLATFORM_TYPE_B:
-			maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-			maxdsm.param[PARAM_PPR_XOVER_FREQ] = freq;
-			maxdsm.param[PARAM_PPR_ENABLE] = 1;
-			maxdsm.param[PARAM_PPR_THRESHOLD_DB] = db;
-			if (ch == 0)
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-			else
-				maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-			ret = maxdsm_dsm_open(&maxdsm);
-			break;
-		case PLATFORM_TYPE_C:
-			if (maxdsm_get_spk_state()) {
-				if (ch == 0)
-					maxdsm.param_offset = 0;
-				else
-					maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-				maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-				maxdsm.param[DSM_API_SETGET_PPR_XOVER_FREQ_HZ] = freq;
-				maxdsm.param[DSM_API_SETGET_ENABLE_PPR] = 1;
-				maxdsm.param[DSM_API_SETGET_PPR_XOVER_THRSH_DB] = db;
-				maxdsm_write_all();
-			}
-			break;
-		default:
-			dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-			break;
-		}
-
-	}
-	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_ppr_enable);
-
-int maxdsm_set_ppr_xover_freq(int freq, int ch)
-{
-	int ret = 0;
-
-	dbg_maxdsm("freq=0x%08x ch=0x%08x", freq, ch);
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-		maxdsm.param[PARAM_PPR_XOVER_FREQ] = freq;
-		if (ch == 0)
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		else
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-		ret = maxdsm_dsm_open(&maxdsm);
-		break;
-	case PLATFORM_TYPE_C:
-		if (maxdsm_get_spk_state()) {
-			if (ch == 0)
-				maxdsm.param_offset = 0;
-			else
-				maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-			maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-			maxdsm.param[DSM_API_SETGET_PPR_XOVER_FREQ_HZ] = freq;
-			maxdsm_write_all();
-			break;
-		}
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_ppr_xover_freq);
-
-int maxdsm_set_ppr_threshold_db(int threshold_db, int ch)
-{
-	int ret = 0;
-
-	dbg_maxdsm("threshold_db=0x%08x ch=0x%08x", threshold_db, ch);
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-		maxdsm.param[PARAM_PPR_THRESHOLD_DB] = threshold_db;
-		if (ch == 0)
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		else
-			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-		ret = maxdsm_dsm_open(&maxdsm);
-		break;
-	case PLATFORM_TYPE_C:
-		if (ch == 0)
-			maxdsm.param_offset = 0;
-		else
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_SET_PPR;
-		maxdsm.param[DSM_API_SETGET_PPR_XOVER_THRSH_DB] = threshold_db;
-		maxdsm_write_all();
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_ppr_threshold_db);
-
-int maxdsm_get_thermal_min_gain(void)
-{
-	int ret = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		if (maxdsm_get_spk_state()) {
-			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-			maxdsm_read_all();
-
-			if (maxdsm.param[PARAM_THERMAL_MIN_GAIN])
-				ret = 1;
-			else
-				ret = 0;
-			dbg_maxdsm("maxdsm.param[PARAM_THERMAL_MIN_GAIN]=0x%08x, Safety mode[%d]",
-				maxdsm.param[PARAM_THERMAL_MIN_GAIN], ret);
-		}
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = 0;
-		maxdsm_read_all();
-		if (maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN])
-			ret = 1;
-		else
-			ret = 0;
-		dbg_maxdsm("maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN]=0x%08x, Safety mode[%d]",
-			maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN], ret);
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_thermal_min_gain);
-
-int maxdsm_set_thermal_min_gain(int enable)
-{
-	int ret = 0;
-	int value = 0;
-
-	dbg_maxdsm("enable=0x%08x", enable);
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		if (enable == 0)
-			value = enable;
-		else
-			value = maxdsm_cal_get_thermal_min_gain();
-		maxdsm.param[PARAM_THERMAL_MIN_GAIN] = value;
-		maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_SET_THERM_MIN_GAIN;
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		maxdsm_dsm_open(&maxdsm);
-
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-		maxdsm_dsm_open(&maxdsm);
-
-		dbg_maxdsm("maxdsm.param[PARAM_THERMAL_MIN_GAIN]=0x%08x", maxdsm.param[PARAM_THERMAL_MIN_GAIN]);
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = 0;
-		if (enable == 0)
-			value = enable;
-		else
-			value = maxdsm_cal_get_thermal_min_gain();
-
-		maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN] = value;
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_SET_THERM_MIN_GAIN;
-		maxdsm_write_all();
-
-		maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm_write_all();
-		dbg_maxdsm("maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN]=0x%08x", maxdsm.param[DSM_API_SETGET_THERMAL_MIN_GAIN]);
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-	maxdsm.param_offset = 0;
-	return ret;
-}
-EXPORT_SYMBOL_GPL(maxdsm_set_thermal_min_gain);
 
 int maxdsm_set_dsm_onoff_status(int on)
 {
@@ -2380,44 +1795,15 @@ int maxdsm_set_dsm_onoff_status(int on)
 		},
 	};
 
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_A:
-	case PLATFORM_TYPE_B:
-		break;
-	case PLATFORM_TYPE_C:
-		data[0].name = DSM_API_SETGET_ENABLE;
-		data[0].wflag = FLAG_WRITE_ALL;
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
 	ret = maxdsm_set_param(
 			data,
 			sizeof(data) / sizeof(struct param_set_data));
 
-	if (maxdsm_is_stereo()) {
-		switch (maxdsm.platform_type) {
-		case PLATFORM_TYPE_A:
-			data->addr += DSM_4_0_LSI_STEREO_OFFSET;
-			break;
-		case PLATFORM_TYPE_B:
-			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-			break;
-		case PLATFORM_TYPE_C:
-			maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-			break;
-		default:
-			dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-			break;
-		}
+	if (maxdsm_is_stereo() && (maxdsm.version == VERSION_4_0_A_S)) {
+		data->addr += DSM_4_0_LSI_STEREO_OFFSET;
 		ret = maxdsm_set_param(
 				data,
 				sizeof(data) / sizeof(struct param_set_data));
-				maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-				maxdsm.param_offset = 0;
 	}
 
 	return ret;
@@ -2427,179 +1813,41 @@ EXPORT_SYMBOL_GPL(maxdsm_set_dsm_onoff_status);
 uint32_t maxdsm_get_dcresistance(void)
 {
 	uint32_t dcresistance = 0;
-
 	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		dcresistance = maxdsm.param[PARAM_RDC];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm_read_all();
-		dcresistance = maxdsm.param[DSM_API_GET_ADAPTIVE_DC_RES];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
+		case PLATFORM_TYPE_B:
+			maxdsm.tx_port_id |= 1 << 31;
+			maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
+			maxdsm_dsm_open(&maxdsm);
+			maxdsm.tx_port_id &= ~(1 << 31);
+			dcresistance = maxdsm.param[PARAM_RDC];
+			break;
+		case PLATFORM_TYPE_C:
+			maxdsm_read_all();
+			dcresistance = maxdsm.param[DSM_API_GET_ADAPTIVE_DC_RES];
+			break;
+		default:
+			dbg_maxdsm("Invalid platform type[%d]!!",maxdsm.platform_type);
+			break;
 	}
 
 	return dcresistance;
 }
 EXPORT_SYMBOL_GPL(maxdsm_get_dcresistance);
 
-uint32_t maxdsm_get_dcresistance_r(void)
-{
-	uint32_t dcresistance = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		maxdsm.tx_port_id &= ~(1 << 31);
-		dcresistance = maxdsm.param[PARAM_RDC];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm_read_all();
-		maxdsm.param_offset = 0;
-		dcresistance = maxdsm.param[DSM_API_GET_ADAPTIVE_DC_RES];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return dcresistance;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_dcresistance_r);
-
-
-uint32_t maxdsm_get_v_validation(void)
-{
-	uint32_t v_validation = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		v_validation = maxdsm.param[PARAM_V_VALIDATION];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = 0;
-		maxdsm_read_all();
-		v_validation = maxdsm.param[DSM_API_GET_V_VALIDATION];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return v_validation;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_v_validation);
-
-uint32_t maxdsm_get_amp_screen_validation(void)
-{
-	uint32_t amp_screen_validation = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		amp_screen_validation = maxdsm.param[PARAM_AMP_SCREEN_VALIDATION];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = 0;
-		maxdsm_read_all();
-		amp_screen_validation = maxdsm.param[DSM_API_SETGET_AMP_SCREEN_VALIDATION];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return amp_screen_validation;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_amp_screen_validation);
-
-uint32_t maxdsm_get_v_validation_r(void)
-{
-	uint32_t v_validation = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		v_validation = maxdsm.param[PARAM_V_VALIDATION];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm_read_all();
-		maxdsm.param_offset = 0;
-		v_validation = maxdsm.param[DSM_API_GET_V_VALIDATION];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return v_validation;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_v_validation_r);
-
-uint32_t maxdsm_get_amp_screen_validation_r(void)
-{
-	uint32_t amp_screen_validation = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-		maxdsm_dsm_open(&maxdsm);
-		maxdsm.tx_port_id &= ~(1 << 31);
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		amp_screen_validation = maxdsm.param[PARAM_AMP_SCREEN_VALIDATION];
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm.param_offset = PARAM_DSM_5_0_MAX;
-		maxdsm_read_all();
-		maxdsm.param_offset = 0;
-		amp_screen_validation = maxdsm.param[DSM_API_SETGET_AMP_SCREEN_VALIDATION];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
-	}
-
-	return amp_screen_validation;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_amp_screen_validation_r);
-
 uint32_t maxdsm_get_dsm_onoff_status(void)
 {
 	uint32_t dsm_onoff = 0;
 
 	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_B:
-		dsm_onoff = maxdsm.param[PARAM_ONOFF];
-		break;
-	case PLATFORM_TYPE_C:
-		dsm_onoff = maxdsm.param[DSM_API_SETGET_ENABLE];
-		break;
-	default:
-		dbg_maxdsm("Invalid platform type[%d]!!", maxdsm.platform_type);
-		break;
+		case PLATFORM_TYPE_B:
+			dsm_onoff = maxdsm.param[PARAM_ONOFF];
+			break;
+		case PLATFORM_TYPE_C:
+			dsm_onoff = maxdsm.param[DSM_API_SETGET_ENABLE];
+			break;
+		default:
+			dbg_maxdsm("Invalid platform type[%d]!!",maxdsm.platform_type);
+			break;
 	}
 	return dsm_onoff;
 }
@@ -2656,11 +1904,10 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 	uint32_t binfo_v40[V40_SIZE] = {
 		/* X_MAX, SPK_FS, Q_GUARD_BAND */
 		15, 27, 29,
-		/* RESERVED_0,  RESERVED_1,  PARAM_THERMAL_MIN_GAIN, PARAM_PPR_THRESHOLD_DB, PARAM_PPR_XOVER_FREQ */
-		0, 0, 31, 20, 9,
-		/* PARAM_PPR_ENABLE, Q_NOTCH, STEREO_CROSSOVER_ENABLE,
-		STEREO_CROSSOVER_FREQ, STEREO_CROSSOVER_Q, POWER  , V_VALIDATION, AMP_SCREEN_VALIDATION */
-		0, 0, 0, 9, 29, 8, 0, 0,
+		/* STIMPEDMODEL_CEFS_A1, A2, B0, B1, B2 */
+		30, 30, 27, 27, 27,
+		/* STIMPEDEMODEL_FLAG, Q_NOTCH, POWER */
+		0, 0, 8,
 	};
 
 	uint32_t binfo_a_v35[A_V35_SIZE] = {
@@ -2713,8 +1960,9 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 		22, 23, 24, 8,
 	};
 
-	for (i = 0; i < PARAM_DSM_5_0_MAX; i++)
+	for (i=0;i<PARAM_DSM_5_0_MAX;i++) {
 		binfo_c_v50[i] = 0;
+	}
 
 	/* Try to get parameter size. */
 	switch (maxdsm->version) {
@@ -2723,7 +1971,6 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 		maxdsm->param_size = PARAM_A_DSM_4_0_MAX;
 		break;
 	case VERSION_4_0_B:
-	case VERSION_4_0_B_S:
 		maxdsm->param_size = PARAM_DSM_4_0_MAX;
 		break;
 	case VERSION_3_5_A:
@@ -2736,7 +1983,6 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 		maxdsm->param_size = PARAM_DSM_3_0_MAX;
 		break;
 	case VERSION_5_0_C:
-	case VERSION_5_0_C_S:
 		maxdsm->param_size = PARAM_DSM_5_0_MAX;
 		break;
 
@@ -2763,7 +2009,6 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 				binfo_a_v35, sizeof(binfo_a_v35));
 		break;
 	case VERSION_4_0_B:
-	case VERSION_4_0_B_S:
 		memcpy(&maxdsm->binfo[
 				ARRAY_SIZE(binfo_v30) + ARRAY_SIZE(binfo_v35)],
 				binfo_v40, sizeof(binfo_v40));
@@ -2775,7 +2020,6 @@ int maxdsm_update_param_info(struct maxim_dsm *maxdsm)
 				binfo_v30, sizeof(binfo_v30));
 		break;
 	case VERSION_5_0_C:
-	case VERSION_5_0_C_S:
 		memcpy(maxdsm->binfo,
 				binfo_c_v50, sizeof(binfo_c_v50));
 		break;
@@ -2824,6 +2068,7 @@ EXPORT_SYMBOL_GPL(maxdsm_update_info);
 void maxdsm_update_sub_reg(uint32_t sub_reg)
 {
 	maxdsm.sub_reg = sub_reg;
+	return;
 }
 EXPORT_SYMBOL_GPL(maxdsm_update_sub_reg);
 
@@ -2857,21 +2102,9 @@ int maxdsm_get_spk_state(void)
 }
 EXPORT_SYMBOL_GPL(maxdsm_get_spk_state);
 
-void maxdsm_set_spk_state(int state, int osm_mode)
+void maxdsm_set_spk_state(int state)
 {
 	maxdsm.spk_state = state;
-	if (state == 0) {
-		maxdsm_power_ppr_control(0);
-		maxdsm_power_control(0);
-	} else {
-		switch (osm_mode) {
-		case MAX98512_OSM_STEREO:
-		case MAX98512_OSM_MONO_R:
-			maxdsm_power_ppr_control(1);
-			break;
-		}
-
-	}
 }
 EXPORT_SYMBOL_GPL(maxdsm_set_spk_state);
 
@@ -2885,7 +2118,6 @@ uint32_t maxdsm_get_power_measurement(void)
 		break;
 	case PLATFORM_TYPE_B:
 		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
 		maxdsm_read_all();
 		val = maxdsm.param[PARAM_POWER_MEASUREMENT];
 		maxdsm.tx_port_id &= ~(1 << 31);
@@ -2899,74 +2131,17 @@ uint32_t maxdsm_get_power_measurement(void)
 }
 EXPORT_SYMBOL_GPL(maxdsm_get_power_measurement);
 
-uint32_t maxdsm_get_power_measurement_r(void)
-{
-	uint32_t val = 0;
-
-	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_A:
-		maxdsm_regmap_read(0x2A01DE, &val);
-		break;
-	case PLATFORM_TYPE_B:
-		maxdsm.tx_port_id |= 1 << 31;
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS_R;
-		maxdsm_read_all();
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		val = maxdsm.param[PARAM_POWER_MEASUREMENT];
-		maxdsm.tx_port_id &= ~(1 << 31);
-		break;
-	case PLATFORM_TYPE_C:
-		maxdsm_read_wrapper(DSM_API_SETGET_POWER_MEASUREMENT + PARAM_DSM_5_0_MAX, &val);
-		break;
-	}
-
-	return val;
-}
-EXPORT_SYMBOL_GPL(maxdsm_get_power_measurement_r);
-
 void maxdsm_set_stereo_mode_configuration(unsigned int mode)
 {
-	unsigned int smode_table[MAX98512_OSM_MAX] = {
-		0, /* MAX98512_OSM_STEREO */
-		3, /* MAX98512_OSM_STEREO_MODE2 */
-		2, /* MAX98512_OSM_MONO_L */
-		1, /* MAX98512_OSM_MONO_R */
-		2, /* MAX98512_OSM_RCV_L */
-		1, /* MAX98512_OSM_RCV_R */
-		0, /* MAX98512_OSM_STEREO_L */
-		0, /* MAX98512_OSM_STEREO_R */
-	};
-
-	dbg_maxdsm("platform %d, mode %d smode_table[mode] %d",
-			maxdsm.platform_type, mode, smode_table[mode]);
+	dbg_maxdsm("platform %d, mode %d", maxdsm.platform_type, mode);
 	switch (maxdsm.platform_type) {
 	case PLATFORM_TYPE_A:
-		maxdsm_regmap_write(0x2A0380, smode_table[mode]);
+		maxdsm_regmap_write(0x2A0380, mode);
 		break;
 	case PLATFORM_TYPE_B:
-		maxdsm.osm_mode = mode;
-		maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_OSM;
-		maxdsm.param[PARAM_ONOFF] = mode;
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
-		maxdsm_dsm_open(&maxdsm);
-		/* right channel */
-		maxdsm.param[PARAM_WRITE_FLAG] = PARAM_WRITE_OSM;
-		maxdsm.param[PARAM_ONOFF] = mode;
-		maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS_R;
-		maxdsm_dsm_open(&maxdsm);
-
-		maxdsm.filter_set = DSM_ID_FILTER_GET_AFE_PARAMS;
-		break;
 	case PLATFORM_TYPE_C:
-		maxdsm_read_all();
-		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = PARAM_WRITE_OSM;
-		maxdsm.param[DSM_API_SETGET_ENABLE] = mode;
-		maxdsm.param_offset = PARAM_DSM_ABOX_SET_OSM;
-		maxdsm_write_all();
-		maxdsm.param_offset = 0;
 		break;
 	}
-	maxdsm.osm_mode = mode; /* save osm mode */
 }
 EXPORT_SYMBOL_GPL(maxdsm_set_stereo_mode_configuration);
 
@@ -3008,7 +2183,7 @@ int maxdsm_set_pilot_signal_state(int on)
 
 		/* set pilot signal on/off */
 		maxdsm.param[DSM_API_SETGET_WRITE_FLAG] = FLAG_WRITE_FEATURE_ONLY;
-		maxdsm.param[DSM_API_SETGET_PILOT_ENABLE] = on;
+  		maxdsm.param[DSM_API_SETGET_PILOT_ENABLE] = on;
 		maxdsm_write_all();
 
 		/* check feature_set parameter */
@@ -3077,7 +2252,7 @@ int maxdsm_update_caldata(int on)
 				}
 			}
 		} else {
-			dbg_maxdsm("failed update caldata...please check the platform A maxdsm.param_size [%d] !!!", maxdsm.param_size);
+			dbg_maxdsm("failed update caldata...please check the platform A maxdsm.param_size [%d] !!!",maxdsm.param_size);
 		}
 		break;
 	case PLATFORM_TYPE_B:
@@ -3092,7 +2267,7 @@ int maxdsm_update_caldata(int on)
 			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
 			maxdsm_dsm_open(&maxdsm);
 		} else {
-			dbg_maxdsm("failed update caldata...please check the platform B maxdsm.param_size [%d] !!!", maxdsm.param_size);
+			dbg_maxdsm("failed update caldata...please check the platform B maxdsm.param_size [%d] !!!",maxdsm.param_size);
 		}
 		break;
 	}
@@ -3108,24 +2283,24 @@ int maxdsm_cal_avail(void)
 static void maxdsm_store_caldata(void)
 {
 	int x;
-
 	switch (maxdsm.platform_type) {
-	case PLATFORM_TYPE_A:
-	case PLATFORM_TYPE_B:
-		if (maxdsm.param_size <= PARAM_A_DSM_4_0_MAX) {
-			for (x = 0; x < (maxdsm.param_size >> 1); x++) {
-				g_pbi[x].val = maxdsm.param[x<<1];
-				dbg_maxdsm("[%d]: 0x%08x",
-						x, g_pbi[x].val);
+		case PLATFORM_TYPE_A:
+		case PLATFORM_TYPE_B:
+			if (maxdsm.param_size <= PARAM_A_DSM_4_0_MAX) {
+				for (x = 0; x < (maxdsm.param_size >> 1); x++) {
+					g_pbi[x].val = maxdsm.param[x<<1];
+					dbg_maxdsm("[%d]: 0x%08x",
+							x, g_pbi[x].val);
+				}
+
+				maxdsm.update_cal = 1;
+			} else {
+				dbg_maxdsm("failed store caldata...please check the maxdsm.param_size [%d] !!!",maxdsm.param_size);
 			}
-			maxdsm.update_cal = 1;
-		} else {
-			dbg_maxdsm("failed store caldata...please check the maxdsm.param_size [%d] !!!", maxdsm.param_size);
-		}
-		break;
-	default:
-		x = 0;
-		break;
+			break;
+		default:
+			x=0;
+			break;
 	}
 }
 #endif /* USE_DSM_UPDATE_CAL */
@@ -3254,33 +2429,6 @@ static long maxdsm_ioctl_handler(struct file *file,
 		maxdsm.tx_port_id = arg;
 		ret = maxdsm.tx_port_id;
 		break;
-	case MAXDSM_IOCTL_GET_PARAM_ID:
-		ret = maxdsm.filter_set;
-		if (copy_to_user(argp,
-					&maxdsm.filter_set,
-					sizeof(maxdsm.filter_set)))
-			goto error;
-		break;
-	case MAXDSM_IOCTL_SET_PARAM_ID:
-		if (arg < DSM_ID_FILTER_GET_AFE_PARAMS ||
-				arg > DSM_ID_FILTER_GET_LOG_AFE_PARAMS_R)
-			goto error;
-		maxdsm.filter_set = arg;
-		ret = maxdsm.filter_set;
-		break;
-	case MAXDSM_IOCTL_GET_PARAM_OFFSET:
-		ret = maxdsm.param_offset;
-		if (copy_to_user(argp,
-					&maxdsm.param_offset,
-					sizeof(maxdsm.param_offset)))
-			goto error;
-		break;
-	case MAXDSM_IOCTL_SET_PARAM_OFFSET:
-		if (arg < 0 || arg > 1000)
-			goto error;
-		maxdsm.param_offset = arg;
-		ret = maxdsm.param_offset;
-		break;
 	default:
 		break;
 	}
@@ -3356,11 +2504,12 @@ static ssize_t maxdsm_write(struct file *filep, const char __user *buf,
 		ret = maxdsm_validation_check(maxdsm.param[PARAM_WRITE_FLAG]);
 		if (!ret) {
 			/* set params from the algorithm to application */
+			maxdsm.filter_set = DSM_ID_FILTER_SET_AFE_CNTRLS;
 			maxdsm_dsm_open(&maxdsm);
 		}
 		break;
 	case PLATFORM_TYPE_C:
-		maxim_dsm_write(&maxdsm.param[0], maxdsm.param_offset, PARAM_DSM_5_0_MAX);
+		maxim_dsm_write(&maxdsm.param[0], 0, PARAM_DSM_5_0_MAX);
 		break;
 	default:
 		dbg_maxdsm("Unknown platform type %d",
@@ -3399,16 +2548,10 @@ static struct miscdevice dsm_ctrl_miscdev = {
 
 void maxdsm_deinit(void)
 {
-	dbg_maxdsm("%s: ++maxdsm_deinit.\n", __func__);
+	kfree(maxdsm.binfo);
+	kfree(maxdsm.param);
 
-	--maxdsm.registered;
-	dbg_maxdsm("%s: maxdsm.registered=%d\n", __func__, maxdsm.registered);
-	if (maxdsm.registered == 0) {
-		kfree(maxdsm.binfo);
-		kfree(maxdsm.param);
-		misc_deregister(&dsm_ctrl_miscdev);
-	}
-	dbg_maxdsm("%s: --maxdsm_deinit.\n", __func__);
+	misc_deregister(&dsm_ctrl_miscdev);
 }
 EXPORT_SYMBOL_GPL(maxdsm_deinit);
 
@@ -3416,13 +2559,14 @@ int maxdsm_init(void)
 {
 	int ret;
 
-	if (maxdsm.registered++) {
-		dbg_maxdsm("%s: Already registered.maxdsm.registered=%d\n", __func__, maxdsm.registered);
+	if (maxdsm.registered) {
+		dbg_maxdsm("%s: Already registered.\n", __func__);
 		return -EALREADY;
 	}
 
 	ret = misc_register(&dsm_ctrl_miscdev);
 	if (!ret) {
+		maxdsm.registered = 1;
 		ret = maxdsm_update_param_info(&maxdsm);
 	}
 

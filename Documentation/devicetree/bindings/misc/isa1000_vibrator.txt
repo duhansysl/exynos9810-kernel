@@ -1,0 +1,35 @@
+IMAGIS isa1000 haptic vibrator
+
+Required properties:
+
+ - compatible: Must be "imagis,isa1000_vibrator".
+
+ - isa1000,motor_type: "LINEAR"
+
+ - pwms: Pwm phandle of the device.
+
+ - isa1000,frequency: Vibrator frequency value. If 205Hz, "2050".
+
+ - isa1000,duty_ratio: Duty percentage of pwm.
+
+Optional properties:
+
+ - isa1000,gpio_en: GPIO used for enable motor.
+
+ - isa1000,regulator_name: Regulator name used for enable motor.
+
+ - pinctrl variants.
+
+Examples:
+
+ isa1000_vibrator {
+	 compatible = "imagis,isa1000_vibrator";
+	 status = "okay";
+	 pwms = <&pwm 0 50000 0>;
+	 isa1000,duty_ratio = <90>;
+	 isa1000,frequency = <2050>; /* 205Hz */
+	 isa1000,gpio_en = <&gpio 1 0>;
+	 isa1000,regulator_name = "VDD_LDO";
+	 isa1000,motor_type = "LINEAR";
+ };
+

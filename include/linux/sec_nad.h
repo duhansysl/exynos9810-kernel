@@ -16,7 +16,7 @@
 #if defined(CONFIG_SEC_FACTORY)
 #define NAD_PARAM_NAME "/dev/block/NAD_REFER"
 #define NAD_OFFSET 8192
-#define NAD_ENV_OFFSET 10240
+#define NAD_ENV_OFFSET 10240 * 2
 
 #define NAD_PARAM_READ	0
 #define NAD_PARAM_WRITE	1

@@ -919,6 +919,7 @@ int decon_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	struct decon_win_config config;
 	int ret = 0;
 	struct decon_mode_info psr;
+	u32 dual_sz = 1;
 
 	if (decon->dt.out_type != DECON_OUT_DSI) {
 		decon_warn("%s: decon%d unspported on out_type(%d)\n",
@@ -953,6 +954,8 @@ int decon_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 					var->bits_per_pixel);
 			return -EINVAL;
 	}
+	if (decon->dt.dsi_mode == DSI_MODE_DUAL_DSI)
+		dual_sz = 2;
 
 	config.dpp_parm.addr[0] = info->fix.smem_start;
 	config.src.x =  var->xoffset;
@@ -963,7 +966,7 @@ int decon_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	config.src.f_h = var->yres_virtual;
 	config.dst.w = config.src.w;
 	config.dst.h = config.src.h;
-	config.dst.f_w = decon->lcd_info->xres;
+	config.dst.f_w = decon->lcd_info->xres * dual_sz;
 	config.dst.f_h = decon->lcd_info->yres;
 	if (decon_check_limitation(decon, decon->dt.dft_win, &config) < 0)
 		return -EINVAL;

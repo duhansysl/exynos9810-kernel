@@ -1070,7 +1070,6 @@ static struct platform_driver madera_pin_driver = {
 	.probe = madera_pin_probe,
 	.driver = {
 		.name = "madera-pinctrl",
-		.suppress_bind_attrs = true,
 	},
 };
 

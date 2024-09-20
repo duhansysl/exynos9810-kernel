@@ -70,17 +70,12 @@ unsigned long exynos_acpm_get_rate(unsigned int id)
 	return config.cmd[1];
 }
 
-char margin_list[MAX_MARGIN_ID][10] = {"MIF", "INT", "BIG", "LIT", "G3D",
-		"INTCAM", "CAM", "DISP", "G3DM",
-		"CP", "FSYS0", "AUD", "IVA", "SCORE"};
-
 int exynos_acpm_set_volt_margin(unsigned int id, int volt)
 {
 	struct ipc_config config;
 	unsigned int cmd[4];
 	unsigned long long before, after, latency;
 	int ret;
-	struct vclk *vclk;
 
 	config.cmd = cmd;
 	config.response = true;
@@ -97,9 +92,6 @@ int exynos_acpm_set_volt_margin(unsigned int id, int volt)
 	if (ret)
 		pr_err("%s:[%d] latency = %llu ret = %d",
 			__func__, id, latency, ret);
-
-	vclk = cmucal_get_node(id);
-	pr_auto(ASL5, "%s: [%s] +margin %d uV\n", __func__, margin_list[vclk->margin_id], volt);
 
 	return ret;
 }

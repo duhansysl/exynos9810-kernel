@@ -1,16 +1,29 @@
+# Copyright (c) 2013-2018 TRUSTONIC LIMITED
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# version 2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+
 #
 # Makefile for the Kinibi trusted UI driver
 #
 
+# MobiCore kernel driver path
 GUD_ROOT_FOLDER := drivers/gud/gud-exynos9810
 ifeq ($(CONFIG_SOC_EXYNOS9810),y)
 PLATFORM := exynos9810
 endif
 
 # add our modules to kernel.
-obj-$(CONFIG_TRUSTONIC_TRUSTED_UI) += TlcTui.o
+obj-$(CONFIG_TRUSTONIC_TRUSTED_UI) += t-base-tui.o
 
-TlcTui-y := main.o tlcTui.o trustedui.o \
+t-base-tui-y := main.o tlcTui.o trustedui.o \
 platforms/$(PLATFORM)/tui-hal.o
 
 # Release mode by default
@@ -27,4 +40,4 @@ ccflags-y += -I$(GUD_ROOT_FOLDER)/TlcTui/inc \
 	     -I$(GUD_ROOT_FOLDER)/TlcTui/public \
 	     -I$(GUD_ROOT_FOLDER)/TlcTui \
 	     -Idrivers/video/fbdev/exynos/dpu_9810 \
-	     -Idrivers/staging/android/ion/
+	     -Idrivers/staging/android/ion

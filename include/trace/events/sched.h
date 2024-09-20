@@ -682,12 +682,12 @@ TRACE_EVENT(sched_rt_load_avg_task,
 	TP_ARGS(tsk, avg),
 
 	TP_STRUCT__entry(
-		__array(char,	comm,	TASK_COMM_LEN)
-		__field(pid_t,	pid)
-		__field(int,	cpu)
-		__field(unsigned long,	util_avg)
-		__field(u32,		util_sum)
-		__field(u32,		period_contrib)
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( int,	cpu			)
+		__field( unsigned long,	util_avg	)
+		__field( u32,		util_sum	)
+		__field( u32,		period_contrib	)
 	),
 
 	TP_fast_assign(
@@ -752,8 +752,8 @@ TRACE_EVENT(sched_rt_load_avg_cpu,
 	TP_ARGS(cpu, rt_rq),
 
 	TP_STRUCT__entry(
-		__field(int,		cpu)
-		__field(unsigned long,	util_avg)
+		__field( int,		cpu	)
+		__field( unsigned long,	util_avg)
 	),
 
 	TP_fast_assign(
@@ -792,16 +792,16 @@ TRACE_EVENT(sched_fluid_select_cpu,
 	TP_ARGS(p, vp, best_cpu, cpu_load, task_load, label),
 
 	TP_STRUCT__entry(
-		__array(char,	comm,		TASK_COMM_LEN)
-		__array(char,	victim_comm,	TASK_COMM_LEN)
-		__field(pid_t,	pid)
-		__field(pid_t,	vpid)
-		__field(int,	vic_prio)
-		__field(int,	task_prio)
-		__field(int,	best_cpu)
-		__field(unsigned long,	cpu_load)
-		__field(unsigned long,	task_load)
-		__array(char,	label,	64)
+		__array(char,	comm,		TASK_COMM_LEN	)
+		__array(char,	victim_comm,	TASK_COMM_LEN	)
+		__field(pid_t,	pid				)
+		__field(pid_t,	vpid				)
+		__field(int,	vic_prio			)
+		__field(int,	task_prio			)
+		__field(int,	best_cpu			)
+		__field(unsigned long,	cpu_load		)
+		__field(unsigned long,	task_load		)
+		__array(char,	label,	64			)
 	),
 
 	TP_fast_assign(
@@ -919,13 +919,13 @@ TRACE_EVENT(sched_tune_grouputil_update,
 	TP_ARGS(idx, total, accumulated, group_util, heaviest_p, biggest_util),
 
 	TP_STRUCT__entry(
-		__field(int,		idx)
-		__field(int,		total)
-		__field(int,		accumulated)
-		__field(unsigned long,	group_util)
-		__field(pid_t,		pid)
-		__array(char,	comm,	TASK_COMM_LEN)
-		__field(unsigned long,	biggest_util)
+		__field( int,		idx		)
+		__field( int,		total		)
+		__field( int,		accumulated	)
+		__field( unsigned long,	group_util	)
+		__field( pid_t,		pid		)
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( unsigned long,	biggest_util	)
 	),
 
 	TP_fast_assign(
@@ -938,7 +938,8 @@ TRACE_EVENT(sched_tune_grouputil_update,
 		__entry->biggest_util	= biggest_util;
 	),
 
-	TP_printk("idx=%d total=%d accumulated=%d group_util=%lu heaviest task(pid=%d comm=%s util=%lu)",
+	TP_printk("idx=%d total=%d accumulated=%d group_util=%lu "
+			"heaviest task(pid=%d comm=%s util=%lu)",
 		__entry->idx, __entry->total, __entry->accumulated, __entry->group_util,
 		__entry->pid, __entry->comm, __entry->biggest_util)
 );
@@ -953,9 +954,9 @@ TRACE_EVENT(sched_tune_check_group_balance,
 	TP_ARGS(idx, ib_count, balancing),
 
 	TP_STRUCT__entry(
-		__field(int,		idx)
-		__field(int,		ib_count)
-		__field(bool,		balancing)
+		__field( int,		idx		)
+		__field( int,		ib_count	)
+		__field( bool,		balancing	)
 	),
 
 	TP_fast_assign(

@@ -37,12 +37,21 @@ config CPU_FREQ_STAT
 
 	  If in doubt, say N.
 
-config CPU_FREQ_TIMES
-       bool "CPU frequency time-in-state statistics"
-       help
-         Export CPU time-in-state information through procfs.
+config CPU_FREQ_STAT_DETAILS
+	bool "CPU frequency transition statistics details"
+	depends on CPU_FREQ_STAT
+	help
+	  Show detailed CPU frequency transition table in sysfs.
 
-         If in doubt, say N.
+	  If in doubt, say N.
+
+config CPU_FREQ_TIMES
+	bool "CPU frequency time-in-state statistics"
+	default y
+	help
+	  Export CPU time-in-state information through procfs.
+
+	  If in doubt, say N.
 
 choice
 	prompt "Default CPUFreq governor"

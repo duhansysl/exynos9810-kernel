@@ -245,7 +245,7 @@ int gpu_memory_seq_show(struct seq_file *sfile, void *data)
 			spin_lock(&(element->kctx->mem_pool.pool_lock));
 			each_free_size = element->kctx->mem_pool.cur_size;
 			spin_unlock(&(element->kctx->mem_pool.pool_lock));
-			seq_printf(sfile, "  (%24s), %s-0x%pK    %12u  %10zu\n", \
+			seq_printf(sfile, "  (%24s), %s-0x%p    %12u  %10zu\n", \
 					element->kctx->name, \
 					"kctx", \
 					element->kctx, \

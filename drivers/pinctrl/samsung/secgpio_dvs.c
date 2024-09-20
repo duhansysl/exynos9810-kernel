@@ -18,7 +18,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 
 #include "secgpio_dvs.h"
 

@@ -35,6 +35,8 @@ enum max77705_hw_rev {
 	MAX77705_PASS1 = 0x1,
 	MAX77705_PASS2 = 0x2,
 	MAX77705_PASS3 = 0x3,
+	MAX77705_PASS4 = 0x4,
+	MAX77705_PASS5 = 0x5,
 };
 
 enum max77705_reg {
@@ -348,6 +350,8 @@ struct max77705_dev {
 	int irq_base;
 	int irq_gpio;
 	bool wakeup;
+	bool blocking_waterevent;
+	int device_product_id;
 	struct mutex irqlock;
 	int irq_masks_cur[MAX77705_IRQ_GROUP_NR];
 	int irq_masks_cache[MAX77705_IRQ_GROUP_NR];
@@ -356,6 +360,7 @@ struct max77705_dev {
 	u8 HW_Revision;
 	u8 FW_Revision;
 	u8 FW_Minor_Revision;
+	u8 FW_Product_ID;
 	struct work_struct fw_work;
 	struct workqueue_struct *fw_workqueue;
 	struct completion fw_completion;
@@ -375,6 +380,8 @@ struct max77705_dev {
 
 	u8 cc_booting_complete;
 
+	int set_altmode;
+
 	struct max77705_platform_data *pdata;
 };
 
@@ -390,6 +397,7 @@ extern int max77705_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest);
 extern int max77705_bulk_read(struct i2c_client *i2c, u8 reg, int count,
 				u8 *buf);
 extern int max77705_write_reg(struct i2c_client *i2c, u8 reg, u8 value);
+extern int max77705_write_reg_nolock(struct i2c_client *i2c, u8 reg, u8 value);
 extern int max77705_bulk_write(struct i2c_client *i2c, u8 reg, int count,
 				u8 *buf);
 extern int max77705_write_word(struct i2c_client *i2c, u8 reg, u16 value);
@@ -404,5 +412,6 @@ extern bool is_muic_usb_path_cp_usb(void);
 /* for charger api */
 extern void max77705_hv_muic_charger_init(void);
 extern int max77705_usbc_fw_update(struct max77705_dev *max77705, const u8 *fw_bin, int fw_bin_len, int enforce_do);
+extern void max77705_usbc_fw_setting(struct max77705_dev *max77705, int enforce_do);
 #endif /* __LINUX_MFD_MAX77705_PRIV_H */
 

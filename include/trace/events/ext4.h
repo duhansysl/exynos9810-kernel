@@ -887,7 +887,6 @@ TRACE_EVENT(ext4_sync_file_enter,
 		__field(	ino_t,	ino			)
 		__field(	ino_t,	parent			)
 		__field(	int,	datasync		)
-		__array(unsigned char,	d_name,	EXT4_NAME_LEN)
 	),
 
 	TP_fast_assign(
@@ -897,14 +896,12 @@ TRACE_EVENT(ext4_sync_file_enter,
 		__entry->ino		= d_inode(dentry)->i_ino;
 		__entry->datasync	= datasync;
 		__entry->parent		= d_inode(dentry->d_parent)->i_ino;
-		memcpy(__entry->d_name, dentry->d_name.name, EXT4_NAME_LEN);
 	),
 
-	TP_printk("dev %d,%d ino %lu parent %lu datasync %d d_name %s",
+	TP_printk("dev %d,%d ino %lu parent %lu datasync %d ",
 		  MAJOR(__entry->dev), MINOR(__entry->dev),
 		  (unsigned long) __entry->ino,
-		  (unsigned long) __entry->parent, __entry->datasync,
-		  __entry->d_name)
+		  (unsigned long) __entry->parent, __entry->datasync)
 );
 
 TRACE_EVENT(ext4_sync_file_exit,
@@ -1471,7 +1468,6 @@ TRACE_EVENT(ext4_unlink_enter,
 		__field(	ino_t,	ino			)
 		__field(	ino_t,	parent			)
 		__field(	loff_t,	size			)
-		__array(unsigned char,	d_name,	EXT4_NAME_LEN)
 	),
 
 	TP_fast_assign(
@@ -1479,13 +1475,12 @@ TRACE_EVENT(ext4_unlink_enter,
 		__entry->ino		= d_inode(dentry)->i_ino;
 		__entry->parent		= parent->i_ino;
 		__entry->size		= d_inode(dentry)->i_size;
-		memcpy(__entry->d_name, dentry->d_name.name, EXT4_NAME_LEN);
 	),
 
-	TP_printk("dev %d,%d ino %lu size %lld parent %lu d_name %s",
+	TP_printk("dev %d,%d ino %lu size %lld parent %lu",
 		  MAJOR(__entry->dev), MINOR(__entry->dev),
 		  (unsigned long) __entry->ino, __entry->size,
-		  (unsigned long) __entry->parent, __entry->d_name)
+		  (unsigned long) __entry->parent)
 );
 
 TRACE_EVENT(ext4_unlink_exit,
@@ -1497,20 +1492,18 @@ TRACE_EVENT(ext4_unlink_exit,
 		__field(	dev_t,	dev			)
 		__field(	ino_t,	ino			)
 		__field(	int,	ret			)
-		__array(unsigned char,	d_name,	EXT4_NAME_LEN)
 	),
 
 	TP_fast_assign(
 		__entry->dev		= dentry->d_sb->s_dev;
 		__entry->ino		= d_inode(dentry)->i_ino;
 		__entry->ret		= ret;
-		memcpy(__entry->d_name, dentry->d_name.name, EXT4_NAME_LEN);
 	),
 
-	TP_printk("dev %d,%d ino %lu ret %d d_name %s",
+	TP_printk("dev %d,%d ino %lu ret %d",
 		  MAJOR(__entry->dev), MINOR(__entry->dev),
 		  (unsigned long) __entry->ino,
-		  __entry->ret, __entry->d_name)
+		  __entry->ret)
 );
 
 DECLARE_EVENT_CLASS(ext4__truncate,

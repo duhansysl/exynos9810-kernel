@@ -41,7 +41,7 @@
 #include "fimc-is-debug.h"
 #include "fimc-is-hw.h"
 #include "fimc-is-vender.h"
-#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP)
+#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP) || defined (USE_MS_PDAF)
 #include "fimc-is-interface-sensor.h"
 #include "fimc-is-device-sensor-peri.h"
 #endif
@@ -695,7 +695,7 @@ p_retry:
 }
 
 static void fimc_is_group_s_leader(struct fimc_is_group *group,
-	struct fimc_is_subdev *leader)
+	struct fimc_is_subdev *leader, bool force)
 {
 	struct fimc_is_subdev *subdev;
 
@@ -706,14 +706,21 @@ static void fimc_is_group_s_leader(struct fimc_is_group *group,
 	subdev->leader = leader;
 
 	list_for_each_entry(subdev, &group->subdev_list, list) {
+		/*
+		 * TODO: Remove this error check logic.
+		 * For MC-scaler group, this warning message could be printed
+		 * because each capture node is shared by different output node.
+		 */
 		if (leader->vctx && subdev->vctx &&
 			(leader->vctx->refcount < subdev->vctx->refcount)) {
-			mgwarn("Invalide subdev instance (%s(%u) < %s(%u))",
+			mgwarn("Invalid subdev instance (%s(%u) < %s(%u))",
 				group, group,
 				leader->name, leader->vctx->refcount,
 				subdev->name, subdev->vctx->refcount);
 		}
-		subdev->leader = leader;
+
+		if (force || test_bit(FIMC_IS_SUBDEV_OPEN, &subdev->state))
+			subdev->leader = leader;
 	}
 }
 
@@ -802,7 +809,7 @@ static void fimc_is_group_set_torch(struct fimc_is_group *group,
 
 	if (group->aeflashMode != ldr_frame->shot->ctl.aa.vendor_aeflashMode) {
 		group->aeflashMode = ldr_frame->shot->ctl.aa.vendor_aeflashMode;
-		fimc_is_vender_set_torch(group->aeflashMode);
+		fimc_is_vender_set_torch(ldr_frame->shot);
 	}
 
 	return;
@@ -846,7 +853,7 @@ static void fimc_is_groupmgr_votf_change_path(struct fimc_is_group *group,
 		child = group->child;
 		leader = &group->leader;
 		while (child) {
-			fimc_is_group_s_leader(child, leader);
+			fimc_is_group_s_leader(child, leader, false);
 			child = child->child;
 		}
 		break;
@@ -859,7 +866,7 @@ static void fimc_is_groupmgr_votf_change_path(struct fimc_is_group *group,
 		child = group->child;
 		leader = &vprev->leader;
 		while (child) {
-			fimc_is_group_s_leader(child, leader);
+			fimc_is_group_s_leader(child, leader, false);
 			child = child->child;
 		}
 
@@ -1172,7 +1179,8 @@ int fimc_is_groupmgr_init(struct fimc_is_groupmgr *groupmgr,
 		mdbgd_group("source vid : %02d\n", group, source_vid);
 		if (source_vid) {
 			leader = &group->leader;
-			fimc_is_group_s_leader(group, leader);
+			/* Set force flag to initialize every leader in subdev. */
+			fimc_is_group_s_leader(group, leader, true);
 
 			if (prev) {
 				group->prev = prev;
@@ -1395,7 +1403,7 @@ int fimc_is_groupmgr_init(struct fimc_is_groupmgr *groupmgr,
 			sibling->tail = next;
 			next->head = sibling;
 			leader = &sibling->leader;
-			fimc_is_group_s_leader(next, leader);
+			fimc_is_group_s_leader(next, leader, false);
 		} else if (test_bit(FIMC_IS_GROUP_VIRTUAL_OTF_INPUT, &next->state)) {
 			group->vnext = next;
 			next->vprev = group;
@@ -1740,6 +1748,7 @@ int fimc_is_group_open(struct fimc_is_groupmgr *groupmgr,
 	group->fcount = 0;
 	group->pcount = 0;
 	group->aeflashMode = 0; /* Flash Mode Control */
+	group->remainIntentCount = 0;
 	atomic_set(&group->scount, 0);
 	atomic_set(&group->rcount, 0);
 	atomic_set(&group->backup_fcount, 0);
@@ -2008,7 +2017,7 @@ static void set_group_shots(struct fimc_is_group *group,
 		group->skip_shots = group->asyn_shots;
 	}
 #else
-	if (ex_mode == EX_DUALFPS_960 || ex_mode == EX_DUALFPS_480) {
+	if (ex_mode == EX_DUALFPS_960 || ex_mode == EX_DUALFPS_480 || framerate > 240) {
 		group->asyn_shots = MIN_OF_ASYNC_SHOTS + 1;
 		group->sync_shots = MIN_OF_SYNC_SHOTS;
 	} else {
@@ -2240,13 +2249,15 @@ int fimc_is_group_stop(struct fimc_is_groupmgr *groupmgr,
 	if (!test_bit(FIMC_IS_GROUP_START, &group->state) &&
 		!test_bit(FIMC_IS_GROUP_START, &group->head->state)) {
 		mwarn("already group stop", group);
-		goto p_err;
+		return -EPERM;
 	}
 
-	if (test_bit(FIMC_IS_GROUP_REQUEST_FSTOP, &group->state)) {
-		set_bit(FIMC_IS_GROUP_FORCE_STOP, &group->state);
-		clear_bit(FIMC_IS_GROUP_REQUEST_FSTOP, &group->state);
+	/* force stop set if only HEAD group OTF input */
+	if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->head->state)) {
+		if (test_bit(FIMC_IS_GROUP_REQUEST_FSTOP, &group->state))
+			set_bit(FIMC_IS_GROUP_FORCE_STOP, &group->state);
 	}
+	clear_bit(FIMC_IS_GROUP_REQUEST_FSTOP, &group->state);
 
 	retry = 150;
 	while (--retry && framemgr->queued_count[FS_REQUEST]) {
@@ -2283,7 +2294,7 @@ int fimc_is_group_stop(struct fimc_is_groupmgr *groupmgr,
 				rframe = list_first_entry(&gtask->sync_list, struct fimc_is_frame, sync_list);
 				list_del(&rframe->sync_list);
 				mgrinfo("flush SYNC REP(%d)\n", group, group, rframe, rframe->index);
-				queue_kthread_work(&gtask->worker, &rframe->work);
+				kthread_queue_work(&gtask->worker, &rframe->work);
 			}
 #endif
 		}
@@ -2297,6 +2308,17 @@ int fimc_is_group_stop(struct fimc_is_groupmgr *groupmgr,
 	if (!retry) {
 		mgerr(" waiting(until request empty) is fail(pc %d)", device, group, group->pcount);
 		errcnt++;
+
+		/*
+		 * Extinctionize pending works in worker to avoid the work_list corruption.
+		 * When user calls 'vb2_stop_streaming()' that calls 'group_stop()',
+		 * 'v4l2_reqbufs()' can be called for another stream
+		 * and it means every work in frame is going to be initialized.
+		 */
+		spin_lock_irqsave(&gtask->worker.lock, flags);
+		INIT_LIST_HEAD(&gtask->worker.work_list);
+		INIT_LIST_HEAD(&gtask->worker.delayed_work_list);
+		spin_unlock_irqrestore(&gtask->worker.lock, flags);
 	}
 
 	/* ensure that request cancel work is complete fully */
@@ -2422,15 +2444,12 @@ int fimc_is_group_buffer_queue(struct fimc_is_groupmgr *groupmgr,
 	struct fimc_is_device_ischain *device;
 	struct fimc_is_framemgr *framemgr;
 	struct fimc_is_frame *frame;
-#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP)
+#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP) || defined (USE_MS_PDAF)
 	struct fimc_is_module_enum *module = NULL;
 	struct fimc_is_device_sensor *sensor = NULL;
 	struct fimc_is_device_sensor_peri *sensor_peri = NULL;
 	cis_shared_data *cis_data = NULL;
 #endif
-	u32 orientation;
-	enum mcsc_port backup_mcsc_blk_port[INTERFACE_TYPE_MAX];
-	int i = 0;
 
 	FIMC_BUG(!groupmgr);
 	FIMC_BUG(!group);
@@ -2444,7 +2463,7 @@ int fimc_is_group_buffer_queue(struct fimc_is_groupmgr *groupmgr,
 	framemgr = &queue->framemgr;
 
 	FIMC_BUG(index >= framemgr->num_frames);
-#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP)
+#if defined(CONFIG_COMPANION_DIRECT_USE) || defined(CONFIG_CAMERA_PDP) || defined (USE_MS_PDAF)
 	sensor = device->sensor;
 	FIMC_BUG(!sensor);
 
@@ -2485,15 +2504,6 @@ int fimc_is_group_buffer_queue(struct fimc_is_groupmgr *groupmgr,
 					panic("HAL panic for request bufs");
 				}
 		}
-
-		/* orientation is set by user */
-		orientation = frame->shot->uctl.scalerUd.orientation;
-		for (i = 0; i < INTERFACE_TYPE_MAX; i++)
-			backup_mcsc_blk_port[i] = frame->shot->uctl.scalerUd.mcsc_sub_blk_port[i];
-		memset(&frame->shot->uctl.scalerUd, 0, sizeof(struct camera2_scaler_uctl));
-		frame->shot->uctl.scalerUd.orientation = orientation;
-		for (i = 0; i < INTERFACE_TYPE_MAX; i++)
-			frame->shot->uctl.scalerUd.mcsc_sub_blk_port[i] = backup_mcsc_blk_port[i];
 
 		frame->lindex = 0;
 		frame->hindex = 0;
@@ -2558,6 +2568,22 @@ int fimc_is_group_buffer_queue(struct fimc_is_groupmgr *groupmgr,
 			}
 		}
 #endif
+
+#ifdef ENABLE_REMOSAIC_CAPTURE_WITH_ROTATION
+		if ((GET_DEVICE_TYPE_BY_GRP(group->id) == FIMC_IS_DEVICE_SENSOR)
+				&& (device->sensor && !test_bit(FIMC_IS_SENSOR_FRONT_START, &device->sensor->state))) {
+			device->sensor->mode_chg_frame = NULL;
+
+			if (CHK_REMOSAIC_SCN(frame->shot->ctl.aa.captureIntent)) {
+				clear_bit(FIMC_IS_SENSOR_OTF_OUTPUT, &device->sensor->state);
+				device->sensor->mode_chg_frame = frame;
+			} else {
+				if (group->child)
+					set_bit(FIMC_IS_SENSOR_OTF_OUTPUT, &device->sensor->state);
+			}
+		}
+#endif
+
 		trans_frame(framemgr, frame, FS_REQUEST);
 	} else {
 		err("frame(%d) is invalid state(%d)\n", index, frame->state);
@@ -2590,6 +2616,15 @@ int fimc_is_group_buffer_queue(struct fimc_is_groupmgr *groupmgr,
 	if (cis_data->is_data.paf_stat_enable == false)
 		frame->shot->uctl.isModeUd.paf_mode = CAMERA_PAF_OFF;
 #endif
+
+#if defined (USE_MS_PDAF)
+	if (sensor_peri->cis.use_pdaf) {
+		frame->shot->uctl.isModeUd.paf_mode  = CAMERA_PAF_ON;
+	} else {
+		frame->shot->uctl.isModeUd.paf_mode = CAMERA_PAF_OFF;
+	}
+#endif /* USE_MS_PDAF */
+
 	fimc_is_group_start_trigger(groupmgr, group, frame);
 
 p_err:
@@ -2913,8 +2948,12 @@ int fimc_is_group_shot(struct fimc_is_groupmgr *groupmgr,
 	struct fimc_is_group *gprev, *gnext;
 	struct fimc_is_group_frame *gframe;
 	struct fimc_is_group_task *gtask;
+	struct fimc_is_group *child;
+	struct fimc_is_group_task *gtask_child;
 	bool try_sdown = false;
 	bool try_rdown = false;
+	bool try_gdown[GROUP_ID_MAX] = {false};
+	u32 gtask_child_id = 0;
 
 	FIMC_BUG(!groupmgr);
 	FIMC_BUG(!group);
@@ -2953,9 +2992,41 @@ int fimc_is_group_shot(struct fimc_is_groupmgr *groupmgr,
 	}
 	try_rdown = true;
 
+	/* check for group stop */
+	if (unlikely(test_bit(FIMC_IS_GROUP_FORCE_STOP, &group->state))) {
+		mgwarn(" cancel by fstop2", group, group);
+		ret = -EINVAL;
+		goto p_err_cancel;
+	}
+
+	if (unlikely(test_bit(FIMC_IS_GTASK_REQUEST_STOP, &gtask->state))) {
+		mgerr(" cancel by gstop2", group, group);
+		ret = -EINVAL;
+		goto p_err_ignore;
+	}
+
 	if (group->vnext && !list_empty(&group->votf_list))
 		/* from ISP-MCSC to ISP-DCP-MCSC group setting change */
 		fimc_is_groupmgr_votf_change_path(group->vnext, START_VIRTUAL_OTF);
+
+	child = group->child;
+	while (child) {
+		if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state))
+			break;
+
+		gtask_child = &groupmgr->gtask[child->id];
+		gtask_child_id = child->id;
+		child = child->child;
+		if (!test_bit(FIMC_IS_GTASK_START, &gtask_child->state))
+			continue;
+
+		ret = down_interruptible(&gtask_child->smp_resource);
+		if (ret) {
+			mgerr(" down fail(%d) #2", group, group, ret);
+			goto p_err_ignore;
+		}
+		try_gdown[gtask_child_id] = true;
+	}
 
 	if (device->sensor && !test_bit(FIMC_IS_SENSOR_FRONT_START, &device->sensor->state)) {
 		/*
@@ -2999,13 +3070,26 @@ int fimc_is_group_shot(struct fimc_is_groupmgr *groupmgr,
 			}
 		}
 
+		/* check for group stop */
+		if (unlikely(test_bit(FIMC_IS_GROUP_FORCE_STOP, &group->state))) {
+			mgwarn(" cancel by fstop3", group, group);
+			ret = -EINVAL;
+			goto p_err_cancel;
+		}
+
+		if (unlikely(test_bit(FIMC_IS_GTASK_REQUEST_STOP, &gtask->state))) {
+			mgerr(" cancel by gstop3", group, group);
+			ret = -EINVAL;
+			goto p_err_ignore;
+		}
+
 		/* for multi-buffer */
 		if (frame->num_buffers) {
 			if (atomic_read(&group->sensor_fcount) <= (atomic_read(&group->backup_fcount) + frame->num_buffers)) {
 				frame->fcount = atomic_read(&group->backup_fcount) + frame->num_buffers;
 			} else {
 				frame->fcount = atomic_read(&group->sensor_fcount);
-				mgwarn(" frame count reset by sensor focunt(%d->%d)", group, group,
+				mgwarn(" frame count reset by sensor fcount(%d->%d)", group, group,
 					atomic_read(&group->backup_fcount) + frame->num_buffers,
 					frame->fcount);
 			}
@@ -3021,7 +3105,7 @@ int fimc_is_group_shot(struct fimc_is_groupmgr *groupmgr,
 					frame->fcount = atomic_read(&group->backup_fcount) + frame->num_buffers;
 				} else {
 					frame->fcount = atomic_read(&group->sensor_fcount);
-					mgwarn(" _frame count reset by sensor focunt(%d->%d)", group, group,
+					mgwarn(" _frame count reset by sensor fcount(%d->%d)", group, group,
 						atomic_read(&group->backup_fcount) + frame->num_buffers,
 						frame->fcount);
 				}
@@ -3033,18 +3117,6 @@ int fimc_is_group_shot(struct fimc_is_groupmgr *groupmgr,
 	}
 
 p_skip_sync:
-	if (unlikely(test_bit(FIMC_IS_GROUP_FORCE_STOP, &group->state))) {
-		mgwarn(" cancel by fstop2", group, group);
-		ret = -EINVAL;
-		goto p_err_cancel;
-	}
-
-	if (unlikely(test_bit(FIMC_IS_GTASK_REQUEST_STOP, &gtask->state))) {
-		mgerr(" cancel by gstop2", group, group);
-		ret = -EINVAL;
-		goto p_err_ignore;
-	}
-
 	PROGRAM_COUNT(6);
 	gnext = group->gnext;
 	gprev = group->gprev;
@@ -3161,6 +3233,21 @@ p_err_ignore:
 		kthread_queue_work(&vnext_gtask->worker, &vframe->work);
 	}
 
+	child = group->child;
+	while (child) {
+		if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state))
+			break;
+
+		if (!test_bit(FIMC_IS_GROUP_OPEN, &child->state))
+			break;
+
+		gtask_child = &groupmgr->gtask[child->id];
+		if (try_gdown[child->id])
+			up(&gtask_child->smp_resource);
+
+		child = child->child;
+	}
+
 	if (group->vprev)
 		fimc_is_groupmgr_votf_change_path(group, END_VIRTUAL_OTF);
 
@@ -3186,6 +3273,21 @@ p_err_cancel:
 		list_del(&vframe->votf_list);
 		vnext_gtask = &groupmgr->gtask[group->vnext->id];
 		kthread_queue_work(&vnext_gtask->worker, &vframe->work);
+	}
+
+	child = group->child;
+	while (child) {
+		if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state))
+			break;
+
+		if (!test_bit(FIMC_IS_GROUP_OPEN, &child->state))
+			break;
+
+		gtask_child = &groupmgr->gtask[child->id];
+		if (try_gdown[child->id])
+			up(&gtask_child->smp_resource);
+
+		child = child->child;
 	}
 
 	if (group->vprev)
@@ -3218,6 +3320,7 @@ int fimc_is_group_done(struct fimc_is_groupmgr *groupmgr,
 	struct fimc_is_group *child;
 #endif
 	ulong flags;
+	struct fimc_is_group_task *gtask_child;
 
 	FIMC_BUG(!groupmgr);
 	FIMC_BUG(!group);
@@ -3296,6 +3399,19 @@ int fimc_is_group_done(struct fimc_is_groupmgr *groupmgr,
 		}
 
 		spin_unlock_irqrestore(&gframemgr->gframe_slock, flags);
+	}
+
+	child = group->child;
+	while (child) {
+		if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state))
+			break;
+
+		gtask_child = &groupmgr->gtask[child->id];
+		child = child->child;
+		if (!test_bit(FIMC_IS_GTASK_START, &gtask_child->state))
+			continue;
+
+		up(&gtask_child->smp_resource);
 	}
 
 	smp_shot_inc(group);

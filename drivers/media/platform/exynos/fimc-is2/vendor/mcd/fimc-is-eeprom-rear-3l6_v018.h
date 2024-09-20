@@ -1,0 +1,11 @@
+#ifndef FIMC_IS_EEPROM_REAR_3L6_V018_H
+#define FIMC_IS_EEPROM_REAR_3L6_V018_H
+
+#define FIMC_IS_MAX_CAL_SIZE					(16 * 1024)
+
+/* PAF calibration Data */
+#define ROM_PAF_CAL_DATA_START_ADDR				0x1B00
+#define ROM_PAF_CAL_ERR_CHECK_OFFSET				0x14
+
+
+#endif /* FIMC_IS_EEPROM_REAR_3L6_V018_H */

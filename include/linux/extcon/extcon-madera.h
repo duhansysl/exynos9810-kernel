@@ -109,15 +109,7 @@ struct madera_extcon {
 	const struct madera_jd_state *old_state;
 	struct delayed_work state_timeout_work;
 
-	struct wakeup_source detection_wake_lock;
-
 	struct madera_micd_bias micd_bias;
-#ifdef CONFIG_EXTCON_PTT
-	int ptt_state; /* PTT haedset state for Samsung */
-	int ptt_ear_int;
-	bool ptt_pressed;
-	struct delayed_work pttd_detect_work;
-#endif
 };
 
 enum madera_accdet_mode {

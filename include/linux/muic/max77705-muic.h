@@ -32,6 +32,7 @@
 #define MUIC_IRQ_INIT_DETECT		(-1)
 #define MUIC_IRQ_CCIC_HANDLER		(-2)
 #define MUIC_IRQ_VBUS_WA		(-3)
+#define MUIC_IRQ_POGO_ADC		(-4)
 
 enum max77705_adc {
 	MAX77705_UIADC_GND		= 0x00,
@@ -87,6 +88,14 @@ enum max77705_muic_command_opcode {
 };
 
 #define AFC_OP_OUT_LEN 11 /* OPCODE(1) + Result(1) + VBADC(1) + RX Data(8) */
+
+#if defined(CONFIG_HICCUP_CHARGER)
+enum MUIC_HICCUP_MODE {
+	MUIC_HICCUP_MODE_OFF	=	0,
+	MUIC_HICCUP_MODE_NOTY,
+	MUIC_HICCUP_MODE_ON,
+};
+#endif
 
 #if defined(CONFIG_MUIC_MAX77705_CCIC)
 #define MUIC_CCIC_NOTI_ATTACH (1)
@@ -191,6 +200,9 @@ struct max77705_muic_data {
 	struct notifier_block		ccic_nb;
 #endif
 #endif /* CONFIG_MUIC_MAX77705_CCIC */
+#if defined(CONFIG_MUIC_SM5504_POGO)
+	int				pogo_adc;
+#endif /* CONFIG_MUIC_SM5504_POGO */
 };
 
 /* max77705 muic register read/write related information defines. */
@@ -381,6 +393,7 @@ extern int max77705_muic_suspend(struct max77705_usbc_platform_data *usbc_data);
 extern int max77705_muic_resume(struct max77705_usbc_platform_data *usbc_data);
 #if defined(CONFIG_HV_MUIC_MAX77705_AFC)
 extern bool max77705_muic_check_is_enable_afc(struct max77705_muic_data *muic_data, muic_attached_dev_t new_dev);
+extern void max77705_muic_check_afc_disabled(struct max77705_muic_data *muic_data);
 extern void max77705_muic_clear_hv_control(struct max77705_muic_data *muic_data);
 extern void max77705_muic_afc_hv_set(struct max77705_muic_data *muic_data, int voltage);
 extern void max77705_muic_qc_hv_set(struct max77705_muic_data *muic_data, int voltage);

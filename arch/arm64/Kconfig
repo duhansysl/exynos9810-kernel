@@ -448,6 +448,20 @@ config ARM64_ERRATUM_1024718
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_1188873
+	bool "Cortex-A76: MRC read following MRRC read of specific Generic Timer in AArch32 might give incorrect result"
+	default y
+	depends on COMPAT
+	select ARM_ARCH_TIMER_OOL_WORKAROUND
+	help
+	  This option adds work arounds for ARM Cortex-A76 erratum 1188873
+
+	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could cause
+	  register corruption when accessing the timer registers from
+	  AArch32 userspace.
+
+	  If unsure, say Y.
+
 config CAVIUM_ERRATUM_22375
 	bool "Cavium erratum 22375, 24313"
 	default y
@@ -899,6 +913,16 @@ config ARM64_SSBD
 
 	  If unsure, say Y.
 
+config MITIGATE_SPECTRE_BRANCH_HISTORY
+	bool "Mitigate Spectre style attacks against branch history" if EXPERT
+	default y
+	depends on HARDEN_BRANCH_PREDICTOR || !KVM
+	help
+	  Speculation attacks against some high-performance processors can
+	  make use of branch history to influence future speculation.
+	  When taking an exception from user-space, a sequence of branches
+	  or a firmware call overwrites the branch history.
+
 menuconfig ARMV8_DEPRECATED
 	bool "Emulate deprecated/obsolete ARMv8 instructions"
 	depends on COMPAT
@@ -973,19 +997,6 @@ config ARM64_SW_TTBR0_PAN
 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
 	  zeroed area and reserved ASID. The user access routines
 	  restore the valid TTBR0_EL1 temporarily.
-
-menu "JOP Attack Prevention"
-
-config RKP_CFP_JOPP
-	bool "Function pointer jumps to function entries only."
-	default n
-
-config RKP_CFP_JOPP_MAGIC
-	hex
-	depends on RKP_CFP_JOPP
-	default "0x00be7bad"
-
-endmenu
 
 menu "ARMv8.1 architectural features"
 
@@ -1077,14 +1088,8 @@ config ARM64_MODULE_CMODEL_LARGE
 
 config ARM64_MODULE_PLTS
 	bool
+	select ARM64_MODULE_CMODEL_LARGE
 	select HAVE_MOD_ARCH_SPECIFIC
-
-config RELOCATABLE_KERNEL
-	bool "set kernel to relocatable in both virtual and physical address"
-	default n
-	help
-	  This configuare will allow you to config the kernel into position
-	  independent kernel, with '--PIE' insert into LD script.
 
 config RELOCATABLE
 	bool
@@ -1117,12 +1122,12 @@ config RANDOMIZE_BASE
 	  If unsure, say N.
 
 config RANDOMIZE_MODULE_REGION_FULL
-	bool "Randomize the module region over a 4 GB range"
+	bool "Randomize the module region independently from the core kernel"
 	depends on RANDOMIZE_BASE && !DYNAMIC_FTRACE && !LTO_CLANG
 	default y
 	help
-	  Randomizes the location of the module region inside a 4 GB window
-	  covering the core kernel. This way, it is less likely for modules
+	  Randomizes the location of the module region without considering the
+	  location of the core kernel. This way, it is impossible for modules
 	  to leak information about the location of core kernel data structures
 	  but it does imply that function calls between modules and the core
 	  kernel will need to be resolved via veneers in the module PLT.
@@ -1237,33 +1242,12 @@ config BUILD_ARM64_APPENDED_KERNEL_IMAGE_NAME
 	default "Image.gz-dtb" if IMG_GZ_DTB
 	default "Image-dtb" if IMG_DTB
 
-config LOD_SEC
-	bool "kernel security re-enforcement for Linux On Dex, including cap re-check and seccomp report"
-	default n
-
-config TIMA
-	bool "Enable TIMA(Trustzone based Integrity Measurement Archtecture) feature"
-	default n
-
-config TIMA_LKMAUTH
-	bool "Enable LKM authentication by TIMA"
-	depends on MODULES
+config BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES
+	string "Default dtb names"
+	depends on BUILD_ARM64_APPENDED_DTB_IMAGE
 	help
-	  TIMA authenticates loaded kernel modules. Disable it if you don't
-	  want TIMA enabled.
-
-config TIMA_LKM_BLOCK
-	bool "Block LKM by TIMA"
-	help
-	  LKM is disapproved by Samsung security policy.
-
-config TIMA_LKMAUTH_CODE_PROT
-	bool "Support kernel Module"
-	depends on MODULES
-	default n
-	help
-	  When enabled, this feature will mark all Executable sections in an
-	  LKM as RO
+	  Space separated list of names of dtbs to append when
+	  building a concatenated Image.gz-dtb.
 
 config UH
 	bool "Enable micro hypervisor feature"
@@ -1346,45 +1330,37 @@ config KDP_TEST
 	help
 	  enable KDP test.
 
-config BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES
-	string "Default dtb names"
-	depends on BUILD_ARM64_APPENDED_DTB_IMAGE
+config UH_LKM_BLOCK
+	bool "Block LKM"
 	help
-	  Space separated list of names of dtbs to append when
-	  building a concatenated Image.gz-dtb.
+	  LKM is not allowed by Samsung security policy.
 
-choice
-	prompt "Exynos device target"
-	default MACH_EXYNOS9810_NONE
+config RKP_CFP
+	bool "JOPP and ROPP"
+	default n
+	help
+	  Control flow protection, including both JOPP and ROPP. Please do NOT
+	  set this CONFIG, JOPP/ROPP will select it.
 
-config MACH_EXYNOS9810_NONE
-	bool "None"
+config RKP_CFP_JOPP
+	bool "JOP Prevention"
+	select RKP_CFP
+	# depends on TIMA_RKP
+	default n
+	help
+	  Restrict function pointer jumps to function entry points only.
 
-config MACH_EXYNOS9810_CROWNLTE_EUR_OPEN
-	bool "Galaxy Note9 (SM-N960F)"
-	select EXYNOS_DTBTOOL
+config RKP_CFP_JOPP_MAGIC
+	hex
+	depends on RKP_CFP && RKP_CFP_JOPP
+	default "0x00be7bad"
 
-config MACH_EXYNOS9810_STARLTE_EUR_OPEN
-	bool "Galaxy S9 (SM-G960F)"
-	select EXYNOS_DTBTOOL
-
-config MACH_EXYNOS9810_STAR2LTE_EUR_OPEN
-	bool "Galaxy S9+ (SM-G965F)"
-	select EXYNOS_DTBTOOL
-
-config MACH_EXYNOS9810_CROWNLTE_KOR
-	bool "Galaxy Note9 (SM-N960N)"
-	select EXYNOS_DTBTOOL
-
-config MACH_EXYNOS9810_STARLTE_KOR
-	bool "Galaxy S9 (SM-G960N)"
-	select EXYNOS_DTBTOOL
-
-config MACH_EXYNOS9810_STAR2LTE_KOR
-	bool "Galaxy S9+ (SM-G965N)"
-	select EXYNOS_DTBTOOL
-
-endchoice
+config RKP_CFP_TEST
+	bool "test file, only include in ENG build"
+	depends on RKP_CFP
+	default n
+	help
+	  For test only.
 
 endmenu
 

@@ -25,11 +25,11 @@ TRACE_EVENT(ehmp_select_boost_cpu,
 	TP_ARGS(p, cpu, trigger, state),
 
 	TP_STRUCT__entry(
-		__array(char,		comm,	TASK_COMM_LEN)
-		__field(pid_t,		pid)
-		__field(int,		cpu)
-		__field(int,		trigger)
-		__array(char,		state,		64)
+		__array(	char,		comm,	TASK_COMM_LEN	)
+		__field(	pid_t,		pid			)
+		__field(	int,		cpu			)
+		__field(	int,		trigger			)
+		__array(	char,		state,		64	)
 	),
 
 	TP_fast_assign(

@@ -20,6 +20,3 @@ obj-$(CONFIG_SOC_EMULATOR8895)		+= emulator8895/cal_data.o
 endif
 
 obj-$(CONFIG_SOC_EXYNOS9810)            += exynos9810/cal_data.o
-
-subdir-ccflags-y += -Wno-sizeof-pointer-div
-subdir-ccflags-y += -Wno-int-conversion

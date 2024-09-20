@@ -474,3 +474,57 @@ p_err_free:
 p_err:
 	return ret;
 }
+
+int fimc_is_sensor_write8_sequential(struct i2c_client *client,
+	u16 addr, u8 *val, u16 num)
+{
+	int ret = 0;
+	struct i2c_msg msg[1];
+	int i = 0;
+	u8 *wbuf;
+
+	if (val == NULL) {
+		pr_err("val array is null\n");
+		ret = -ENODEV;
+		goto p_err;
+	}
+
+	if (!client->adapter) {
+		pr_err("Could not find adapter!\n");
+		ret = -ENODEV;
+		goto p_err;
+	}
+
+	wbuf = kzalloc((2 + (num * 2)), GFP_KERNEL);
+	if (!wbuf) {
+		pr_err("failed to alloc buffer for burst i2c\n");
+		ret = -ENODEV;
+		goto p_err;
+	}
+
+	msg->addr = client->addr;
+	msg->flags = 0;
+	msg->len = 2 + (num * 1);
+	msg->buf = wbuf;
+	wbuf[0] = (addr & 0xFF00) >> 8;
+	wbuf[1] = (addr & 0xFF);
+	for (i = 0; i < num; i++) {
+		wbuf[(i * 1) + 2] = val[i];
+	}
+
+	ret = fimc_is_i2c_transfer(client->adapter, msg, 1);
+	if (ret < 0) {
+		pr_err("i2c treansfer fail(%d)", ret);
+		goto p_err_free;
+	}
+
+	i2c_info("I2CW08(%d) [0x%04x] : 0x%04x\n", client->addr, addr, *val);
+	kfree(wbuf);
+	return 0;
+
+p_err_free:
+	kfree(wbuf);
+p_err:
+	return ret;
+}
+

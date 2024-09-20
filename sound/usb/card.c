@@ -647,10 +647,10 @@ static int usb_audio_probe(struct usb_interface *intf,
 	usb_set_intfdata(intf, chip);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
-
+#if !defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	if (dev->do_remote_wakeup)
 		usb_enable_autosuspend(dev);
-
+#endif
 	return 0;
 
  __error:

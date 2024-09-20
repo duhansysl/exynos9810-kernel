@@ -61,7 +61,6 @@ static struct platform_driver dummy_cpu_driver = {
 		.name	= "dummy_cpu_dai",
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(dummy_cpu_of_match),
-		.suppress_bind_attrs = true,
 	},
 };
 

@@ -30,6 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/dma-buf.h>
+#include <media/videobuf2-memops.h>
 
 #include "fimc-is-core.h"
 #include "fimc-is-cmd.h"
@@ -43,18 +44,28 @@
 #endif
 
 #if defined(CONFIG_VIDEOBUF2_ION)
+struct vb2_ion_buf {
+	struct device			*dev;
+	struct vb2_vmarea_handler	handler;
+	struct vm_area_struct		*vma;
+	struct ion_handle		*handle;
+	struct dma_buf			*dma_buf;
+	struct dma_buf_attachment	*attachment;
+	enum dma_data_direction		direction;
+	void				*kva;
+	unsigned long			size;
+	atomic_t			ref;
+	bool				cached;
+	bool				ion;
+	struct vb2_ion_cookie		cookie;
+};
+
 /* fimc-is vb2 buffer operations */
 static inline ulong fimc_is_vb2_ion_plane_kvaddr(
 		struct fimc_is_vb2_buf *vbuf, u32 plane)
 
 {
 	return (ulong)vb2_plane_vaddr(&vbuf->vb.vb2_buf, plane);
-}
-
-static inline ulong fimc_is_vb2_ion_plane_cookie(
-		struct fimc_is_vb2_buf *vbuf, u32 plane)
-{
-	return (ulong)vb2_plane_cookie(&vbuf->vb.vb2_buf, plane);
 }
 
 static dma_addr_t fimc_is_vb2_ion_plane_dvaddr(
@@ -162,6 +173,75 @@ static void fimc_is_vb2_ion_buf_finish(struct fimc_is_vb2_buf *vbuf, bool exact)
 	clear_bit(FIMC_IS_VBUF_CACHE_INVALIDATE, &vbuf->cache_state);
 }
 
+static long is_vb2_ion_buf_remap_attr(struct fimc_is_vb2_buf *vbuf, int attr)
+{
+	struct vb2_buffer *vb = &vbuf->vb.vb2_buf;
+	struct vb2_ion_buf *buf;
+	unsigned int plane;
+	long ret;
+	int ioprot = IOMMU_READ	| IOMMU_WRITE;
+
+	for (plane = 0; plane < vb->num_planes; ++plane) {
+		buf = vb->planes[plane].mem_priv;
+		vbuf->sgt[plane] = dma_buf_map_attachment(buf->attachment,
+								buf->direction);
+
+		if (IS_ERR_OR_NULL(vbuf->sgt[plane])) {
+			ret = -EINVAL;
+			pr_err("Error getting dmabuf scatterlist\n");
+			goto err_get_sgt;
+		}
+
+		if ((vbuf->dva[plane] == 0) || IS_ERR_VALUE(vbuf->dva[plane])) {
+			if (device_get_dma_attr(buf->dev) == DEV_DMA_COHERENT)
+				ioprot |= IOMMU_CACHE;
+
+			vbuf->dva[plane] = ion_iovmm_map_attr(buf->attachment,0,
+						buf->size, DMA_BIDIRECTIONAL,
+						ioprot, attr);
+			if (IS_ERR_VALUE(vbuf->dva[plane])) {
+				ret = vbuf->dva[plane];
+				pr_err("Error from ion_iovmm_map_attr(): %ld\n", ret);
+				goto err_map_remap;
+			}
+		}
+	}
+
+	return 0;
+
+err_map_remap:
+	dma_buf_unmap_attachment(buf->attachment, vbuf->sgt[plane], DMA_BIDIRECTIONAL);
+	vbuf->dva[plane] = 0;
+
+err_get_sgt:
+	while (plane-- > 0) {
+		buf = vb->planes[plane].mem_priv;
+
+		ion_iovmm_unmap_attr(buf->attachment, vbuf->dva[plane], attr);
+		dma_buf_unmap_attachment(buf->attachment, vbuf->sgt[plane],
+								DMA_BIDIRECTIONAL);
+		vbuf->dva[plane] = 0;
+	}
+
+	return ret;
+}
+
+void is_vb2_ion_buf_unremap_attr(struct fimc_is_vb2_buf *vbuf, int attr)
+{
+	struct vb2_buffer *vb = &vbuf->vb.vb2_buf;
+	struct vb2_ion_buf *buf;
+	unsigned int plane;
+
+	for (plane = 0; plane < vb->num_planes; ++plane) {
+		buf = vb->planes[plane].mem_priv;
+
+		ion_iovmm_unmap_attr(buf->attachment, vbuf->dva[plane], attr);
+		dma_buf_unmap_attachment(buf->attachment, vbuf->sgt[plane],
+								DMA_BIDIRECTIONAL);
+		vbuf->dva[plane] = 0;
+	}
+}
+
 static dma_addr_t fimc_is_bufcon_map(struct fimc_is_vb2_buf *vbuf,
 	struct device *dev,
 	int idx,
@@ -221,14 +301,16 @@ static void fimc_is_bufcon_unmap(struct fimc_is_vb2_buf *vbuf,
 
 const struct fimc_is_vb2_buf_ops fimc_is_vb2_buf_ops_ion = {
 	.plane_kvaddr	= fimc_is_vb2_ion_plane_kvaddr,
-	.plane_cookie	= fimc_is_vb2_ion_plane_cookie,
 	.plane_dvaddr	= fimc_is_vb2_ion_plane_dvaddr,
 	.plane_prepare	= fimc_is_vb2_ion_plane_prepare,
 	.plane_finish	= fimc_is_vb2_ion_plane_finish,
 	.buf_prepare	= fimc_is_vb2_ion_buf_prepare,
 	.buf_finish	= fimc_is_vb2_ion_buf_finish,
+	.remap_attr	= is_vb2_ion_buf_remap_attr,
+	.unremap_attr	= is_vb2_ion_buf_unremap_attr,
 	.bufcon_map	= fimc_is_bufcon_map,
 	.bufcon_unmap	= fimc_is_bufcon_unmap,
+
 };
 
 /* fimc-is private buffer operations */
@@ -355,7 +437,6 @@ static void *fimc_is_ion_init(struct platform_device *pdev)
 	mutex_init(&ctx->lock);
 
 	return ctx;
-
 }
 
 static void fimc_is_ion_deinit(void *ctx)
@@ -368,21 +449,24 @@ static void fimc_is_ion_deinit(void *ctx)
 }
 
 static struct fimc_is_priv_buf *fimc_is_ion_alloc(void *ctx,
-		size_t size, size_t align)
+		size_t size, unsigned int heap_id_mask, unsigned int flags)
 {
 	struct fimc_is_ion_ctx *alloc_ctx = ctx;
 	struct fimc_is_priv_buf *buf;
-	int heapflags = EXYNOS_ION_HEAP_SYSTEM_MASK;
 	int ret = 0;
 
 	buf = vzalloc(sizeof(*buf));
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
 
+	if (heap_id_mask)
+		info("heap_id_mask: 0x%08x, size: 0x%lx\n", heap_id_mask, size);
+
 	size = PAGE_ALIGN(size);
 
 	buf->handle = ion_alloc(alloc_ctx->client, size, alloc_ctx->alignment,
-				heapflags, alloc_ctx->flags);
+				heap_id_mask ? heap_id_mask : EXYNOS_ION_HEAP_SYSTEM_MASK,
+				flags ? flags : alloc_ctx->flags);
 	if (IS_ERR(buf->handle)) {
 		ret = -ENOMEM;
 		goto err_alloc;

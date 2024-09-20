@@ -153,10 +153,6 @@ static int journal_submit_commit_record(journal_t *journal,
 	set_buffer_uptodate(bh);
 	bh->b_end_io = journal_end_buffer_io_sync;
 
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (journal->j_flags & JBD2_JOURNAL_TAG)
-		set_buffer_journal(bh);
-#endif
 	if (journal->j_flags & JBD2_BARRIER &&
 	    !jbd2_has_feature_async_commit(journal))
 		ret = submit_bh(REQ_OP_WRITE, WRITE_SYNC | WRITE_FLUSH_FUA, bh);
@@ -723,10 +719,6 @@ start_journal_io:
 				clear_buffer_dirty(bh);
 				set_buffer_uptodate(bh);
 				bh->b_end_io = journal_end_buffer_io_sync;
-#ifdef CONFIG_JOURNAL_DATA_TAG
-				if (journal->j_flags & JBD2_JOURNAL_TAG)
-					set_buffer_journal(bh);
-#endif
 				submit_bh(REQ_OP_WRITE, WRITE_SYNC, bh);
 			}
 			cond_resched();

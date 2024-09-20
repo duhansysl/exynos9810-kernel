@@ -27,95 +27,139 @@
 #include <linux/mfd/madera/registers.h>
 
 struct madera_irq_priv {
-	struct device			*dev;
-	int				irq;
-	struct regmap_irq_chip_data	*irq_data;
-	struct madera			*madera;
+	struct device *dev;
+	int irq;
+	struct regmap_irq_chip_data *irq_data;
+	struct madera *madera;
 };
 
-#define MADERA_IRQ(_irq, _reg)						     \
-	[MADERA_IRQ_ ## _irq] = { .reg_offset = (_reg) - MADERA_IRQ1_STATUS_1, \
-				.mask = MADERA_ ## _irq ## _EINT1 }
-
 static const struct regmap_irq madera_irqs[MADERA_NUM_IRQ] = {
-	MADERA_IRQ(FLL1_LOCK,		MADERA_IRQ1_STATUS_2),
-	MADERA_IRQ(FLL2_LOCK,		MADERA_IRQ1_STATUS_2),
-	MADERA_IRQ(FLL3_LOCK,		MADERA_IRQ1_STATUS_2),
-	MADERA_IRQ(FLLAO_LOCK,		MADERA_IRQ1_STATUS_2),
+	[MADERA_IRQ_FLL1_LOCK] =  { .reg_offset = 0,
+				    .mask = MADERA_FLL1_LOCK_EINT1 },
+	[MADERA_IRQ_FLL2_LOCK] =  { .reg_offset = 0,
+				    .mask = MADERA_FLL2_LOCK_EINT1 },
+	[MADERA_IRQ_FLL3_LOCK] =  { .reg_offset = 0,
+				    .mask = MADERA_FLL3_LOCK_EINT1 },
+	[MADERA_IRQ_FLLAO_LOCK] = { .reg_offset = 0,
+				    .mask = MADERA_FLLAO_LOCK_EINT1 },
 
-	MADERA_IRQ(MICDET1,		MADERA_IRQ1_STATUS_6),
-	MADERA_IRQ(MICDET2,		MADERA_IRQ1_STATUS_6),
-	MADERA_IRQ(HPDET,		MADERA_IRQ1_STATUS_6),
+	[MADERA_IRQ_MICDET1] = { .reg_offset = 4,
+				 .mask = MADERA_MICDET1_EINT1 },
+	[MADERA_IRQ_MICDET2] = { .reg_offset = 4,
+				 .mask = MADERA_MICDET2_EINT1 },
+	[MADERA_IRQ_HPDET] =   { .reg_offset = 4,
+				 .mask = MADERA_HPDET_EINT1 },
 
-	MADERA_IRQ(MICD_CLAMP_RISE,	MADERA_IRQ1_STATUS_7),
-	MADERA_IRQ(MICD_CLAMP_FALL,	MADERA_IRQ1_STATUS_7),
-	MADERA_IRQ(JD1_RISE,		MADERA_IRQ1_STATUS_7),
-	MADERA_IRQ(JD1_FALL,		MADERA_IRQ1_STATUS_7),
+	[MADERA_IRQ_MICD_CLAMP_RISE] = { .reg_offset = 5,
+					 .mask = MADERA_MICD_CLAMP_RISE_EINT1 },
+	[MADERA_IRQ_MICD_CLAMP_FALL] = { .reg_offset = 5,
+					 .mask = MADERA_MICD_CLAMP_FALL_EINT1 },
+	[MADERA_IRQ_JD1_FALL] =	       { .reg_offset = 5,
+					 .mask = MADERA_JD1_FALL_EINT1 },
+	[MADERA_IRQ_JD1_RISE] =	       { .reg_offset = 5,
+					 .mask = MADERA_JD1_RISE_EINT1 },
 
-	MADERA_IRQ(ASRC2_IN1_LOCK,	MADERA_IRQ1_STATUS_9),
-	MADERA_IRQ(ASRC2_IN2_LOCK,	MADERA_IRQ1_STATUS_9),
-	MADERA_IRQ(ASRC1_IN1_LOCK,	MADERA_IRQ1_STATUS_9),
-	MADERA_IRQ(ASRC1_IN2_LOCK,	MADERA_IRQ1_STATUS_9),
-	MADERA_IRQ(DRC2_SIG_DET,	MADERA_IRQ1_STATUS_9),
-	MADERA_IRQ(DRC1_SIG_DET,	MADERA_IRQ1_STATUS_9),
+	[MADERA_IRQ_ASRC2_IN1_LOCK] = { .reg_offset = 7,
+					.mask = MADERA_ASRC2_IN1_LOCK_EINT1 },
+	[MADERA_IRQ_ASRC2_IN2_LOCK] = { .reg_offset = 7,
+					.mask = MADERA_ASRC2_IN2_LOCK_EINT1 },
+	[MADERA_IRQ_ASRC1_IN1_LOCK] = { .reg_offset = 7,
+					.mask = MADERA_ASRC1_IN1_LOCK_EINT1 },
+	[MADERA_IRQ_ASRC1_IN2_LOCK] = { .reg_offset = 7,
+					.mask = MADERA_ASRC1_IN2_LOCK_EINT1 },
 
-	MADERA_IRQ(DSP_IRQ1,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ2,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ3,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ4,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ5,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ6,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ7,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ8,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ9,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ10,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ11,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ12,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ13,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ14,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ15,		MADERA_IRQ1_STATUS_11),
-	MADERA_IRQ(DSP_IRQ16,		MADERA_IRQ1_STATUS_11),
+	[MADERA_IRQ_DRC2_SIG_DET] = { .reg_offset = 7,
+				      .mask = MADERA_DRC2_SIG_DET_EINT1 },
+	[MADERA_IRQ_DRC1_SIG_DET] = { .reg_offset = 7,
+				      .mask = MADERA_DRC1_SIG_DET_EINT1 },
 
-	MADERA_IRQ(HP3R_SC,		MADERA_IRQ1_STATUS_12),
-	MADERA_IRQ(HP3L_SC,		MADERA_IRQ1_STATUS_12),
-	MADERA_IRQ(HP2R_SC,		MADERA_IRQ1_STATUS_12),
-	MADERA_IRQ(HP2L_SC,		MADERA_IRQ1_STATUS_12),
-	MADERA_IRQ(HP1R_SC,		MADERA_IRQ1_STATUS_12),
-	MADERA_IRQ(HP1L_SC,		MADERA_IRQ1_STATUS_12),
+	[MADERA_IRQ_DSP_IRQ1] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ1_EINT1 },
+	[MADERA_IRQ_DSP_IRQ2] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ2_EINT1 },
+	[MADERA_IRQ_DSP_IRQ3] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ3_EINT1 },
+	[MADERA_IRQ_DSP_IRQ4] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ4_EINT1 },
+	[MADERA_IRQ_DSP_IRQ5] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ5_EINT1 },
+	[MADERA_IRQ_DSP_IRQ6] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ6_EINT1 },
+	[MADERA_IRQ_DSP_IRQ7] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ7_EINT1 },
+	[MADERA_IRQ_DSP_IRQ8] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ8_EINT1 },
+	[MADERA_IRQ_DSP_IRQ9] = { .reg_offset = 9,
+				  .mask = MADERA_DSP_IRQ9_EINT1 },
+	[MADERA_IRQ_DSP_IRQ10] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ10_EINT1 },
+	[MADERA_IRQ_DSP_IRQ11] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ11_EINT1 },
+	[MADERA_IRQ_DSP_IRQ12] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ12_EINT1 },
+	[MADERA_IRQ_DSP_IRQ13] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ13_EINT1 },
+	[MADERA_IRQ_DSP_IRQ14] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ14_EINT1 },
+	[MADERA_IRQ_DSP_IRQ15] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ15_EINT1 },
+	[MADERA_IRQ_DSP_IRQ16] = { .reg_offset = 9,
+				   .mask = MADERA_DSP_IRQ16_EINT1 },
 
-	MADERA_IRQ(SPK_OVERHEAT_WARN,	MADERA_IRQ1_STATUS_15),
-	MADERA_IRQ(SPK_OVERHEAT,	MADERA_IRQ1_STATUS_15),
+	[MADERA_IRQ_HP3R_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP3R_SC_EINT1 },
+	[MADERA_IRQ_HP3L_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP3L_SC_EINT1 },
+	[MADERA_IRQ_HP2R_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP2R_SC_EINT1 },
+	[MADERA_IRQ_HP2L_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP2L_SC_EINT1 },
+	[MADERA_IRQ_HP1R_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP1R_SC_EINT1 },
+	[MADERA_IRQ_HP1L_SC] = { .reg_offset = 10,
+				.mask = MADERA_HP1L_SC_EINT1 },
 
-	MADERA_IRQ(DSP1_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP2_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP3_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP4_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP5_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP6_BUS_ERR,	MADERA_IRQ1_STATUS_33),
-	MADERA_IRQ(DSP7_BUS_ERR,	MADERA_IRQ1_STATUS_33),
+	[MADERA_IRQ_SPK_OVERHEAT_WARN] = { .reg_offset = 13,
+				.mask = MADERA_SPK_OVERHEAT_WARN_EINT1 },
+	[MADERA_IRQ_SPK_OVERHEAT] = { .reg_offset = 13,
+				.mask = MADERA_SPK_SHUTDOWN_EINT1 },
 
-	MADERA_IRQ(BOOT_DONE,		MADERA_IRQ1_STATUS_1),
+	[MADERA_IRQ_DSP1_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP1 },
+	[MADERA_IRQ_DSP2_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP2 },
+	[MADERA_IRQ_DSP3_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP3 },
+	[MADERA_IRQ_DSP4_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP4 },
+	[MADERA_IRQ_DSP5_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP5 },
+	[MADERA_IRQ_DSP6_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP6 },
+	[MADERA_IRQ_DSP7_BUS_ERROR] = { .reg_offset = 31,
+					.mask = MADERA_ADSP_ERROR_STATUS_DSP7 },
 };
 
 static const struct regmap_irq_chip madera_irq = {
-	.name		= "madera IRQ",
-	.status_base	= MADERA_IRQ1_STATUS_1,
-	.mask_base	= MADERA_IRQ1_MASK_1,
-	.ack_base	= MADERA_IRQ1_STATUS_1,
-	.runtime_pm	= true,
-	.num_regs	= 33,
-	.irqs		= madera_irqs,
-	.num_irqs	= ARRAY_SIZE(madera_irqs),
+	.name = "madera IRQ",
+	.status_base = MADERA_IRQ1_STATUS_2,
+	.mask_base = MADERA_IRQ1_MASK_2,
+	.ack_base = MADERA_IRQ1_STATUS_2,
+	.runtime_pm = true, /* codec must be resumed to read IRQ status */
+	.num_regs = 32,
+	.irqs = madera_irqs,
+	.num_irqs = ARRAY_SIZE(madera_irqs),
 };
 
 static int madera_map_irq(struct madera *madera, int irq)
 {
-	struct madera_irq_priv *priv;
+	struct madera_irq_priv *priv = dev_get_drvdata(madera->irq_dev);
+
+	if (irq < 0)
+		return irq;
 
 	if (!madera->irq_dev)
 		return -ENOENT;
-
-	priv = dev_get_drvdata(madera->irq_dev);
 
 	return regmap_irq_get_virq(priv->irq_data, irq);
 }
@@ -161,7 +205,7 @@ static int madera_suspend_noirq(struct device *dev)
 {
 	struct madera_irq_priv *priv = dev_get_drvdata(dev);
 
-	dev_info(priv->dev, "No IRQ suspend, reenabling IRQ\n");
+	dev_dbg(priv->dev, "No IRQ suspend, reenabling IRQ\n");
 
 	enable_irq(priv->irq);
 
@@ -172,7 +216,7 @@ static int madera_suspend(struct device *dev)
 {
 	struct madera_irq_priv *priv = dev_get_drvdata(dev);
 
-	dev_info(priv->dev, "Suspend, disabling IRQ\n");
+	dev_dbg(priv->dev, "Suspend, disabling IRQ\n");
 
 	disable_irq(priv->irq);
 
@@ -183,7 +227,7 @@ static int madera_resume_noirq(struct device *dev)
 {
 	struct madera_irq_priv *priv = dev_get_drvdata(dev);
 
-	dev_info(priv->dev, "No IRQ resume, disabling IRQ\n");
+	dev_dbg(priv->dev, "No IRQ resume, disabling IRQ\n");
 
 	disable_irq(priv->irq);
 
@@ -194,36 +238,13 @@ static int madera_resume(struct device *dev)
 {
 	struct madera_irq_priv *priv = dev_get_drvdata(dev);
 
-	dev_info(priv->dev, "Resume, reenabling IRQ\n");
+	dev_dbg(priv->dev, "Resume, reenabling IRQ\n");
 
 	enable_irq(priv->irq);
 
 	return 0;
 }
 #endif
-
-static irqreturn_t madera_boot_done(int irq, void *data)
-{
-	struct madera *madera = data;
-	unsigned int val = 0;
-	int ret;
-
-	switch (madera->type) {
-	case CS47L92:
-	case CS47L93:
-		ret = regmap_read(madera->regmap, MADERA_CTRL_SCRATCH, &val);
-		if (ret != 0)
-			dev_warn(madera->dev,
-				 "Failed to read scratch reg: %d\n", ret);
-		dev_warn(madera->dev, "BOOT_DONE: 0x%x\n", val);
-		break;
-	default:
-		dev_warn(madera->dev, "BOOT_DONE\n");
-		break;
-	}
-
-	return IRQ_HANDLED;
-}
 
 static const struct dev_pm_ops madera_irq_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(madera_suspend, madera_resume)
@@ -258,14 +279,13 @@ static int madera_irq_probe(struct platform_device *pdev)
 		}
 
 		irq_flags = irqd_get_trigger_type(irq_data);
-
-		/* Codec defaults to trigger low, use this if no flags given */
 		if (irq_flags == IRQ_TYPE_NONE)
-			irq_flags = IRQF_TRIGGER_LOW;
+			irq_flags = IRQF_TRIGGER_LOW; /* Device default */
 	}
 
 	if (irq_flags & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)) {
-		dev_err(priv->dev, "Host interrupt not level-triggered\n");
+		dev_err(priv->dev,
+			"Host interrupt not level-triggered\n");
 		return -EINVAL;
 	}
 
@@ -293,9 +313,6 @@ static int madera_irq_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, priv);
 	madera->irq_dev = priv->dev;
 
-	madera_request_irq(madera, MADERA_IRQ_BOOT_DONE, "BOOT_DONE",
-			  madera_boot_done, madera);
-
 	return 0;
 }
 
@@ -308,24 +325,23 @@ static int madera_irq_remove(struct platform_device *pdev)
 	 * it starts cleaning up all child drivers
 	 */
 
-	madera_free_irq(priv->madera, MADERA_IRQ_BOOT_DONE, priv->madera);
-
 	priv->madera->irq_dev = NULL;
 
 	regmap_del_irq_chip(priv->irq, priv->irq_data);
+	free_irq(priv->irq, priv);
 
 	return 0;
 }
 
 static struct platform_driver madera_irq_driver = {
-	.probe	= madera_irq_probe,
+	.probe = madera_irq_probe,
 	.remove = madera_irq_remove,
 	.driver = {
 		.name	= "madera-irq",
-		.pm	= &madera_irq_pm_ops,
-		.suppress_bind_attrs = true,
+		.pm = &madera_irq_pm_ops,
 	}
 };
+
 module_platform_driver(madera_irq_driver);
 
 MODULE_DESCRIPTION("Madera IRQ driver");

@@ -309,7 +309,7 @@ int gpu_memory_seq_show(struct seq_file *sfile, void *data)
 			spin_lock(&(element->kctx->mem_pool.pool_lock));
 			each_free_size = element->kctx->mem_pool.cur_size;
 			spin_unlock(&(element->kctx->mem_pool.pool_lock));
-			seq_printf(sfile, "  (%24s), %s-0x%pK    %12u  %10zu\n", \
+			seq_printf(sfile, "  (%24s), %s-0x%p    %12u  %10zu\n", \
 					element->kctx->name, \
 					"kctx", \
 					element->kctx, \
@@ -326,7 +326,6 @@ void gpu_update_status(void *dev, char *str, u32 val)
 {
 	struct kbase_device *kbdev;
 	struct exynos_context *platform;
-	int i;
 
 	kbdev = (struct kbase_device *)dev;
 	KBASE_DEBUG_ASSERT(kbdev != NULL);
@@ -378,8 +377,7 @@ void gpu_update_status(void *dev, char *str, u32 val)
 	else if (strcmp(str, "reset_count") == 0)
 		platform->gpu_exception_count[GPU_RESET]++;
 
-	for (i = GPU_JOB_CONFIG_FAULT; i < GPU_EXCEPTION_LIST_END; i++)
-		platform->fault_count += platform->gpu_exception_count[i];
+	platform->fault_count++;
 }
 
 #define KBASE_MMU_PAGE_ENTRIES	512

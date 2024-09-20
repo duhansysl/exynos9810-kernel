@@ -749,38 +749,28 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	dwc->dotg = dotg;
 	dotg->dwc = dwc;
 
+	ret = of_property_read_u32(dwc->dev->of_node,"ldos", &dotg->ldos);
+	if (ret < 0) {
+		dev_err(dwc->dev, "can't get ldo information\n");
+		return -EINVAL;
+	} else {
+		if (dotg->ldos) {
+			dev_info(dwc->dev, "have %d LDOs for supporting USB L2 suspend \n", dotg->ldos);
+			dotg->ldo_num = (int *)devm_kmalloc(dwc->dev, sizeof(int) * (dotg->ldos),
+				GFP_KERNEL);
+			ret = of_property_read_u32_array(dwc->dev->of_node,
+					"ldo_number", dotg->ldo_num, dotg->ldos);
+		} else {
+			dev_info(dwc->dev, "don't have LDOs for supporting USB L2 suspend \n");
+		}
+	}
+
 	if (of_property_read_bool(dwc->dev->of_node, "ldo_manual_control"))
 		dotg->ldo_manual_control = 1;
 	else
 		dotg->ldo_manual_control = 0;
 	dev_info(dwc->dev, "%s, ldo_man_control = %d\n",
 			__func__, dotg->ldo_manual_control);
-
-	ret = of_property_read_u32(dwc->dev->of_node,"ldos", &dotg->ldos);
-	if (ret < 0) {
-		dev_err(dwc->dev, "can't get ldo information\n");
-		return -EINVAL;
-	}
-
-	if (dotg->ldo_manual_control) {
-		/*
-		 * ldo 12, 13, 14 is controlled manually,
-		 * decrement ldo numbers
-		 */
-		dotg->ldos = dotg->ldos - 3;
-	}
-
-	if (dotg->ldos) {
-		dev_info(dwc->dev, "have %d LDOs for USB L2 suspend\n",
-			dotg->ldos);
-		dotg->ldo_num = (int *)devm_kmalloc(dwc->dev,
-			sizeof(int) * (dotg->ldos), GFP_KERNEL);
-		ret = of_property_read_u32_array(dwc->dev->of_node,
-				"ldo_number", dotg->ldo_num, dotg->ldos);
-	} else {
-		dev_info(dwc->dev,
-			"don't have LDOs for USB L2 suspend\n");
-	}
 
 	if (dotg->ldo_manual_control == 1) {
 		dotg->ldo12 = regulator_get(dwc->dev, "vdd_ldo12");

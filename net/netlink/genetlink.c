@@ -1094,7 +1094,6 @@ static int __init genl_init(void)
 
 problem:
 	panic("GENL: Cannot register controller: %d\n", err);
-	return 0;
 }
 
 subsys_initcall(genl_init);

@@ -985,3 +985,4 @@ static int __init exynos_powermode_muic_notifier_init(void)
 late_initcall(exynos_powermode_muic_notifier_init);
 #endif /* CONFIG_MUIC_NOTIFIER && CONFIG_CCIC_NOTIFIER */
 #endif /* CONFIG_SEC_PM */
+

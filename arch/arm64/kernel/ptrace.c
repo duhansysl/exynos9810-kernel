@@ -333,7 +333,7 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
 	if (disabled)
 		return 0;
 
-	err = arch_bp_generic_fields(&ctrl, &len, &type, &offset);
+	err = arch_bp_generic_fields(ctrl, &len, &type, &offset);
 	if (err)
 		return err;
 

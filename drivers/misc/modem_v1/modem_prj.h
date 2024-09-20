@@ -283,7 +283,7 @@ enum iod_rx_state {
 	MAX_IOD_RX_STATE
 };
 
-static const char *rx_state_string[] = {
+static const char const *rx_state_string[] = {
 	[IOD_RX_ON_STANDBY]	= "RX_ON_STANDBY",
 	[IOD_RX_HEADER]		= "RX_HEADER",
 	[IOD_RX_PAYLOAD]	= "RX_PAYLOAD",
@@ -729,6 +729,8 @@ struct modem_ctl {
 	void (*gpio_revers_bias_clear)(void);
 	void (*gpio_revers_bias_restore)(void);
 	void (*modem_complete)(struct modem_ctl *mc);
+
+	int receive_first_ipc;
 };
 
 static inline bool cp_offline(struct modem_ctl *mc)

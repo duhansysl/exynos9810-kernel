@@ -42,21 +42,11 @@ struct s2mpb03_regulator_data {
 	struct device_node *reg_node;
 };
 
-struct s2mpb03_ldo_slew2 {
-	u8 dram_dsch1;
-	u8 dram_dsch2;
-	u8 l5_slew;
-	u8 l6_slew;
-	u8 l7_slew;
-};
-
 struct s2mpb03_platform_data {
 	bool wakeup;
 	int num_regulators;
 	struct	s2mpb03_regulator_data *regulators;
 	int	device_type;
-	bool disable_ldo2_remote_sense;
-	struct s2mpb03_ldo_slew2 slew2;
 };
 
 struct s2mpb03 {

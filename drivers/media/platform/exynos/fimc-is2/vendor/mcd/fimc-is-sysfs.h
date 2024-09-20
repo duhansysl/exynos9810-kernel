@@ -12,7 +12,6 @@
 
 #include "fimc-is-core.h"
 
-#ifdef CAMERA_SYSFS_V2
 enum fimc_is_cam_info_isp {
 	CAM_INFO_ISP_TYPE_INTERNAL = 0,
 	CAM_INFO_ISP_TYPE_EXTERNAL,
@@ -78,11 +77,19 @@ enum fimc_is_cam_info_index {
 	CAM_INFO_REAR = 0,
 	CAM_INFO_FRONT,
 	CAM_INFO_REAR2,
+	CAM_INFO_FRONT2,
+	CAM_INFO_REAR3,
+	CAM_INFO_FRONT3,
+	CAM_INFO_REAR4,
+	CAM_INFO_FRONT4,
+	CAM_INFO_REAR_TOF,
+	CAM_INFO_FRONT_TOF,
 	CAM_INFO_IRIS,
 	CAM_INFO_MAX
 };
 
 struct fimc_is_cam_info {
+	unsigned int internal_id;
 	unsigned int isp;
 	unsigned int cal_memory;
 	unsigned int read_version;
@@ -96,7 +103,12 @@ struct fimc_is_cam_info {
 	unsigned int dual_open;
 };
 
-int fimc_is_get_cam_info(struct fimc_is_cam_info **caminfo);
+struct fimc_is_common_cam_info {
+	unsigned int supported_camera_ids[11];	/*FIMC_IS_SENSOR_COUNT*/
+	unsigned int max_supported_camera;
+};
 
-#endif
+int fimc_is_get_cam_info(struct fimc_is_cam_info **caminfo);
+void fimc_is_get_common_cam_info(struct fimc_is_common_cam_info **caminfo);
+
 #endif /* _FIMC_IS_SYSFS_H_ */

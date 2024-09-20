@@ -81,9 +81,12 @@ static inline int acpm_get_mifdn_count(void)
 enum ids_info {
 	tg,
 	lg,
+	mg,
 	bg,
 	g3dg,
 	mifg,
+	lids,
+	mids,
 	bids,
 	gids,
 };

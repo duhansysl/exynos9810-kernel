@@ -140,7 +140,8 @@ trigger_skip:
 
 	frame = peek_frame(framemgr, FS_REQUEST);
 	if (frame) {
-		flite_hw_set_dma_addr(flite->base_reg, 0, true, frame->dvaddr_buffer[0]);
+		flite_hw_set_dma_addr(flite->base_reg, 0, true,
+				(u32)frame->dvaddr_buffer[0]);
 		trans_frame(framemgr, frame, FS_PROCESS);
 	} else {
 		flite_hw_set_dma_addr(flite->base_reg, 0, false, 0);
@@ -179,7 +180,8 @@ void tasklet_flite_str_m2m(unsigned long data)
 
 	frame = peek_frame(framemgr, FS_REQUEST);
 	if (frame) {
-		flite_hw_set_dma_addr(flite->base_reg, 0, true, frame->dvaddr_buffer[0]);
+		flite_hw_set_dma_addr(flite->base_reg, 0, true,
+				(u32)frame->dvaddr_buffer[0]);
 		trans_frame(framemgr, frame, FS_PROCESS);
 	} else {
 		flite_hw_set_dma_addr(flite->base_reg, 0, false, 0);
@@ -242,7 +244,8 @@ static void tasklet_flite_end(unsigned long data)
 						(1 << FLITE_STATUS_MIPI_VALID), false)) {
 					merr("over vblank", flite);
 				} else {
-					flite_hw_set_dma_addr(flite->base_reg, 0, true, frame->dvaddr_buffer[0]);
+					flite_hw_set_dma_addr(flite->base_reg, 0, true,
+							(u32)frame->dvaddr_buffer[0]);
 					trans_frame(framemgr, frame, FS_PROCESS);
 				}
 			} else {
@@ -620,7 +623,8 @@ static int flite_stream_on(struct v4l2_subdev *subdev,
 	if (framemgr->queued_count[FS_REQUEST] >= 1) {
 		frame = peek_frame(framemgr, FS_REQUEST);
 		if (frame) {
-			flite_hw_set_dma_addr(flite->base_reg, 0, true, frame->dvaddr_buffer[0]);
+			flite_hw_set_dma_addr(flite->base_reg, 0, true,
+					(u32)frame->dvaddr_buffer[0]);
 			trans_frame(framemgr, frame, FS_PROCESS);
 			buffer_ready = true;
 		} else {
@@ -900,7 +904,8 @@ static int flite_s_buffer(struct v4l2_subdev *subdev, void *buf, unsigned int *s
 		frame = peek_frame(framemgr, FS_REQUEST);
 		if (frame) {
 			if (!flite_hw_get_output_dma(flite->base_reg)) {
-				flite_hw_set_dma_addr(flite->base_reg, 0, true, frame->dvaddr_buffer[0]);
+				flite_hw_set_dma_addr(flite->base_reg, 0, true,
+						(u32)frame->dvaddr_buffer[0]);
 				trans_frame(framemgr, frame, FS_PROCESS);
 			}
 		}

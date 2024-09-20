@@ -21,6 +21,7 @@
 
 #define FIMC_IS_RESERVE_LIB_SIZE	(0x00200000)	/* 2MB */
 #define FIMC_IS_TAAISP_SIZE		(0x00080000)	/* 512KB */
+#define TAAISP_MEDRC_SIZE		(0x00000000)	/* zero */
 #define FIMC_IS_VRA_SIZE		(0x00800000)	/* 8MB */
 
 enum taaisp_chain_id {

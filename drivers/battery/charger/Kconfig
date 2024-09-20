@@ -1,0 +1,68 @@
+
+config CHARGER_DUMMY
+	tristate "dummy charger driver"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support
+	 for dummy charger driver.
+	 This driver source code implemented
+	 skeleton source code for charger functions.
+
+config CHARGER_MAX77705
+	tristate "MAX77705 battery charger support"
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y here to enable support for the MAX77705 charger
+
+config SWITCHING_S2ASL01
+    tristate "S2ASL01 SWITCHING IC support"
+    depends on I2C
+    help
+	  Say Y here to enable support for S2ASL01 switching driver.
+
+config CHARGER_PCA9468
+	tristate "PCA9468 charger driver"
+	default n
+	depends on DIRECT_CHARGING
+	help
+	  Say Y here to enable support for the PCA9468 charger
+
+config CHARGER_SM5705
+	tristate "SM5705 battery charger support"
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y here to enable support for the SM5705 charger
+
+config CHARGER_SMB1351
+        tristate "SMB1351 charger driver"
+        default n
+        help
+         Say Y here to support for the smb1351 charger
+         The SMB1351 is a slave charger that extends
+         the current capability of an existing charging solution.
+
+config CHARGER_S2MU107
+    tristate "S2MU107 charger support"
+    depends on (MFD_S2MU107) && I2C
+    help
+     Say Y here to enable support for the S2MU107 charger.
+     S2MU107 charger is an AFC compatible charging IC.
+     S2MU107 charger is dependent on MFD_S2MU107
+     so it needs to be defined.
+
+config CHARGER_S2MU107_DIRECT
+	tristate "S2MU107 direct charger support"
+	depends on (MFD_S2MU107) && I2C
+	help
+	 Say Y here to enable support for the S2MU107 direct charger.
+	 S2MU107 direct charger is dependent on MFD_S2MU107
+	 so it needs to be defined.
+
+config PM_S2MU107
+	tristate "S2MU107 power meter support"
+	depends on (MFD_S2MU107) && I2C
+	help
+	 Say Y here to enable support for the S2MU107 power meter.
+	 S2MU107 power meter is dependent on MFD_S2MU107
+	 so it needs to be defined.

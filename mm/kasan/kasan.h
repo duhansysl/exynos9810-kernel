@@ -36,10 +36,6 @@
 #define KASAN_ABI_VERSION 1
 #endif
 
-#if defined(CONFIG_SEC_DEBUG_KASAN)
-#include  <linux/sec_debug_ksan.h>
-#endif
-
 struct kasan_access_info {
 	const void *access_addr;
 	const void *first_bad_addr;

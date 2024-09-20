@@ -914,7 +914,7 @@ static int gdc_open(struct file *file)
 {
 	struct gdc_dev *gdc = video_drvdata(file);
 	struct gdc_ctx *ctx;
-	int ret;
+	int ret = 0;
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx) {

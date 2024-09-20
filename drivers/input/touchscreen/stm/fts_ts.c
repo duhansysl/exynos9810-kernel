@@ -54,8 +54,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/input/mt.h>
-#ifdef CONFIG_SEC_SYSFS
-#include <linux/sec_sysfs.h>
+#ifdef CONFIG_DRV_SAMSUNG
+#include <linux/sec_class.h>
 #endif
 #ifdef CONFIG_TRUSTONIC_TRUSTED_UI
 #include <linux/t-base-tui.h>
@@ -2496,7 +2496,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	if (info->board->support_mskey) {
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 		info->fac_dev_tk = sec_device_create(info, "sec_touchkey");
 #else
 		info->fac_dev_tk = device_create(sec_class, NULL, 11, info, "sec_touchkey");
@@ -2597,7 +2597,7 @@ static int fts_remove(struct i2c_client *client)
 		sysfs_remove_link(&info->fac_dev_tk->kobj, "input");
 		sysfs_remove_group(&info->fac_dev_tk->kobj,
 				   &sec_touchkey_factory_attr_group);
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 		sec_device_destroy(info->fac_dev_tk->devt);
 #else
 		device_destroy(sec_class, 11);

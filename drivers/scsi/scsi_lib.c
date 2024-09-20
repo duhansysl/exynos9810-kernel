@@ -1757,7 +1757,7 @@ static void scsi_request_fn(struct request_queue *q)
 			preempt_enable_no_resched();
 			goto host_not_ready;
 		}
-	
+
 		if (sdev->simple_tags)
 			cmd->flags |= SCMD_TAGGED;
 		else

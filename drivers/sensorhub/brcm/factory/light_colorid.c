@@ -34,25 +34,11 @@ struct light_coef_predefine_item {
 	unsigned int thresh_alert;	/* high*/
 };
 
-#ifdef CONFIG_SENSORS_SSP_GREAT
 struct light_coef_predefine_item light_coef_predefine_table[COLOR_NUM+1] = {
-	{170609,	COLOR_ID_DEFAULT,	{-170, 80, -290, 1000, 2266, 1389, 1372},	{2300, 1000}, 550},
-	{170609,	COLOR_ID_UTYPE,		{-170, 80, -290, 1000, 2266, 1389, 1372},	{2300, 1000}, 550},
-	{170609,	COLOR_ID_BLACK,		{-170, 80, -290, 1000, 2266, 1389, 1372},	{2300, 1000}, 550},
+	{190610,	COLOR_ID_DEFAULT,	{-888, 217, -444, 1115, 3673, 1112, 1370},	{0, 0}, 550},
+	{190610,	COLOR_ID_UTYPE,		{-888, 217, -444, 1115, 3673, 1112, 1370},	{0, 0}, 550},
+	{190610,	COLOR_ID_BLACK,		{-888, 217, -444, 1115, 3673, 1112, 1370},	{0, 0}, 550},
 };
-#elif defined(CONFIG_SENSORS_SSP_STAR)
-struct light_coef_predefine_item light_coef_predefine_table[COLOR_NUM+1] = {
-	{181212,	COLOR_ID_DEFAULT,	{-170, 80, -290, 1000, 2266, 1116, 1500},	{2300, 1000}, 550},
-	{181212,	COLOR_ID_UTYPE,		{-170, 80, -290, 1000, 2266, 1116, 1500},	{2300, 1000}, 550},
-	{181212,	COLOR_ID_BLACK,		{-170, 80, -290, 1000, 2266, 1116, 1500},	{2300, 1000}, 550},
-};
-#else
-struct light_coef_predefine_item light_coef_predefine_table[COLOR_NUM+1] = {
-	{180509,	COLOR_ID_DEFAULT,	{-170, 80, -290, 1000, 2266, 1112, 1370},	{2300, 1000}, 550},
-	{180509,	COLOR_ID_UTYPE,		{-170, 80, -290, 1000, 2266, 1112, 1370},	{2300, 1000}, 550},
-	{180509,	COLOR_ID_BLACK,		{-170, 80, -290, 1000, 2266, 1112, 1370},	{2300, 1000}, 550},
-};
-#endif
 
 /* Color ID functions */
 

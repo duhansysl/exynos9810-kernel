@@ -22,7 +22,6 @@
 #include <linux/suspend.h>
 #include <linux/tick.h>
 #include <trace/events/power.h>
-#include <linux/exynos-ucc.h>
 
 #include "cpuidle.h"
 
@@ -192,8 +191,6 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 		target_state = &drv->states[index];
 		broadcast = false;
 	}
-
-	index = filter_cstate(dev->cpu, index);
 
 	/* Take note of the planned idle state. */
 	sched_idle_set_state(target_state, index);
@@ -724,5 +721,5 @@ static int __init cpuidle_init(void)
 	return 0;
 }
 
-module_param(off, int, 0644);
+module_param(off, int, 0444);
 core_initcall(cpuidle_init);

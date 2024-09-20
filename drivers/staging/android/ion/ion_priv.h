@@ -682,6 +682,4 @@ struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 int ion_share_dma_buf_fd_nolock(struct ion_client *client,
 				struct ion_handle *handle);
 
-void show_ion_system_heap_size(struct seq_file *s);
-void show_ion_system_heap_pool_size(struct seq_file *s);
 #endif /* _ION_PRIV_H */

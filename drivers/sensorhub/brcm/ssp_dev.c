@@ -211,6 +211,11 @@ static void initialize_variable(struct ssp_data *data)
 	data->IsVDIS_Enabled = false;
         data->IsAPsuspend = false;
         data->IsNoRespCnt = 0;
+#if defined(CONFIG_SENSORS_SABC)
+	data->camera_lux_en = false;
+//	data->brightness = -1;
+#endif
+	data->hall_ic_status = 0;
 }
 
 int initialize_mcu(struct ssp_data *data)
@@ -272,6 +277,9 @@ int initialize_mcu(struct ssp_data *data)
 	if (initialize_thermistor_table(data) < 0)
 		pr_err("[SSP]: %s - initialize thermistor table failed\n",
 			__func__);
+	if (set_prox_cal_to_ssp(data) < 0)
+		pr_err("[SSP]: %s - send proximity calibration data failed\n",
+			__func__);
 
 	data->uCurFirmRev = get_firmware_rev(data);
 	pr_info("[SSP] MCU Firm Rev : New = %8u\n",
@@ -281,6 +289,11 @@ int initialize_mcu(struct ssp_data *data)
 
 	data->dhrAccelScaleRange = get_accel_range(data);
 
+
+	send_hall_ic_status(data->hall_ic_status);
+#if defined(CONFIG_SENSORS_SABC)
+	set_light_brightness(data);
+#endif
 /* hoi: il dan mak a */
 #ifndef CONFIG_SENSORS_SSP_BBD
 	iRet = ssp_send_cmd(data, MSG2SSP_AP_MCU_DUMP_CHECK, 0);
@@ -590,18 +603,25 @@ int ssp_motor_callback(int state)
 {
 	int iRet = 0;
 
-	ssp_data_info->motor_state = state;
+	if (ssp_data_info != NULL) {
+		ssp_data_info->motor_state = state;
 
-	queue_work(ssp_data_info->ssp_motor_wq,
-			&ssp_data_info->work_ssp_motor);
-
-	pr_info("[SSP] %s : Motor state %d\n", __func__, state);
+		if (ssp_data_info->ssp_motor_wq != NULL)
+				queue_work(ssp_data_info->ssp_motor_wq, &ssp_data_info->work_ssp_motor);
+		pr_info("[SSP] %s : Motor state %d\n", __func__, state);
+	} else {
+		pr_info("[SSP] %s : ssp do not ready yet.\n", __func__);
+	}
+	
 
 	return iRet;
 }
 int get_current_motor_state(void)
 {
-	return ssp_data_info->motor_state;
+	if (ssp_data_info != NULL)
+		return ssp_data_info->motor_state;
+	else
+		return 0;
 }
 int (*getMotorCallback(void))(int)
 {
@@ -619,7 +639,52 @@ void ssp_motor_work_func(struct work_struct *work)
 	pr_info("[SSP] %s : Motor state %d, iRet %d\n", __func__, data->motor_state, iRet);
 }
 #endif
+#if defined(CONFIG_SENSORS_SABC)
+void set_light_brightness(struct ssp_data *data) {
+	struct ssp_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	int iRet = 0;
 
+	if (msg == NULL) {
+                pr_err("[SSP] %s, failed to allocate memory for ssp_msg\n", __func__);
+                return;
+        }
+	msg->cmd = MSG2SSP_PANEL_INFORMATION;
+	msg->length = sizeof(data->brightness);
+	msg->options = AP2HUB_WRITE;
+	msg->buffer = kzalloc(sizeof(data->brightness), GFP_KERNEL);
+	msg->free_buffer = 1;
+	memcpy(msg->buffer, (u8 *)&data->brightness, sizeof(data->brightness));
+
+	iRet = ssp_spi_async(ssp_data_info, msg);
+
+	if (iRet < 0)
+		pr_err("[SSP] %s, failed to send brightness information", __func__);
+	else
+		pr_info("[SSP] %s, %d\n", __func__, data->brightness);
+}
+#endif
+int send_hall_ic_status(bool enable) {
+	struct ssp_msg *msg;
+	int iRet = 0;
+
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+
+	msg->cmd = MSG2SSP_HALL_IC_ON_OFF;
+	msg->length = 1;
+	msg->options = AP2HUB_WRITE;
+	msg->buffer = kzalloc(1, GFP_KERNEL);
+	msg->free_buffer = 1;
+	msg->buffer[0] = enable;
+
+	iRet = ssp_spi_async(ssp_data_info, msg);
+	if (iRet != SUCCESS) {
+		pr_err("[SSP]: %s - hall ic command, failed %d\n", __func__, iRet);
+		return iRet;
+	}
+
+	pr_info("[SSP] %s HALL IC ON/OFF, %d enabled %d\n", __func__, iRet, enable);
+	return iRet;
+}
 
 void ssp_timestamp_sync_work_func(struct work_struct *work)
 {

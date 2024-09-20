@@ -87,7 +87,7 @@ static void max77865_irq_sync_unlock(struct irq_data *data)
 	struct max77865_dev *max77865 = irq_get_chip_data(data->irq);
 	int i;
 
-	for (i = 0; i < (int)ARRAY_SIZE(max77865_mask_reg); i++) {
+	for (i = 0; i < ARRAY_SIZE(max77865_mask_reg); i++) {
 		u8 mask_reg = max77865_mask_reg[i];
 		struct i2c_client *i2c = get_i2c(max77865, i);
 
@@ -252,7 +252,7 @@ int max77865_irq_init(struct max77865_dev *max77865)
 	gpio_free(max77865->irq_gpio);
 
 	/* Mask individual interrupt sources */
-	for (i = 0; i < (int)ARRAY_SIZE(max77865_mask_reg); i++) {
+	for (i = 0; i < ARRAY_SIZE(max77865_mask_reg); i++) {
 		struct i2c_client *i2c;
 		/* MUIC IRQ  0:MASK 1:NOT MASK => NOT USE */
 		/* Other IRQ 1:MASK 0:NOT MASK */

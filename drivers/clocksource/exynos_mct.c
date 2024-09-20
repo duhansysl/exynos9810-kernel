@@ -618,7 +618,7 @@ out_irq:
 static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
 {
 	u32 nr_irqs, i;
-	int ret = 0;
+	int ret;
 
 	mct_int_type = int_type;
 
@@ -648,15 +648,11 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
 	if (ret)
 		return ret;
 
-	ret = exynos4_clockevent_init();
-	if (ret)
-		return ret;
-
 #ifdef CONFIG_SEC_BOOTSTAT
 	sec_bootstat_mct_start(exynos4_read_count_64());
 #endif
 
-	return ret;
+	return exynos4_clockevent_init();
 }
 
 

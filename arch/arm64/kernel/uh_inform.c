@@ -44,10 +44,10 @@ static char* feature_state_char[UH_INFORM_SIZE_STATE] = {
 
 static struct feature_uh feature_uh_s[UH_INFORM_SIZE_FEATURE];
 
-static int feature_init(int feature_id, int feature_type, int feature_state, 
+static int feature_init(int feature_id, int feature_type, int feature_state,
 		char* feature_id_str ) {
-	if(feature_id >= UH_INFORM_SIZE_FEATURE || 
-		feature_type >= UH_INFORM_SIZE_TYPE || 
+	if(feature_id >= UH_INFORM_SIZE_FEATURE ||
+		feature_type >= UH_INFORM_SIZE_TYPE ||
 		feature_state >= UH_INFORM_SIZE_STATE ||
 		feature_id_str == NULL )
 		return UH_INFORM_FALSE;
@@ -63,25 +63,25 @@ static int feature_get_config(void) {
 	int ret = UH_INFORM_TRUE;
 #ifdef CONFIG_RKP_CFP_JOPP
 	ret |= feature_set_state(FEATURE_JOPP, UH_INFORM_ACTIVE);
-#endif	
+#endif
 #ifdef CONFIG_RKP_CFP_ROPP
 	ret |= feature_set_state(FEATURE_ROPP, UH_INFORM_ACTIVE);
-#endif	
+#endif
 #ifdef CONFIG_UH_RKP
 	ret |= feature_set_state(FEATURE_RKP, UH_INFORM_ACTIVE);
-#endif	
+#endif
 #ifdef CONFIG_UH_RKP_KDP
 	ret |= feature_set_state(FEATURE_KDP, UH_INFORM_ACTIVE);
-#endif	
+#endif
 #ifdef CONFIG_DM_VERITY
 	ret |= feature_set_state(FEATURE_DMV, UH_INFORM_DMV_FULL);
-#endif	
+#endif
 #ifdef DMV_ALTA
 	ret |= feature_set_state(FEATURE_DMV, UH_INFORM_DMV_ALTA);
-#endif	
+#endif
 #ifdef DMV_LITE
 	ret |= feature_set_state(FEATURE_DMV, UH_INFORM_DMV_LITE);
-#endif	
+#endif
 	return ret;
 }
 
@@ -100,11 +100,11 @@ static int uh_inform_init(void) {
 }
 
 int feature_set_state(int feature_id, int feature_state) {
-	if(feature_id >= UH_INFORM_SIZE_FEATURE || 
+	if(feature_id >= UH_INFORM_SIZE_FEATURE ||
 		feature_state >= UH_INFORM_SIZE_STATE )
 		return UH_INFORM_FALSE;
 	feature_uh_s[feature_id].feature_state_str = feature_state_char[feature_state];
-	
+
 	if(feature_uh_s[feature_id].feature_state_str == NULL)
 		return UH_INFORM_FALSE;
 	return UH_INFORM_TRUE;
@@ -160,13 +160,13 @@ static int get_partition_info(void) {
 static void print_feature(struct seq_file *m) {
 	int feature_n;
 	for(feature_n = 0; feature_n < UH_INFORM_SIZE_FEATURE; feature_n++)
-		seq_printf(m, "%s %s\n", get_feature_id_str(feature_n), 
-			get_feature_state_str(feature_n));	
+		seq_printf(m, "%s %s\n", get_feature_id_str(feature_n),
+			get_feature_state_str(feature_n));
 }
 
 static int uh_inform_debug_show(struct seq_file *m, void *private) {
 	int ret = UH_INFORM_TRUE;
-	
+
 	ret |= get_partition_info();
 	print_feature(m);
 	return 0;
@@ -193,7 +193,7 @@ static ssize_t uh_inform_write(struct file *file, const char __user *buf,
 
 	if(count >= 2)
 		arg = buffer[1];
-	
+
 	if(feature_id > UH_INFORM_SIZE_FEATURE)
 		return -EFAULT;
 

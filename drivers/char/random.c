@@ -805,10 +805,6 @@ static void crng_initialize(struct crng_state *crng)
 	crng->init_time = jiffies - CRNG_RESEED_INTERVAL - 1;
 }
 
-/*
- * crng_fast_load() can be called by code in the interrupt service
- * path.  So we can't afford to dilly-dally.
- */
 static int crng_fast_load(const char *cp, size_t len)
 {
 	unsigned long flags;
@@ -1674,7 +1670,6 @@ void get_random_bytes_arch(void *buf, int nbytes)
 
 		if (!arch_get_random_long(&v))
 			break;
-
 		memcpy(p, &v, chunk);
 		p += chunk;
 		nbytes -= chunk;

@@ -10,3 +10,13 @@ config SEC_DISPLAYPORT_BIGDATA
 	default n
 	---help---
 	  Enable DISPLAYPORT bigdata.
+
+config SEC_DISPLAYPORT_SELFTEST
+	bool "DISPLAYPORT self test"
+	depends on DISPLAYPORT_ENG
+	default n
+	help
+	 This config is for supporting DISPLAYPORT self test.
+	 1. check if displayport is enabled.
+	 2. check if resolution is correct.
+	 3. additional functions can be added.

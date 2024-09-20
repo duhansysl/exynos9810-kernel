@@ -16,7 +16,9 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/sysfs.h>
+#include <linux/version.h>
 #include <linux/vmalloc.h>
+#include <linux/binfmts.h>
 #include <linux/defex.h>
 #include "defex_config.h"
 
@@ -42,6 +44,10 @@
 #define FEATURE_SAFEPLACE_SOFT			(1 << 9)
 #define FEATURE_FIVE				(1 << 10) /* reserved for future use */
 #define FEATURE_FIVE_SOFT			(1 << 11) /* reserved for future use */
+#define FEATURE_TRUSTED_MAP			(1 << 12)
+#define FEATURE_TRUSTED_MAP_SOFT		(1 << 13)
+#define FEATURE_INTEGRITY			(1 << 14)
+#define FEATURE_INTEGRITY_SOFT		(1 << 15)
 
 #define FEATURE_CLEAR_ALL			(0xFF0000)
 
@@ -102,24 +108,7 @@
 		(ids_ptr)->egid = egid; \
 		(cred_data_ptr)->cred_flags |= cred_flags; } while(0)
 
-struct defex_privesc {
-	struct kobject kobj;
-	unsigned int status;
-};
-#define to_privesc_obj(obj) container_of(obj, struct defex_privesc, kobj)
-
-struct privesc_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct defex_privesc *privesc, struct privesc_attribute *attr, char *buf);
-	ssize_t (*store)(struct defex_privesc *foo, struct privesc_attribute *attr, const char *buf, size_t count);
-};
-#define to_privesc_attr(obj) container_of(obj, struct privesc_attribute, attr)
-
-struct defex_privesc *task_defex_create_privesc_obj(struct kset *defex_kset);
-void task_defex_destroy_privesc_obj(struct defex_privesc *privesc);
-extern struct defex_privesc *global_privesc_obj;
-ssize_t task_defex_privesc_store_status(struct defex_privesc *privesc_obj,
-		struct privesc_attribute *attr, const char *buf, size_t count);
+extern unsigned char global_privesc_status;
 
 void get_task_creds(struct task_struct *p, unsigned int *uid_ptr, unsigned int *fsuid_ptr, unsigned int *egid_ptr, unsigned short *cred_flags_ptr);
 int set_task_creds(struct task_struct *p, unsigned int uid, unsigned int fsuid, unsigned int egid, unsigned short cred_flags);
@@ -127,50 +116,48 @@ void set_task_creds_tcnt(struct task_struct *p, int addition);
 int is_task_creds_ready(void);
 
 /* -------------------------------------------------------------------------- */
+/* Integrity feature */
+/* -------------------------------------------------------------------------- */
+
+extern unsigned char global_integrity_status;
+
+/* -------------------------------------------------------------------------- */
 /* SafePlace feature */
 /* -------------------------------------------------------------------------- */
 
-struct defex_safeplace {
-	struct kobject kobj;
-	unsigned int status;
-};
-#define to_safeplace_obj(obj) container_of(obj, struct defex_safeplace, kobj)
-
-struct safeplace_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct defex_safeplace *safeplace, struct safeplace_attribute *attr, char *buf);
-	ssize_t (*store)(struct defex_safeplace *foo, struct safeplace_attribute *attr, const char *buf, size_t count);
-};
-#define to_safeplace_attr(obj) container_of(obj, struct safeplace_attribute, attr)
-
-struct defex_safeplace *task_defex_create_safeplace_obj(struct kset *defex_kset);
-extern void task_defex_destroy_safeplace_obj(struct defex_safeplace *safeplace);
-extern struct defex_safeplace *global_safeplace_obj;
-ssize_t safeplace_status_store(struct defex_safeplace *safeplace_obj,
-		struct safeplace_attribute *attr, const char *buf, size_t count);
+extern unsigned char global_safeplace_status;
 
 /* -------------------------------------------------------------------------- */
 /* Immutable feature */
 /* -------------------------------------------------------------------------- */
 
-struct defex_immutable {
-	struct kobject kobj;
-	unsigned int status;
-};
-#define to_immutable_obj(obj) container_of(obj, struct defex_immutable, kobj)
+extern unsigned char global_immutable_status;
 
-struct immutable_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct defex_immutable *immutable, struct immutable_attribute *attr, char *buf);
-	ssize_t (*store)(struct defex_immutable *foo, struct immutable_attribute *attr, const char *buf, size_t count);
-};
-#define to_immutable_attr(obj) container_of(obj, struct immutable_attribute, attr)
+/* -------------------------------------------------------------------------- */
+/* Trusted Map feature */
+/* -------------------------------------------------------------------------- */
 
-struct defex_immutable *task_defex_create_immutable_obj(struct kset *defex_kset);
-extern void task_defex_destroy_immutable_obj(struct defex_immutable *immutable);
-extern struct defex_immutable *global_immutable_obj;
-ssize_t immutable_status_store(struct defex_immutable *immutable_obj,
-		struct immutable_attribute *attr, const char *buf, size_t count);
+extern unsigned char global_trusted_map_status;
+
+enum trusted_map_status {
+	DEFEX_TM_ENFORCING_MODE		= (1 << 0),
+	DEFEX_TM_PERMISSIVE_MODE	= (1 << 1),
+	DEFEX_TM_DEBUG_VIOLATIONS	= (1 << 2),
+	DEFEX_TM_DEBUG_CALLS		= (1 << 3),
+	DEFEX_TM_LAST_STATUS		= (1 << 4) - 1
+};
+
+static inline int defex_tm_mode_enabled(int mode_flag)
+{
+	return global_trusted_map_status & mode_flag;
+}
+
+struct defex_context;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+int defex_trusted_map_lookup(struct defex_context *dc, int argc, struct linux_binprm *bprm);
+#else
+int defex_trusted_map_lookup(struct defex_context *dc, int argc, void *argv);
+#endif
 
 /* -------------------------------------------------------------------------- */
 /* Common Helper API */
@@ -180,7 +167,6 @@ struct defex_context {
 	int syscall_no;
 	struct task_struct *task;
 	struct file *process_file;
-	struct cred cred;
 	struct file *target_file;
 	const struct path *process_dpath;
 	const struct path *target_dpath;
@@ -188,13 +174,16 @@ struct defex_context {
 	char *target_name;
 	char *target_name_buff;
 	char *process_name_buff;
+
+	/* NB: cred must be the last field */
+	struct cred *cred;
 };
 
 extern const char unknown_file[];
 
 struct file *local_fopen(const char *fname, int flags, umode_t mode);
 int local_fread(struct file *f, loff_t offset, void *ptr, unsigned long bytes);
-void init_defex_context(struct defex_context *dc, int syscall, struct task_struct *p, struct file *f);
+int init_defex_context(struct defex_context *dc, int syscall, struct task_struct *p, struct file *f);
 void release_defex_context(struct defex_context *dc);
 struct file *get_dc_process_file(struct defex_context *dc);
 const struct path *get_dc_process_dpath(struct defex_context *dc);
@@ -204,6 +193,7 @@ char *get_dc_target_name(struct defex_context *dc);
 struct file *defex_get_source_file(struct task_struct *p);
 char *defex_get_filename(struct task_struct *p);
 char* defex_resolve_filename(const char *name, char **out_buff);
+int defex_files_identical(const struct file *f1, const struct file *f2);
 static inline void safe_str_free(void *ptr)
 {
 	if (ptr && ptr != unknown_file)
@@ -215,8 +205,7 @@ static inline void safe_str_free(void *ptr)
 /* Defex lookup API */
 /* -------------------------------------------------------------------------- */
 
-int rules_lookup(const struct path *dpath, int attribute, struct file *f);
-int rules_lookup2(const char *target_file, int attribute, struct file *f);
+int rules_lookup(const char *target_file, int attribute, struct file *f);
 
 /* -------------------------------------------------------------------------- */
 /* Defex init API */
@@ -224,9 +213,24 @@ int rules_lookup2(const char *target_file, int attribute, struct file *f);
 
 int __init defex_init_sysfs(void);
 void __init creds_fast_hash_init(void);
+int __init do_load_rules(void);
 
+/* -------------------------------------------------------------------------- */
+/* Defex debug API */
+/* -------------------------------------------------------------------------- */
+
+int immutable_status_store(const char *status_str);
+int privesc_status_store(const char *status_str);
+int safeplace_status_store(const char *status_str);
+int integrity_status_store(const char *status_str);
+
+extern bool boot_state_recovery __ro_after_init;
 #ifdef DEFEX_DEPENDING_ON_OEMUNLOCK
 extern bool boot_state_unlocked __ro_after_init;
+extern int warranty_bit __ro_after_init;
+#else
+#define boot_state_unlocked	(0)
+#define warranty_bit		(0)
 #endif /* DEFEX_DEPENDING_ON_OEMUNLOCK */
 
 #endif /* CONFIG_SECURITY_DEFEX_INTERNAL_H */

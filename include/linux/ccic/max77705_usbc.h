@@ -25,6 +25,8 @@
 #include <linux/usb/typec.h>
 #endif
 
+#define MAX77705_SYS_FW_UPDATE
+
 struct max77705_opcode {
 	unsigned char opcode;
 	unsigned char data[OPCODE_DATA_LENGTH];
@@ -126,6 +128,7 @@ struct max77705_usbc_platform_data {
 
 	struct work_struct op_wait_work;
 	struct work_struct op_send_work;
+	struct work_struct cc_open_req_work;
 	struct workqueue_struct	*op_wait_queue;
 	struct workqueue_struct	*op_send_queue;
 	struct completion op_completion;
@@ -225,6 +228,9 @@ struct max77705_usbc_platform_data {
 #endif
 	int detach_done_wait;
 	uint32_t dr_swap_cnt;
+
+	u8 control3_reg;
+	int cc_open_req;
 };
 
 /* Function Status from s2mm005 definition */
@@ -284,6 +290,8 @@ extern void max77705_vbus_turn_on_ctrl(struct max77705_usbc_platform_data *usbc_
 extern void max77705_dp_detach(void *data);
 void max77705_usbc_disable_auto_vbus(struct max77705_usbc_platform_data *usbc_data);
 extern void max77705_set_host_turn_on_event(int mode);
+extern void pdic_manual_ccopen_request(int is_on);
+extern void pdic_error_recovery_request(void);
 #if defined(CONFIG_TYPEC)
 int max77705_get_pd_support(struct max77705_usbc_platform_data *usbc_data);
 #endif

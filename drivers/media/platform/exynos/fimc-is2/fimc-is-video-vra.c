@@ -218,16 +218,15 @@ const struct v4l2_file_operations fimc_is_vra_video_fops = {
 static int fimc_is_vra_video_querycap(struct file *file, void *fh,
 					struct v4l2_capability *cap)
 {
-	struct fimc_is_video *video = video_drvdata(file);
+	struct fimc_is_core *core = video_drvdata(file);
 
-	FIMC_BUG(!cap);
-	FIMC_BUG(!video);
+	strncpy(cap->driver, core->pdev->name, sizeof(cap->driver) - 1);
 
-	snprintf(cap->driver, sizeof(cap->driver), "%s", video->vd.name);
-	snprintf(cap->card, sizeof(cap->card), "%s", video->vd.name);
+	strncpy(cap->card, core->pdev->name, sizeof(cap->card) - 1);
+	
 	cap->capabilities |= V4L2_CAP_STREAMING
-			| V4L2_CAP_VIDEO_OUTPUT
-			| V4L2_CAP_VIDEO_OUTPUT_MPLANE;
+				| V4L2_CAP_VIDEO_OUTPUT
+				| V4L2_CAP_VIDEO_OUTPUT_MPLANE;
 	cap->device_caps |= cap->capabilities;
 
 	return 0;
@@ -365,10 +364,12 @@ static int fimc_is_vra_video_prepare(struct file *file, void *priv,
 	       goto p_err;
 	}
 
+#ifdef ENABLE_IS_CORE
 	if (!test_bit(FRAME_MEM_MAPPED, &frame->mem_state)) {
 		fimc_is_itf_map(device, GROUP_ID(device->group_vra.id), frame->dvaddr_shot, frame->shot_size);
 		set_bit(FRAME_MEM_MAPPED, &frame->mem_state);
 	}
+#endif
 
 p_err:
 	minfo("[VRA:V] %s(%d):%d\n", device, __func__, buf->index, ret);
@@ -605,6 +606,10 @@ static int fimc_is_vra_queue_setup(struct vb2_queue *vbq,
 	struct fimc_is_video_ctx *vctx = vbq->drv_priv;
 	struct fimc_is_video *video;
 	struct fimc_is_queue *queue;
+#if defined(SECURE_CAMERA_FACE)
+	struct fimc_is_core *core =
+		(struct fimc_is_core *)dev_get_drvdata(fimc_is_dev);
+#endif
 
 	FIMC_BUG(!vctx);
 	FIMC_BUG(!vctx->video);
@@ -613,6 +618,11 @@ static int fimc_is_vra_queue_setup(struct vb2_queue *vbq,
 
 	video = GET_VIDEO(vctx);
 	queue = GET_QUEUE(vctx);
+
+#if defined(SECURE_CAMERA_FACE)
+       if (core->scenario == FIMC_IS_SCENARIO_SECURE)
+               set_bit(IS_QUEUE_NEED_TO_REMAP, &queue->state);
+#endif
 
 	ret = fimc_is_queue_setup(queue,
 		video->alloc_ctx,
@@ -623,21 +633,6 @@ static int fimc_is_vra_queue_setup(struct vb2_queue *vbq,
 		merr("fimc_is_queue_setup is fail(%d)", vctx, ret);
 
 	return ret;
-}
-
-static int fimc_is_vra_buffer_prepare(struct vb2_buffer *vb)
-{
-	return fimc_is_queue_prepare(vb);
-}
-
-static inline void fimc_is_vra_wait_prepare(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_prepare(vbq);
-}
-
-static inline void fimc_is_vra_wait_finish(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_finish(vbq);
 }
 
 static int fimc_is_vra_start_streaming(struct vb2_queue *vbq,
@@ -738,31 +733,14 @@ static void fimc_is_vra_buffer_finish(struct vb2_buffer *vb)
 	}
 }
 
-static int fimc_is_vra_buffer_init(struct vb2_buffer *vb)
-{
-	struct vb2_v4l2_buffer *vb2_v4l2_buf = to_vb2_v4l2_buffer(vb);
-	struct fimc_is_vb2_buf *vbuf = vb_to_fimc_is_vb2_buf(vb2_v4l2_buf);
-	struct fimc_is_video_ctx *vctx = vb->vb2_queue->drv_priv;
-	unsigned int plane;
-
-	vbuf->ops = vctx->fimc_is_vb2_buf_ops;
-
-	for (plane = 0; plane < vb->num_planes; ++plane) {
-		vbuf->kva[plane] = vbuf->ops->plane_kvaddr(vbuf, plane);
-		vbuf->dva[plane] = vbuf->ops->plane_dvaddr(vbuf, plane);
-	}
-
-	return 0;
-}
-
 const struct vb2_ops fimc_is_vra_qops = {
 	.queue_setup		= fimc_is_vra_queue_setup,
-	.buf_init		= fimc_is_vra_buffer_init,
-	.buf_prepare		= fimc_is_vra_buffer_prepare,
+	.buf_init		= fimc_is_queue_buffer_init,
+	.buf_prepare		= fimc_is_queue_buffer_prepare,
 	.buf_queue		= fimc_is_vra_buffer_queue,
 	.buf_finish		= fimc_is_vra_buffer_finish,
-	.wait_prepare		= fimc_is_vra_wait_prepare,
-	.wait_finish		= fimc_is_vra_wait_finish,
+	.wait_prepare		= fimc_is_queue_wait_prepare,
+	.wait_finish		= fimc_is_queue_wait_finish,
 	.start_streaming	= fimc_is_vra_start_streaming,
 	.stop_streaming		= fimc_is_vra_stop_streaming,
 };

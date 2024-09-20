@@ -290,37 +290,6 @@ static struct regulator_desc regulators[S2MPB03_REGULATOR_MAX] = {
 };
 
 #ifdef CONFIG_OF
-#ifdef CONFIG_SEC_PM
-static void s2mpb03_pmic_dt_parse_ldo_slew(struct device_node *pmic_np,
-					struct s2mpb03_platform_data *pdata)
-{
-	u8 val;
-
-	pdata->disable_ldo2_remote_sense =
-		of_property_read_bool(pmic_np, "disable_ldo2_remote_sense");
-
-	if (of_property_read_u8(pmic_np, "slew2,dram_dsch1", &val))
-		val = -1;
-	pdata->slew2.dram_dsch1 = val;
-
-	if (of_property_read_u8(pmic_np, "slew2,dram_dsch2", &val))
-		val = -1;
-	pdata->slew2.dram_dsch2 = val;
-
-	if (of_property_read_u8(pmic_np, "slew2,l5_slew", &val))
-		val = -1;
-	pdata->slew2.l5_slew = val;
-
-	if (of_property_read_u8(pmic_np, "slew2,l6_slew", &val))
-		val = -1;
-	pdata->slew2.l6_slew = val;
-
-	if (of_property_read_u8(pmic_np, "slew2,l7_slew", &val))
-		val = -1;
-	pdata->slew2.l7_slew = val;
-}
-#endif /* CONFIG_SEC_PM */
-
 static int s2mpb03_pmic_dt_parse_pdata(struct device *dev,
 					struct s2mpb03_platform_data *pdata)
 {
@@ -334,10 +303,6 @@ static int s2mpb03_pmic_dt_parse_pdata(struct device *dev,
 		return -ENODEV;
 	}
 	pdata->wakeup = of_property_read_bool(pmic_np, "s2mpb03,wakeup");
-
-#ifdef CONFIG_SEC_PM
-	s2mpb03_pmic_dt_parse_ldo_slew(pmic_np, pdata);
-#endif
 
 	regulators_np = of_find_node_by_name(pmic_np, "regulators");
 	if (!regulators_np) {
@@ -391,60 +356,6 @@ static int s2mpb03_pmic_dt_parse_pdata(struct s2mpb03_dev *iodev,
 	return 0;
 }
 #endif /* CONFIG_OF */
-
-#ifdef CONFIG_SEC_PM
-static inline void s2mpb03_update_ldo_slew(struct i2c_client *i2c,
-		const u8 addr, const u8 val, const u8 mask, const u8 shift)
-{
-	int ret;
-
-	ret = s2mpb03_update_reg(i2c, addr, val << shift, mask << shift);
-	if (ret < 0)
-		dev_err(&i2c->dev, "%s: failed to update ldo slew\n"
-				"\t(addr:0x%02X, shift:0x%02X)\n", __func__,
-				addr, shift);
-}
-
-static void s2mpb03_pmic_set_ldo_slew(struct i2c_client *i2c,
-					struct s2mpb03_platform_data *pdata)
-{
-	u8 val;
-	const u8 dsch_mask = 1;
-	const u8 ldo_slew_mask = 3;
-
-	val = !pdata->disable_ldo2_remote_sense;
-	s2mpb03_update_reg(i2c, S2MPB03_REG_LDO_SLEW1, val, 1);
-
-	val = pdata->slew2.dram_dsch1;
-	if (val <= dsch_mask)
-		s2mpb03_update_ldo_slew(i2c, S2MPB03_REG_LDO_SLEW2, val,
-				dsch_mask, 0);
-
-	val = pdata->slew2.dram_dsch2;
-	if (val <= dsch_mask)
-		s2mpb03_update_ldo_slew(i2c, S2MPB03_REG_LDO_SLEW2, val,
-				dsch_mask, 1);
-
-	val = pdata->slew2.l5_slew;
-	if (val <= ldo_slew_mask)
-		s2mpb03_update_ldo_slew(i2c, S2MPB03_REG_LDO_SLEW2, val,
-				ldo_slew_mask, 6);
-
-	val = pdata->slew2.l6_slew;
-	if (val <= ldo_slew_mask)
-		s2mpb03_update_ldo_slew(i2c, S2MPB03_REG_LDO_SLEW2, val,
-				ldo_slew_mask, 4);
-
-	val = pdata->slew2.l7_slew;
-	if (val <= ldo_slew_mask)
-		s2mpb03_update_ldo_slew(i2c, S2MPB03_REG_LDO_SLEW2, val,
-				ldo_slew_mask, 2);
-
-	s2mpb03_read_reg(i2c, S2MPB03_REG_LDO_SLEW2, &val);
-	dev_info(&i2c->dev, "%s: SLEW2 val=0x%02X\n", __func__, val);
-
-}
-#endif /* CONFIG_SEC_PM */
 
 static int s2mpb03_pmic_probe(struct i2c_client *i2c,
 				const struct i2c_device_id *dev_id)
@@ -523,10 +434,6 @@ static int s2mpb03_pmic_probe(struct i2c_client *i2c,
 			goto err_s2mpb03_data;
 		}
 	}
-
-#ifdef CONFIG_SEC_PM
-	s2mpb03_pmic_set_ldo_slew(i2c, pdata);
-#endif
 
 	return ret;
 

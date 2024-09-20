@@ -26,38 +26,43 @@
 #define __CCIC_NOTIFIER_H__
 
 /* CCIC notifier call sequence,
- * largest priority number device will be called first. */
+ * largest priority number device will be called first.
+ * refer Team Docs > ETC > 1. USB Type C >
+ * code managing > ccic_notifier, pdic_notifier
+ */
 typedef enum {
-	CCIC_NOTIFY_DEV_INITIAL = 0,
-	CCIC_NOTIFY_DEV_USB,
-	CCIC_NOTIFY_DEV_BATTERY,
-	CCIC_NOTIFY_DEV_PDIC,
-	CCIC_NOTIFY_DEV_MUIC,
-	CCIC_NOTIFY_DEV_CCIC,
-#ifdef CONFIG_USB_TYPEC_MANAGER_NOTIFIER
-	CCIC_NOTIFY_DEV_MANAGER,
-#endif
-	CCIC_NOTIFY_DEV_DP,
-	CCIC_NOTIFY_DEV_USB_DP,
+	CCIC_NOTIFY_DEV_INITIAL 		= 0,
+	CCIC_NOTIFY_DEV_USB 			= 1,
+	CCIC_NOTIFY_DEV_BATTERY 		= 2,
+	CCIC_NOTIFY_DEV_PDIC 			= 3,
+	CCIC_NOTIFY_DEV_MUIC 			= 4,
+	CCIC_NOTIFY_DEV_CCIC 			= 5,
+	CCIC_NOTIFY_DEV_MANAGER 		= 6,
+	CCIC_NOTIFY_DEV_DP 				= 7,
+	CCIC_NOTIFY_DEV_USB_DP 			= 8,
+	CCIC_NOTIFY_DEV_SUB_BATTERY 	= 9,
+	CCIC_NOTIFY_DEV_SECOND_MUIC 	= 10,
 } ccic_notifier_device_t;
 
 typedef enum {
-	CCIC_NOTIFY_ID_INITIAL = 0,
-	CCIC_NOTIFY_ID_ATTACH,
-	CCIC_NOTIFY_ID_RID,
-	CCIC_NOTIFY_ID_USB,
-#ifdef CONFIG_USB_TYPEC_MANAGER_NOTIFIER
-	CCIC_NOTIFY_ID_POWER_STATUS,
-#endif
-	CCIC_NOTIFY_ID_WATER,
-	CCIC_NOTIFY_ID_VCONN,
-	CCIC_NOTIFY_ID_DP_CONNECT,
-	CCIC_NOTIFY_ID_DP_HPD,
-	CCIC_NOTIFY_ID_DP_LINK_CONF,
-	CCIC_NOTIFY_ID_USB_DP,
-	CCIC_NOTIFY_ID_ROLE_SWAP,
-	CCIC_NOTIFY_ID_FAC,
-	CCIC_NOTIFY_ID_CC_PIN_STATUS,
+	CCIC_NOTIFY_ID_INITIAL 			= 0,
+	CCIC_NOTIFY_ID_ATTACH 			= 1,
+	CCIC_NOTIFY_ID_RID 				= 2,
+	CCIC_NOTIFY_ID_USB 				= 3,
+	CCIC_NOTIFY_ID_POWER_STATUS 	= 4,
+	CCIC_NOTIFY_ID_WATER 			= 5,
+	CCIC_NOTIFY_ID_VCONN 			= 6,
+	CCIC_NOTIFY_ID_OTG 				= 7,
+	CCIC_NOTIFY_ID_TA 				= 8,
+	CCIC_NOTIFY_ID_DP_CONNECT 		= 9,
+	CCIC_NOTIFY_ID_DP_HPD 			= 10,
+	CCIC_NOTIFY_ID_DP_LINK_CONF 	= 11,
+	CCIC_NOTIFY_ID_USB_DP 			= 12,
+	CCIC_NOTIFY_ID_ROLE_SWAP 		= 13,
+	CCIC_NOTIFY_ID_FAC 				= 14,
+	CCIC_NOTIFY_ID_CC_PIN_STATUS 	= 15,
+	CCIC_NOTIFY_ID_WATER_CABLE 		= 16,
+	CCIC_NOTIFY_ID_POGO	 		= 17,
 } ccic_notifier_id_t;
 
 typedef struct
@@ -120,6 +125,15 @@ typedef enum {
 	State_PE_SRC_Send_Capabilities = 3,
 	State_PE_SNK_Wait_for_Capabilities = 17,
 } ccic_notifier_pd_state_t;
+
+typedef enum
+{
+	Rp_None = 0,
+	Rp_56K = 1,	/* 80uA */
+	Rp_22K = 2,	/* 180uA */
+	Rp_10K = 3,	/* 330uA */
+	Rp_Abnormal = 4,
+} CCIC_RP_CurrentLvl;
 #endif
 
 /* ID = 2 : RID */
@@ -180,7 +194,6 @@ typedef enum
 	USB_STATUS_NOTIFY_ATTACH_DFP = 1, // Host
 	USB_STATUS_NOTIFY_ATTACH_UFP = 2, // Device
 	USB_STATUS_NOTIFY_ATTACH_DRP = 3, // Dual role
-	USB_STATUS_NOTIFY_ATTACH_HPD = 4, // DP : Hot Plugged Detect
 } USB_STATUS;
 
 /* TODO:  */
@@ -202,70 +215,15 @@ extern int ccic_notifier_register(struct notifier_block *nb,
 extern int ccic_notifier_unregister(struct notifier_block *nb);
 extern int ccic_notifier_init(void);
 
-#define CCIC_NOTI_DEST_NUM	(10)
-#define CCIC_NOTI_ID_NUM	(14)
+#define CCIC_NOTI_DEST_NUM	(12)
+#define CCIC_NOTI_ID_NUM	(18)
 #define CCIC_NOTI_RID_NUM	(8)
 #define CCIC_NOTI_USB_STATUS_NUM (5)
 #define CCIC_NOTI_PIN_STATUS_NUM	(8)
 
-static const char CCIC_NOTI_DEST_Print[CCIC_NOTI_DEST_NUM][10] = {
-    {"INITIAL"},
-    {"USB"},
-    {"BATTERY"},
-    {"PDIC"},
-    {"MUIC"},
-    {"CCIC"},
-    {"MANAGER"},
-    {"DP"},
-    {"DPUSB"},
-    {"ALL"},
-};
-
-static const char CCIC_NOTI_ID_Print[CCIC_NOTI_ID_NUM][20] = {
-    {"ID_INITIAL"},
-    {"ID_ATTACH"},
-    {"ID_RID"},
-    {"ID_USB"},
-    {"ID_POWER_STATUS"},
-    {"ID_WATER"},
-    {"ID_VCONN"},
-    {"ID_DP_CONNECT"},
-    {"ID_DP_HPD"},
-    {"ID_DP_LINK_CONF"},
-    {"ID_DP_USB"},
-    {"ID_ROLE_SWAP"},
-    {"ID_FAC"},
-    {"ID_PIN_STATUS"},
-};
-
-static const char CCIC_NOTI_RID_Print[CCIC_NOTI_RID_NUM][15] = {
-    {"RID_UNDEFINED"},
-    {"RID_000K"},
-    {"RID_001K"},
-    {"RID_255K"},
-    {"RID_301K"},
-    {"RID_523K"},
-    {"RID_619K"},
-    {"RID_OPEN"},
-};
-
-static const char CCIC_NOTI_USB_STATUS_Print[CCIC_NOTI_USB_STATUS_NUM][20] = {
-    {"USB_DETACH"},
-    {"USB_ATTACH_DFP"},
-    {"USB_ATTACH_UFP"},
-    {"USB_ATTACH_DRP"},
-    {"USB_ATTACH_NO_USB"},
-};
-
-static const char CCIC_NOTI_PIN_STATUS_Print[CCIC_NOTI_PIN_STATUS_NUM][20] = {
-    {"NO_DETERMINATION"},
-    {"CC1_ACTIVE"},
-    {"CC2_ACTIVE"},
-    {"AUDIO_ACCESSORY"},
-    {"DEBUG_ACCESSORY"},
-    {"CCIC_ERROR"},
-    {"DISABLED"},
-    {"RFU"},
-};
+extern char CCIC_NOTI_DEST_Print[CCIC_NOTI_DEST_NUM][10];
+extern char CCIC_NOTI_ID_Print[CCIC_NOTI_ID_NUM][20];
+extern char CCIC_NOTI_RID_Print[CCIC_NOTI_RID_NUM][15];
+extern char CCIC_NOTI_USB_STATUS_Print[CCIC_NOTI_USB_STATUS_NUM][20];
 #endif /* __CCIC_NOTIFIER_H__ */
 

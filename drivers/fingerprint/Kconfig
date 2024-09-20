@@ -9,47 +9,17 @@ menuconfig SENSORS_FINGERPRINT
 	  doesn't affect the kernel.
 	  If unsure, say Y.
 
-config SENSORS_FPRINT_SECURE
-	tristate "fingerprint sensor support"
-	default n
-	help
-	  If you say yes here you get support for Trustzone.
-	  In case of user binary, fingerprint sensor operates within trustzone.
-	  If this feature enabled, spi communication is controlled by Trusted Application.
-	  Then it should be enabled in the user binary.
-
-config SENSORS_FINGERPRINT_32BITS_PLATFORM_ONLY
-	tristate "Fingerprint sensor supports only 32bits platform"
-	default n
-	help
-	  If you say yes here the non TZ device driver will only supports
-	  32bits platform.
-	  In case of Exynos7580, this feature should be enabled.
-	  And you should be use the compat_ioctl not the unlocked_ioctl.
-
-config SENSORS_VFS7XXX
-	tristate "VFS7XXX fingerprint sensor support"
-	default n
-	help
-	  Fingerprint sensor driver.
-	  If you say yes here you get support for viper2 sensor.
-	  Viper2 is the touch type fingerprint sensor.
-	  Viper2 82E5 module can support WOG mode.
-
-config SENSORS_VFS8XXX
-	tristate "VFS8XXX fingerprint sensor support"
-	default n
-	help
-	  Fingerprint sensor driver.
-	  If you say yes here you get support for Namsan sensor.
-	  Namsan is the touch type fingerprint sensor.
-	  Namsan module can support WOF mode.
-
+if SENSORS_FINGERPRINT
 config SENSORS_ET5XX
-	tristate "ET5XX fingerprint sensor supprot"
+	tristate "ET5XX fingerprint sensor support"
 	default n
 	help
-	  Fingerprint sensor driver.
-	  If you say yes here you get support for ET5XX sensor.
-	  ET5XX is the touch type fingerprint sensor.
-	  ET5XX module can support WOF mode.
+	  If you say yes here you get support for Egistec's
+	  fingerprint sensor ET5XX.
+config SENSORS_ET7XX
+	tristate "ET7XX fingerprint sensor support"
+	default n
+	help
+	  If you say yes here you get support for Egistec's
+	  fingerprint sensor ET7XX.
+endif

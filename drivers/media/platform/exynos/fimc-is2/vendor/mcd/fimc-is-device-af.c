@@ -39,6 +39,48 @@
 #include "fimc-is-device-sensor-peri.h"
 
 #define FIMC_IS_AF_DEV_NAME "exynos-fimc-is-af"
+#define AK737X_MAX_PRODUCT_LIST		6
+
+bool check_af_init_rear = false;
+bool check_af_init_rear2 = false;
+
+int fimc_is_af_i2c_read_8(struct i2c_client *client,
+	u8 addr, u8 *val)
+{
+	int ret = 0;
+	struct i2c_msg msg[2];
+	u8 wbuf[1];
+
+	if (!client->adapter) {
+		pr_err("Could not find adapter!\n");
+		ret = -ENODEV;
+		goto p_err;
+	}
+
+	/* 1. I2C operation for writing. */
+	msg[0].addr = client->addr;
+	msg[0].flags = 0; /* write : 0, read : 1 */
+	msg[0].len = 1;
+	msg[0].buf = wbuf;
+	wbuf[0] = addr;
+
+	/* 2. I2C operation for reading data. */
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 1;
+	msg[1].buf = val;
+
+	ret = fimc_is_i2c_transfer(client->adapter, msg, 2);
+	if (ret < 0) {
+		pr_err("i2c treansfer fail");
+		goto p_err;
+	}
+
+	i2c_info("I2CR08(%d) [0x%04X] : 0x%04X\n", client->addr, addr, *val);
+	return 0;
+p_err:
+	return ret;
+}
 
 int fimc_is_af_i2c_read(struct i2c_client *client, u16 addr, u16 *data)
 {
@@ -239,7 +281,7 @@ int16_t fimc_is_af_enable(void *device, bool onoff)
 	struct fimc_is_device_af *af_device = (struct fimc_is_device_af *)device;
 	struct fimc_is_core *core;
 	bool af_regulator = false, io_regulator = false;
-	struct fimc_is_vender_specific *specific;
+	bool camera_running;
 
 	core = (struct fimc_is_core *)dev_get_drvdata(fimc_is_dev);
 	if (!core) {
@@ -247,10 +289,10 @@ int16_t fimc_is_af_enable(void *device, bool onoff)
 		return -ENODEV;
 	}
 
-	specific = core->vender.private_data;
+	camera_running = fimc_is_vendor_check_camera_running(SENSOR_POSITION_REAR);
 
-	pr_info("af_noise : running_rear_camera = %d, onoff = %d\n", specific->running_rear_camera, onoff);
-	if (!specific->running_rear_camera) {
+	pr_info("af_noise : camera_running = %d, onoff = %d\n", camera_running, onoff);
+	if (!camera_running) {
 		if (onoff) {
 			fimc_is_af_power(af_device, true);
 			ret = fimc_is_af_i2c_write(af_device->client, 0x02, 0x00);
@@ -292,7 +334,7 @@ int16_t fimc_is_af_enable(void *device, bool onoff)
 	return ret;
 
 power_off:
-	if (!specific->running_rear_camera) {
+	if (!camera_running) {
 		af_regulator = fimc_is_check_regulator_status("VDDAF_COMMON_CAM");
 		io_regulator = fimc_is_check_regulator_status("VDDIO_1.8V_CAM");
 		if (af_regulator && io_regulator) {
@@ -304,22 +346,118 @@ power_off:
 	return ret;
 }
 
+int fimc_is_af_init(struct fimc_is_actuator *actuator, struct i2c_client *client, int val)
+{
+	int ret = 0;
+	int i = 0;
+	u32 product_id_list[AK737X_MAX_PRODUCT_LIST] = {0, };
+	u32 product_id_len = 0;
+	u8 product_id = 0;
+	const u32 *product_id_spec;
+
+	struct device *dev;
+	struct device_node *dnode;
+
+	WARN_ON(!actuator);
+
+	if (unlikely(!client)) {
+		err("client is NULL");
+		ret = -EINVAL;
+		goto p_err;
+	}
+
+	dev = &client->dev;
+	dnode = dev->of_node;
+
+	product_id_spec = of_get_property(dnode, "vendor_product_id", &product_id_len);
+	if (!product_id_spec)
+		err("vendor_product_id num read is fail(%d)", ret);
+
+	product_id_len /= (unsigned int)sizeof(*product_id_spec);
+
+	ret = of_property_read_u32_array(dnode, "vendor_product_id", product_id_list, product_id_len);
+	if (ret)
+		err("vendor_product_id read is fail(%d)", ret);
+
+	if (product_id_len < 2 || (product_id_len % 2) != 0
+		|| product_id_len > AK737X_MAX_PRODUCT_LIST) {
+		err("[%s] Invalid product_id in dts\n", __func__);
+		ret = -EINVAL;
+		goto p_err;
+	}
+
+	if (actuator->vendor_use_standby_mode) {
+		/* Go standby mode */
+		ret = fimc_is_af_i2c_write(client, 0x02, 0x40);
+		if (ret < 0)
+			goto p_err;
+		msleep(1);
+	}
+
+	for (i = 0; i < product_id_len; i += 2) {
+		ret = fimc_is_af_i2c_read_8(client, product_id_list[i], &product_id);
+		if (ret < 0) {
+			goto p_err;
+		}
+
+		info("[%s][%d] dt[addr=0x%X,id=0x%X], product_id=0x%X\n",
+				__func__, actuator->device, product_id_list[i], product_id_list[i+1], product_id);
+
+		if (product_id_list[i+1] == product_id) {
+			actuator->vendor_product_id = product_id_list[i+1];
+			break;
+		}
+	}
+
+	if (i == product_id_len) {
+		err("[%s] Invalid product_id in module\n", __func__);
+		ret = -EINVAL;
+		goto p_err;
+	}
+
+	/* Go sleep mode */
+	ret = fimc_is_af_i2c_write(client, 0x02, 0x20);
+	if (ret < 0)
+		goto p_err;
+
+p_err:
+	return ret;
+}
+
 int16_t fimc_is_af_move_lens(struct fimc_is_core *core)
 {
 	int ret = 0;
-	struct fimc_is_vender_specific *specific = core->vender.private_data;
 	struct fimc_is_actuator *actuator = NULL;
 	struct i2c_client *client = NULL;
 	struct fimc_is_device_sensor *device;
+	bool camera_running;
+
+	camera_running = fimc_is_vendor_check_camera_running(SENSOR_POSITION_REAR);
 
 	device = &core->sensor[SENSOR_POSITION_REAR];
 	actuator = device->actuator[SENSOR_POSITION_REAR];
 	client = actuator->client;
 
-	pr_info("fimc_is_af_move_lens : running_rear_camera = %d\n", specific->running_rear_camera);
-	if (!specific->running_rear_camera) {
-		/* wide cam AF i2c pin is controlled at 2l3 power sequence. So not controlled here.*/
-		//fimc_is_i2c_pin_config(client, true);
+	info("fimc_is_af_move_lens : camera_running = %d\n", camera_running);
+	if (!camera_running) {
+		if (actuator->vendor_use_standby_mode) {
+			if (!check_af_init_rear) {
+				ret = fimc_is_af_init(actuator, client, 0);
+				if (ret) {
+					err("v4l2_actuator_call(init) is fail(%d)", ret);
+					return ret;
+				}
+				check_af_init_rear = true;
+			}
+
+			/* Go standby mode */
+			ret = fimc_is_af_i2c_write(client, 0x02, 0x40);
+			if (ret) {
+				err("i2c write fail\n");
+			}
+			msleep(1);
+			info("[%s] Set standy mode\n", __func__);
+		}
 
 		ret = fimc_is_af_i2c_write(client, 0x00, 0x80);
 		if (ret) {
@@ -335,8 +473,6 @@ int16_t fimc_is_af_move_lens(struct fimc_is_core *core)
 		if (ret) {
 			err("i2c write fail\n");
 		}
-
-		//fimc_is_i2c_pin_config(client, false);
 	}
 
 	return ret;
@@ -346,18 +482,37 @@ int16_t fimc_is_af_move_lens(struct fimc_is_core *core)
 int16_t fimc_is_af_move_lens_rear2(struct fimc_is_core *core)
 {
 	int ret = 0;
-	struct fimc_is_vender_specific *specific = core->vender.private_data;
 	struct fimc_is_actuator *actuator = NULL;
 	struct i2c_client *client = NULL;
 	struct fimc_is_device_sensor *device;
+	bool camera_running_rear2;
+
+	camera_running_rear2 = fimc_is_vendor_check_camera_running(SENSOR_POSITION_REAR2);
 
 	device = &core->sensor[SENSOR_POSITION_REAR2];
 	actuator = device->actuator[SENSOR_POSITION_REAR2];
 	client = actuator->client;
 
-	pr_info("fimc_is_af_move_lens : running_rear2_camera = %d\n", specific->running_rear_second_camera);
-	if (!specific->running_rear_second_camera) {
-		fimc_is_i2c_pin_config(client, true);
+	info("fimc_is_af_move_lens : camera_running_rear2 = %d\n", camera_running_rear2);
+	if (!camera_running_rear2) {
+		if (actuator->vendor_use_standby_mode) {
+			if (!check_af_init_rear2) {
+				ret = fimc_is_af_init(actuator, client, 0);
+				if (ret) {
+					err("v4l2_actuator_call(init) is fail(%d)", ret);
+					return ret;
+				}
+				check_af_init_rear2 = true;
+			}
+
+			/* Go standby mode */
+			ret = fimc_is_af_i2c_write(client, 0x02, 0x40);
+			if (ret) {
+				err("i2c write fail\n");
+			}
+			msleep(1);
+			info("[%s] Set standy mode\n", __func__);
+		}
 
 		ret = fimc_is_af_i2c_write(client, 0x00, 0x80);
 		if (ret) {
@@ -373,8 +528,6 @@ int16_t fimc_is_af_move_lens_rear2(struct fimc_is_core *core)
 		if (ret) {
 			err("i2c write fail\n");
 		}
-
-		fimc_is_i2c_pin_config(client, false);
 	}
 
 	return ret;

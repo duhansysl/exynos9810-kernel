@@ -26,9 +26,7 @@
 #include <soc/samsung/cal-if.h>
 #include <dt-bindings/soc/samsung/exynos-ss-table.h>
 
-#ifdef CONFIG_SEC_DEBUG
 #include <linux/sec_debug.h>
-#endif
 #ifdef CONFIG_SEC_PM_DEBUG
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
@@ -42,8 +40,6 @@ extern void register_hook_logbuf(void (*)(const char));
 extern void register_hook_logbuf(void (*)(const char *, size_t));
 #endif
 extern void register_hook_logger(void (*)(const char *, const char *, size_t));
-
-typedef int (*ess_initcall_t)(const struct device_node *);
 
 struct exynos_ss_interface {
 	struct exynos_ss_log *info_event;
@@ -77,6 +73,72 @@ static struct exynos_ss_interface ess_info __attribute__ ((used));
 struct exynos_ss_base ess_base;
 struct exynos_ss_log *ess_log = NULL;
 struct exynos_ss_desc ess_desc;
+
+void sec_debug_get_kevent_info(struct ess_info_offset *p, int type)
+{
+	unsigned long kevent_base_va = (unsigned long)(ess_log->task);
+	unsigned long kevent_base_pa = ess_items[ess_desc.kevents_num].entry.paddr;
+
+	switch (type) {
+	case DSS_KEVENT_TASK:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->task) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __task_log);
+		p->per_core = 1;
+		break;
+
+	case DSS_KEVENT_WORK:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->work) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __work_log);
+		p->per_core = 1;
+		break;
+
+	case DSS_KEVENT_IRQ:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->irq) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM * 2;
+		p->size = sizeof(struct __irq_log);
+		p->per_core = 1;
+		break;
+
+	case DSS_KEVENT_FREQ:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->freq) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __freq_log);
+		p->per_core = 0;
+		break;
+
+	case DSS_KEVENT_IDLE:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->cpuidle) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __cpuidle_log);
+		p->per_core = 1;
+		break;
+
+	case DSS_KEVENT_THRM:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->thermal) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __thermal_log);
+		p->per_core = 0;
+		break;
+
+	case DSS_KEVENT_ACPM:
+		p->base = kevent_base_pa + (unsigned long)(ess_log->acpm) - kevent_base_va;
+		p->nr = ESS_LOG_MAX_NUM;
+		p->size = sizeof(struct __acpm_log);
+		p->per_core = 0;
+		break;
+
+	default:
+		p->base = 0;
+		p->nr = 0;
+		p->size = 0;
+		p->per_core = 0;
+		break;
+	}
+
+	p->last = sec_debug_get_kevent_index_addr(type);
+}
 
 int exynos_ss_get_debug_level(void)
 {
@@ -185,6 +247,16 @@ static inline void exynos_ss_hook_logger(const char *name,
 	}
 }
 
+size_t exynos_ss_get_curr_ptr_for_sysrq(void)
+{
+#ifdef CONFIG_SEC_DEBUG_SYSRQ_KMSG
+	struct exynos_ss_item *item = &ess_items[ess_desc.log_kernel_num];
+	return (size_t)item->curr_ptr;
+#else
+	return 0;
+#endif
+}
+
 #ifdef CONFIG_SEC_PM_DEBUG
 static bool sec_log_full;
 #endif
@@ -198,12 +270,12 @@ static inline void exynos_ss_hook_logbuf(const char buf)
 	if (likely(ess_base.enabled && item->entry.enabled)) {
 		if (exynos_ss_check_eob(item, 1)) {
 			item->curr_ptr = item->head_ptr;
+#ifdef CONFIG_SEC_DEBUG_LAST_KMSG
+			*((unsigned long long *)(item->head_ptr + item->entry.size - (size_t)0x08)) = SEC_LKMSG_MAGICKEY;
+#endif
 #ifdef CONFIG_SEC_PM_DEBUG
 			if (unlikely(!sec_log_full))
 				sec_log_full = true;
-#endif
-#ifdef CONFIG_SEC_DEBUG_LAST_KMSG
-			*((unsigned long long *)(item->head_ptr + item->entry.size - (size_t)0x08)) = SEC_LKMSG_MAGICKEY;
 #endif
 		}
 
@@ -226,12 +298,12 @@ static inline void exynos_ss_hook_logbuf(const char *buf, size_t size)
 
 		if (exynos_ss_check_eob(item, size)) {
 			item->curr_ptr = item->head_ptr;
+#ifdef CONFIG_SEC_DEBUG_LAST_KMSG
+			*((unsigned long long *)(item->head_ptr + item->entry.size - (size_t)0x08)) = SEC_LKMSG_MAGICKEY;
+#endif
 #ifdef CONFIG_SEC_PM_DEBUG
 			if (unlikely(!sec_log_full))
 				sec_log_full = true;
-#endif
-#ifdef CONFIG_SEC_DEBUG_LAST_KMSG
-			*((unsigned long long *)(item->head_ptr + item->entry.size - (size_t)0x08)) = SEC_LKMSG_MAGICKEY;
 #endif
 		}
 

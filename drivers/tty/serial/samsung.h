@@ -80,7 +80,7 @@ struct s3c24xx_uart_port {
 	u32				use_default_irq;
 	unsigned long			qos_timeout;
 	unsigned int			usi_v2;
-	unsigned int		uart_panic_log;
+	unsigned int			uart_panic_log;
 	struct pinctrl_state 	*uart_pinctrl_tx_dat;
 	struct pinctrl_state 	*uart_pinctrl_rts;
 	struct pinctrl_state 	*uart_pinctrl_default;
@@ -99,9 +99,11 @@ struct s3c24xx_uart_port {
 
 	unsigned int			in_band_wakeup;
 	unsigned int dbg_mode;
-
 	unsigned int			uart_logging;
 	struct uart_local_buf		uart_local_buf;
+
+	unsigned int wake_peer_en;
+	unsigned int wake_peer_pended;
 };
 
 /* conversion functions */

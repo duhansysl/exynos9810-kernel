@@ -243,10 +243,6 @@ struct global_attr {
 			 const char *c, size_t count);
 };
 
-#define cpufreq_freq_attr_wo(_name)		\
-static struct freq_attr _name =			\
-__ATTR(_name, 0200, NULL, store_##_name)
-
 #define define_one_global_ro(_name)		\
 static struct global_attr _name =		\
 __ATTR(_name, 0444, show_##_name, NULL)
@@ -898,20 +894,6 @@ static inline int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 		pr_err("%s: Invalid relation: %d\n", __func__, relation);
 		return -EINVAL;
 	}
-}
-
-static inline int cpufreq_table_count_valid_entries(const struct cpufreq_policy *policy)
-{
-	struct cpufreq_frequency_table *pos;
-	int count = 0;
-
-	if (unlikely(!policy->freq_table))
-		return 0;
-
-	cpufreq_for_each_valid_entry(pos, policy->freq_table)
-		count++;
-
-	return count;
 }
 #else
 static inline int cpufreq_boost_trigger_state(int state)

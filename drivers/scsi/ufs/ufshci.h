@@ -246,12 +246,6 @@ enum link_status {
 /*
  * UFS Protector configuration
  */
-#define UFS_DISK_ENC_MODE	(1 << 0)
-#define UFS_FILE_ENC_MODE	(1 << 1)
-
-#define UFSHCI_SECTOR_SIZE                      0x1000
-#define MIN_SECTOR_SIZE                         0x200
-
 /* UIC Commands */
 enum uic_cmd_dme {
 	UIC_CMD_DME_GET			= 0x01,

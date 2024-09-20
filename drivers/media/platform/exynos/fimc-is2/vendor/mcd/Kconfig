@@ -10,6 +10,18 @@ config CAMERA_EEPROM_SUPPORT_FRONT
         default n
         help
           Enable eeprom for front cam.
+config CAMERA_OTPROM_SUPPORT_FRONT
+        bool "Enable otprom for front cam"
+        depends on VENDER_MCD
+        default n
+        help
+          Enable otprom for front cam.
+config CAMERA_FROM
+        bool "Enable from for cam"
+        depends on VENDER_MCD
+        default n
+        help
+          Enable from for cam.
 config COMPANION_USE
         bool "Use companion"
         depends on VENDER_MCD
@@ -100,42 +112,36 @@ config TORCH_CURRENT_CHANGE_SUPPORT
         default n
         help
           Change torch current in recording mode.
-config CAMERA_HERO
-        bool "This camera is hero project"
+config FLASH_CURRENT_CHANGE_SUPPORT
+        bool "Change flash current in capturing image"
         depends on VENDER_MCD
         default n
         help
-          This camera is hero project.
-config CAMERA_VJFLTE
-        bool "This camera is vjflte project"
-        depends on VENDER_MCD
-        default n
-        help
-          This camera is vjflte project.
+           Change torch current in capturing image.
 config OIS_USE_RUMBA_S4
         bool "Use RUMBA S4 ois driver IC"
         depends on OIS_USE
         default n
         help
           Use RUMBA S4 ois driver IC.
-config CAMERA_STAR
-        bool "This caamera is star project"
-        depends on VENDER_MCD
-        default n
-        help
-          This caamera is star project.
-config CAMERA_STAR2
-        bool "This caamera is star2 project"
-        depends on VENDER_MCD
-        default n
-        help
-          This caamera is star2 project.
 config CAMERA_CROWN
         bool "This caamera is crown project"
         depends on VENDER_MCD
         default n
         help
           This camera is crown project.
+config CAMERA_RNS_V07
+        bool "This caamera is rns_v07 project"
+        depends on VENDER_MCD
+        default n
+        help
+          This camera is rns_v07 project.
+config CAMERA_ATT_V03
+        bool "This caamera is att_v03 project"
+        depends on VENDER_MCD
+        default n
+        help
+          This camera is att_v03 project.
 config OIS_USE_RUMBA_S6
         bool "Use RUMBA S6 ois driver IC"
         depends on OIS_USE
@@ -160,3 +166,21 @@ config USE_CAMERA_LDU
         default n
         help
           Use Camera LDU.
+config CAMERA_CIS_IMX316_BUCK_USE
+        bool "Use isl91128 for tof"
+        depends on VENDER_MCD
+        default n
+        help
+          Use isl91128.
+config CAMERA_USE_MCU
+	bool "Use Camera mcu"
+	depends on VENDER_MCD
+	default n
+	help
+          Use Camera MCU.
+config SENSORCORE_MCU_CONTROL
+	bool "Use sensor core mcu control"
+	depends on VENDER_MCD
+	default n
+	help
+          Use sensor control mcu.

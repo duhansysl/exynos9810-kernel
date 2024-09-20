@@ -36,17 +36,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/s2dos05.h>
 #include <linux/regulator/of_regulator.h>
-#ifdef CONFIG_SEC_PM
-#include <linux/sec_sysfs.h>
-#ifdef CONFIG_SEC_FACTORY
-#include <linux/fb.h>
-#endif /* CONFIG_SEC_FACTORY */
-#endif /* CONFIG_SEC_PM */
-
-#ifdef CONFIG_SEC_PM
-struct device *sec_disp_pmic_dev;
-static struct s2dos05_data *s2dos05_info;
-#endif /* CONFIG_SEC_PM */
 
 struct s2dos05_data {
 	struct s2dos05_dev *iodev;
@@ -267,30 +256,6 @@ static int s2m_set_voltage_time_sel(struct regulator_dev *rdev,
 	return 0;
 }
 
-#ifdef CONFIG_SEC_PM
-static int s2m_set_elvss_short_detection(struct regulator_dev *rdev,
-					 bool enable, int lv_uA)
-{
-	struct s2dos05_data *info = rdev_get_drvdata(rdev);
-	struct i2c_client *i2c = info->iodev->i2c;
-	int ret = -ENODEV;
-	u8 lv = 0, val, mask;
-
-	if (enable) {
-		lv = lv_uA / 2000 - 1;
-
-		if (lv > 3)
-			return -EINVAL;
-	}
-
-	val = (!enable << 3) | (lv << 5);
-	mask = S2DOS05_ELVSS_SSD_EN_MASK | S2DOS05_ELVSS_SEL_SSD_MASK;
-
-	ret = s2dos05_update_reg(i2c, S2DOS05_REG_SSD_TSD, val, mask);
-	return ret;
-}
-#endif /* CONFIG_SEC_PM */
-
 static struct regulator_ops s2dos05_ldo_ops = {
 	.list_voltage		= regulator_list_voltage_linear,
 	.map_voltage		= regulator_map_voltage_linear,
@@ -312,12 +277,6 @@ static struct regulator_ops s2dos05_buck_ops = {
 	.set_voltage_sel	= s2m_set_voltage_sel_regmap_buck,
 	.set_voltage_time_sel	= s2m_set_voltage_time_sel,
 };
-
-#ifdef CONFIG_SEC_PM
-static struct regulator_ops s2dos05_elvss_ops = {
-	.set_short_detection	= s2m_set_elvss_short_detection,
-};
-#endif
 
 #define _BUCK(macro)	S2DOS05_BUCK##macro
 #define _buck_ops(num)	s2dos05_buck_ops##num
@@ -360,16 +319,6 @@ static struct regulator_ops s2dos05_elvss_ops = {
 	.enable_time	= t					\
 }
 
-#ifdef CONFIG_SEC_PM
-#define ELVSS_DESC(_name, _id)				{	\
-	.name		= _name,				\
-	.id		= _id,					\
-	.ops		= &s2dos05_elvss_ops,			\
-	.type		= REGULATOR_CURRENT,			\
-	.owner		= THIS_MODULE,				\
-}
-#endif
-
 static struct regulator_desc regulators[S2DOS05_REGULATOR_MAX] = {
 		/* name, id, ops, min_uv, uV_step, vsel_reg, enable_reg */
 		LDO_DESC("s2dos05-ldo1", _LDO(1), &_ldo_ops(), _LDO(_MIN1),
@@ -387,32 +336,15 @@ static struct regulator_desc regulators[S2DOS05_REGULATOR_MAX] = {
 		BUCK_DESC("s2dos05-buck1", _BUCK(1), &_buck_ops(), _BUCK(_MIN1),
 			_BUCK(_STEP1), _REG(_BUCK_VOUT),
 			_REG(_EN), _MASK(_B1), _TIME(_BUCK)),
-#ifdef CONFIG_SEC_PM
-		ELVSS_DESC("s2dos05-elvss", S2DOS05_ELVSS),
-#endif
 };
 
 static irqreturn_t s2dos05_irq_thread(int irq, void *irq_data)
 {
 	struct s2dos05_data *s2dos05 = irq_data;
 	u8 val = 0;
-#ifdef CONFIG_SEC_PM_DEBUG
-	const char *irq_bit[] = { "OCD", "UVLO", "SCP", "SSD", "TSD", "PWRMT" };
-	char irq_name[32];
-	ssize_t ret = 0;
-	unsigned long bit, lval;
-#endif /* CONFIG_SEC_PM_DEBUG */
-
 
 	s2dos05_read_reg(s2dos05->iodev->i2c, S2DOS05_REG_IRQ, &val);
 	pr_info("%s:irq(%d) S2DOS05_REG_IRQ : 0x%x\n", __func__, irq, val);
-#ifdef CONFIG_SEC_PM_DEBUG
-	lval = val;
-	for_each_set_bit(bit, &lval, ARRAY_SIZE(irq_bit))
-		ret += sprintf(irq_name + ret, " %s", irq_bit[bit]);
-
-	pr_info("%s: IRQ:%s\n", __func__, irq_name);
-#endif /* CONFIG_SEC_PM_DEBUG */
 
 	return IRQ_HANDLED;
 }
@@ -505,133 +437,6 @@ static int s2dos05_pmic_dt_parse_pdata(struct s2dos05_dev *iodev,
 }
 #endif /* CONFIG_OF */
 
-#ifdef CONFIG_SEC_PM
-static ssize_t enable_fd_show(struct device *dev, struct device_attribute *attr,
-				char *buf)
-{
-	struct i2c_client *i2c = s2dos05_info->iodev->i2c;
-	u8 uvlo_fd;
-	bool enabled;
-
-	s2dos05_read_reg(i2c, S2DOS05_REG_UVLO_FD, &uvlo_fd);
-
-	dev_info(&i2c->dev, "%s: uvlo_fd(0x%02X)\n", __func__, uvlo_fd);
-
-	enabled = !(uvlo_fd & 1);
-
-	return sprintf(buf, "%s\n", enabled ? "enabled" :  "disabled");
-}
-
-static ssize_t enable_fd_store(struct device *dev, struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	struct i2c_client *i2c = s2dos05_info->iodev->i2c;
-	int ret;
-	bool enable;
-	u8 uvlo_fd;
-
-	ret = strtobool(buf, &enable);
-	if (ret)
-		return ret;
-
-	dev_info(&i2c->dev, "%s: enable(%d)\n", __func__, enable);
-
-	uvlo_fd = !enable;
-
-	ret = s2dos05_update_reg(i2c, S2DOS05_REG_UVLO_FD, uvlo_fd, 1);
-	if (ret < 0) {
-		dev_err(&i2c->dev, "%s: Failed to update FD(%d)\n", __func__, ret);
-		return ret;
-	}
-
-	return count;
-}
-
-static DEVICE_ATTR(enable_fd, 0664, enable_fd_show, enable_fd_store);
-
-#ifdef CONFIG_SEC_FACTORY
-static int fb_state_change(struct notifier_block *nb, unsigned long val,
-			   void *data)
-{
-	struct i2c_client *i2c = s2dos05_info->iodev->i2c;
-	struct fb_event *evdata = data;
-	struct fb_info *info = evdata->info;
-	unsigned int blank;
-	int ret;
-
-	if (val != FB_EVENT_BLANK && val != FB_R_EARLY_EVENT_BLANK)
-		return 0;
-
-	/*
-	 * If FBNODE is not zero, it is not primary display(LCD)
-	 * and don't need to process these scheduling.
-	 */
-	if (info->node)
-		return NOTIFY_OK;
-
-	blank = *(int *)evdata->data;
-
-	if (blank == FB_BLANK_UNBLANK) {
-		dev_info(&i2c->dev, "%s: Enable FD\n", __func__);
-		ret = s2dos05_update_reg(i2c, S2DOS05_REG_UVLO_FD, 0, 1);
-		if (ret < 0)
-			dev_err(&i2c->dev, "%s: Failed to enable FD(%d)\n",
-					__func__, ret);
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block fb_block = {
-	.notifier_call = fb_state_change,
-};
-#endif /* CONFIG_SEC_FACTORY */
-
-static int s2dos05_sec_pm_init(struct s2dos05_dev *iodev, struct device *dev)
-{
-	int ret = 0;
-
-	sec_disp_pmic_dev = sec_device_create(NULL, "disp_pmic");
-	if (unlikely(IS_ERR(sec_disp_pmic_dev))) {
-		ret = PTR_ERR(sec_disp_pmic_dev);
-		dev_err(dev, "%s: Failed to create disp_pmic(%d)\n", __func__,
-				ret);
-		return ret;
-	}
-
-#ifdef CONFIG_SEC_FACTORY
-	dev_info(dev, "%s: Enable FD\n", __func__);
-	ret = s2dos05_update_reg(iodev->i2c, S2DOS05_REG_UVLO_FD, 0, 1);
-	if (ret < 0) {
-		dev_err(dev, "%s: Failed to enable FD(%d)\n", __func__, ret);
-		goto remove_sec_disp_pmic_dev;
-	}
-
-	fb_register_client(&fb_block);
-#endif /* CONFIG_SEC_FACTORY */
-
-	ret = device_create_file(sec_disp_pmic_dev, &dev_attr_enable_fd);
-	if (ret) {
-		dev_err(dev, "%s: Failed to create enable_fd(%d)\n", __func__,
-				ret);
-		goto remove_sec_disp_pmic_dev;
-	}
-
-	return 0;
-
-remove_sec_disp_pmic_dev:
-	sec_device_destroy(sec_disp_pmic_dev->devt);
-
-	return ret;
-}
-
-static void s2dos05_sec_pm_deinit(void)
-{
-	device_remove_file(sec_disp_pmic_dev, &dev_attr_enable_fd);
-	sec_device_destroy(sec_disp_pmic_dev->devt);
-}
-#endif /* CONFIG_SEC_PM */
-
 static int s2dos05_pmic_probe(struct i2c_client *i2c,
 				const struct i2c_device_id *dev_id)
 {
@@ -712,21 +517,13 @@ static int s2dos05_pmic_probe(struct i2c_client *i2c,
 		}
 	}
 
-#ifdef CONFIG_SEC_PM
-	s2dos05_info = s2dos05;
-	ret = s2dos05_sec_pm_init(iodev, &i2c->dev);
-	if (ret < 0)
-		goto err_s2dos05_data;
-#endif /* CONFIG_SEC_PM */
-
 	iodev->adc_mode = pdata->adc_mode;
 	iodev->adc_sync_mode = pdata->adc_sync_mode;
 	if (iodev->adc_mode > 0)
 		s2dos05_powermeter_init(iodev);
 
-	/* Enable SSD, SCP interrupt */
 	val = (S2DOS05_IRQ_PWRMT_MASK | S2DOS05_IRQ_TSD_MASK
-			| S2DOS05_IRQ_UVLO_MASK | S2DOS05_IRQ_OCD_MASK);
+		| S2DOS05_IRQ_SCP_MASK | S2DOS05_IRQ_UVLO_MASK | S2DOS05_IRQ_OCD_MASK);
 	mask = (S2DOS05_IRQ_PWRMT_MASK | S2DOS05_IRQ_TSD_MASK | S2DOS05_IRQ_SSD_MASK
 		| S2DOS05_IRQ_SCP_MASK | S2DOS05_IRQ_UVLO_MASK | S2DOS05_IRQ_OCD_MASK);
 	ret = s2dos05_update_reg(iodev->i2c, S2DOS05_REG_IRQ_MASK, val, mask);
@@ -784,9 +581,7 @@ static int s2dos05_pmic_remove(struct i2c_client *i2c)
 	dev_info(&i2c->dev, "%s\n", __func__);
 
 	s2dos05_powermeter_deinit(s2dos05->iodev);
-#ifdef CONFIG_SEC_PM
-	s2dos05_sec_pm_deinit();
-#endif /* CONFIG_SEC_PM */
+
 	return 0;
 }
 
@@ -812,16 +607,9 @@ static int s2dos05_pmic_resume(struct device *dev)
 
 	pr_info("%s adc_mode : %d\n", __func__, s2dos05->adc_mode);
 
-	if (s2dos05->adc_mode > 0) {
-		int ret = s2dos05_update_reg(s2dos05->i2c, S2DOS05_REG_PWRMT_CTRL2,
+	if (s2dos05->adc_mode > 0)
+		s2dos05_update_reg(s2dos05->i2c, S2DOS05_REG_PWRMT_CTRL2,
 				s2dos05->adc_en_val & 0x80, ADC_EN_MASK);
-#ifdef CONFIG_SEC_PM_DEBUG
-		if (ret < 0)
-			pr_err("%s s2dos05_update_reg is fail(%d)!!\n", __func__, ret);
-		else
-			pr_info("%s s2dos05_update_reg\n", __func__);
-#endif /* CONFIG_SEC_PM_DEBUG */
-	}
 	return 0;
 }
 #else

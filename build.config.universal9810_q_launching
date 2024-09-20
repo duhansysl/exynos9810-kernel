@@ -1,0 +1,13 @@
+ARCH=arm64
+CROSS_COMPILE=aarch64-linux-android-
+CLANG_TRIPLE=aarch64-linux-gnu-
+DEFCONFIG=universal9810_api29_defconfig
+MALI_CONFIG=universal9810_mali.cfg
+CLANG_VERSION=clang-r353983c
+TARGET_SOC=exynos9810
+FILES="
+arch/arm64/boot/Image:kernel
+arch/arm64/boot/dts/exynos/exynos9810.dtb:dtb.img
+dtbo.img:dtbo.img
+vmlinux:vmlinux
+"

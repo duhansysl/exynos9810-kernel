@@ -20,7 +20,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/iio/consumer.h>
 #include <linux/platform_data/sec_thermistor.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 
 #define ADC_SAMPLING_CNT	5
 

@@ -15,6 +15,10 @@
 #ifdef FEATURE_SUPPORT_DISPLAYID
 #include <drm/drm_displayid.h>
 #endif
+#ifdef CONFIG_SEC_DISPLAYPORT_SELFTEST
+#include "./dp_logger/dp_self_test.h"
+#endif
+
 
 #define EDID_SEGMENT_ADDR	(0x60 >> 1)
 #define EDID_ADDR		(0xA0 >> 1)
@@ -52,7 +56,7 @@ void edid_check_set_i2c_capabilities(void)
 	u8 val[1];
 
 	displayport_reg_dpcd_read(DPCD_ADD_I2C_SPEED_CONTROL_CAPABILITES, 1, val);
-	displayport_info("DPCD_ADD_I2C_SPEED_CONTROL_CAPABILITES = 0x%x\n", val[0]);
+	displayport_dbg("DPCD_ADD_I2C_SPEED_CONTROL_CAPA = 0x%x\n", val[0]);
 
 	if (val[0] != 0) {
 		if (val[0] & I2C_1Mbps)
@@ -278,12 +282,6 @@ void edid_parse_hdmi14_vsdb(unsigned char *edid_ext_blk,
 				&& edid_ext_blk[i + IEEE_OUI_0_BYTE_NUM] == HDMI14_IEEE_OUI_0
 				&& edid_ext_blk[i + IEEE_OUI_1_BYTE_NUM] == HDMI14_IEEE_OUI_1
 				&& edid_ext_blk[i + IEEE_OUI_2_BYTE_NUM] == HDMI14_IEEE_OUI_2) {
-			int vsdb_len = edid_ext_blk[i] & 0x1F;
-
-			/* check the length of vsdb */
-			if (vsdb_len < 8)
-				break;
-
 			displayport_dbg("EDID: find VSDB for HDMI 1.4\n");
 
 			if (edid_ext_blk[i + 8] & VSDB_HDMI_VIDEO_PRESETNT_MASK) {
@@ -298,10 +296,6 @@ void edid_parse_hdmi14_vsdb(unsigned char *edid_ext_blk,
 					vsdb_offset_calc = vsdb_offset_calc - 2;
 					displayport_dbg("EDID: Not support I_LATENCY_FILEDS_PRESETNT in VSDB\n");
 				}
-
-				/* check if vsdb length is enough for vic data */
-				if (vsdb_len < vsdb_offset_calc)
-					break;
 
 				hdmi_vic_len = (edid_ext_blk[i + vsdb_offset_calc]
 						& VSDB_VIC_LENGTH_MASK) >> VSDB_VIC_LENGTH_BIT_POSITION;
@@ -551,6 +545,12 @@ static int edid_parse_audio_video_db(unsigned char *edid, struct fb_audio *sad)
 void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u8 *edid)
 {
 	int i;
+#ifdef FEATURE_USE_PREFERRED_TIMING_1ST
+	int matched_timing_idx = 0;
+	int matched_resolution_idx = 0;
+	int matched_resolution_fps = 0;
+	int max_dex_support_idx = 0;
+#endif
 	struct fb_videomode *mode = NULL;
 	u64 pixelclock = 0;
 	struct displayport_device *displayport = get_displayport_drvdata();
@@ -567,44 +567,46 @@ void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u
 
 	mode = &(specs->modedb[i]);
 
-	pixelclock = (u64)((u32)block[1] << 8 | (u32)block[0]) * 10000;;
+	pixelclock = (u64)((u32)block[1] << 8 | (u32)block[0]) * 10000;
 
 	displayport_info("detail_timing_desc1: %d*%d@%d (%lld, %dps)\n",
 			mode->xres, mode->yres, mode->refresh, pixelclock, mode->pixclock);
 
 	for (i = 0; i < supported_videos_pre_cnt; i++) {
+#ifdef FEATURE_USE_PREFERRED_TIMING_1ST
+		if (mode->vmode == FB_VMODE_NONINTERLACED &&
+				mode->xres == supported_videos[i].dv_timings.bt.width &&
+				mode->yres == supported_videos[i].dv_timings.bt.height) {
+
+			matched_resolution_idx = i;
+			if (matched_resolution_fps < supported_videos[i].fps &&
+					supported_videos[i].edid_support_match == true) {
+				matched_resolution_fps = supported_videos[i].fps;
+			}
+
+			if ((mode->refresh == supported_videos[i].fps ||
+				mode->refresh == supported_videos[i].fps - 1) &&
+					!matched_timing_idx) {
+				matched_timing_idx = i;
+				displayport_info("found matched timing:%d\n", i);
+			}
+			if (supported_videos[i].dex_support != DEX_NOT_SUPPORT)
+				max_dex_support_idx = i;
+		}
+#else
 		if (mode->vmode == FB_VMODE_NONINTERLACED &&
 				(mode->refresh == supported_videos[i].fps ||
-				 mode->refresh == supported_videos[i].fps - 1) &&
+				mode->refresh == supported_videos[i].fps - 1) &&
 				mode->xres == supported_videos[i].dv_timings.bt.width &&
 				mode->yres == supported_videos[i].dv_timings.bt.height) {
 			if (supported_videos[i].edid_support_match == true) {
 				displayport_info("already found timing:%d\n", i);
 				return;
-			} else
-				break; /* matched but not found */
+			}
+			break; /* matched but not found */
 		}
+#endif
 	}
-
-	/* check if index is valid and index is bigger than best video */
-	if (i >= supported_videos_pre_cnt || i <= displayport->best_video) {
-		displayport_info("invalid timing i:%d, best:%d\n", i, displayport->best_video);
-		return;
-	}
-
-	/* check if found index does not support dex at dex mode */
-	if (displayport->dex_setting &&
-			(supported_videos[i].dex_support == DEX_NOT_SUPPORT ||
-			 supported_videos[i].dex_support > displayport->dex_adapter_type)) {
-		displayport_info("dex mode but not supported resolution(%d)\n", i);
-		return;
-	}
-
-	displayport_info("find same supported timing: %d*%d@%d (%lld)\n",
-			supported_videos[i].dv_timings.bt.width,
-			supported_videos[i].dv_timings.bt.height,
-			supported_videos[i].fps,
-			supported_videos[i].dv_timings.bt.pixelclock);
 
 	if (supported_videos[V640X480P60].dv_timings.bt.pixelclock >= pixelclock ||
 			supported_videos[V4096X2160P60].dv_timings.bt.pixelclock <= pixelclock) {
@@ -612,8 +614,36 @@ void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u
 		return;
 	}
 
-	supported_videos[VDUMMYTIMING].dex_support = supported_videos[i].dex_support;
-	supported_videos[VDUMMYTIMING].ratio = supported_videos[i].ratio;
+/*use every preferred timing as top priority*/
+#ifdef FEATURE_USE_PREFERRED_TIMING_1ST
+	/* ignore if preferred fps is lower than other matched */
+	if (matched_resolution_fps != 0 && mode->refresh < (matched_resolution_fps - 1)) {
+		displayport_info("EDID: framerate(%d) lower than matched(%d)\n",
+					mode->refresh, matched_resolution_fps);
+		return;
+	}
+
+	if (matched_timing_idx != 0 && matched_timing_idx < VDUMMYTIMING) {
+		/* copy dex_support and ratio if found the same timing at table */
+		supported_videos[VDUMMYTIMING].ratio = supported_videos[matched_timing_idx].ratio;
+		supported_videos[VDUMMYTIMING].dex_support = supported_videos[matched_timing_idx].dex_support;
+	} else if (matched_resolution_idx != 0 && matched_resolution_idx < VDUMMYTIMING) {
+		displayport_info("found matched resolution:%d\n", i);
+		supported_videos[VDUMMYTIMING].ratio = supported_videos[matched_resolution_idx].ratio;
+	}
+#else
+	/* check if index is valid and index is bigger than best video */
+	if (i >= supported_videos_pre_cnt || i <= displayport->sst[sst_id]->best_video) {
+		displayport_info("invalid timing i:%d, best:%d\n",
+				i, displayport->sst[sst_id]->best_video);
+		return;
+	}
+	displayport_info("found same supported timing: %d*%d@%d (%lld)\n",
+			supported_videos[i].dv_timings.bt.width,
+			supported_videos[i].dv_timings.bt.height,
+			supported_videos[i].fps,
+			supported_videos[i].dv_timings.bt.pixelclock);
+#endif
 
 	displayport->best_video = VDUMMYTIMING;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.width = mode->xres;
@@ -639,8 +669,8 @@ void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u
 			mode->left_margin, mode->hsync_len, mode->right_margin,
 			mode->upper_margin, mode->vsync_len, mode->lower_margin,
 			mode->sync, mode->vmode, mode->flag);
-	displayport_info("EDID: %s edid_support_match = %d\n", supported_videos[VDUMMYTIMING].name,
-			supported_videos[VDUMMYTIMING].edid_support_match);
+	displayport_info("EDID: %s edid_support_match:%d, dex_support:%d\n", supported_videos[VDUMMYTIMING].name,
+			supported_videos[VDUMMYTIMING].edid_support_match, supported_videos[VDUMMYTIMING].dex_support);
 }
 
 #ifdef FEATURE_SUPPORT_DISPLAYID
@@ -691,9 +721,6 @@ static void edid_mode_displayid_detailed(struct displayid_detailed_timings_1 *ti
 	}
 
 	if (i < supported_videos_pre_cnt) {
-		supported_videos[i].dex_support = supported_videos[i].dex_support;
-		supported_videos[i].ratio = supported_videos[i].ratio;
-
 		if (i > displayport->best_video)
 			displayport->best_video = i;
 
@@ -817,7 +844,7 @@ static int edid_add_displayid_detailed_modes(u8 *edid)
 		}
 	}
 
-	return num_modes;	
+	return num_modes;
 }
 #endif
 
@@ -861,8 +888,17 @@ int edid_update(struct displayport_device *hdev)
 		edid = &hdev->edid_test_buf[1];
 		block_cnt = hdev->edid_test_buf[0];
 		displayport_info("using test edid %d\n", block_cnt);
-	} else
+	}
+#ifdef CONFIG_SEC_DISPLAYPORT_SELFTEST
+	else if (self_test_on_process()) {
+		edid_test = 1;
+		block_cnt = self_test_get_edid(hdev->edid_test_buf);
+		edid = hdev->edid_test_buf;
+	}
+#endif
+	else
 		block_cnt = edid_read(hdev, &edid);
+
 	if (block_cnt < 0) {
 		hdev->bpc = BPC_6;
 		goto out;

@@ -54,7 +54,7 @@ static void cmd_exit_work(struct work_struct *work)
 void sec_cmd_set_default_result(struct sec_cmd_data *data)
 {
 	char delim = ':';
-	memset(data->cmd_result, 0x00, SEC_CMD_RESULT_STR_LEN);
+	memset(data->cmd_result, 0x00, SEC_CMD_RESULT_STR_LEN_EXPAND);
 	memcpy(data->cmd_result, data->cmd, SEC_CMD_STR_LEN);
 	strncat(data->cmd_result, &delim, 1);
 }
@@ -63,12 +63,12 @@ void sec_cmd_set_cmd_result_all(struct sec_cmd_data *data, char *buff, int len, 
 {
 	char delim1 = ' ';
 	char delim2 = ':';
-	int cmd_result_len;
+	size_t cmd_result_len;
 
-	cmd_result_len = (int)strlen(data->cmd_result_all) + len + 2 + (int)strlen(item);
+	cmd_result_len = strlen(data->cmd_result_all) + len + 2 + strlen(item);
 
-	if (cmd_result_len >= SEC_CMD_RESULT_STR_LEN) {
-		pr_err("%s %s: cmd length is over (%d)!!", SECLOG, __func__, cmd_result_len);
+	if (cmd_result_len >= (unsigned int)SEC_CMD_RESULT_STR_LEN) {
+		pr_err("%s %s: cmd length is over (%d)!!", SECLOG, __func__, (int)cmd_result_len);
 		return;
 	}
 
@@ -81,6 +81,15 @@ void sec_cmd_set_cmd_result_all(struct sec_cmd_data *data, char *buff, int len, 
 
 void sec_cmd_set_cmd_result(struct sec_cmd_data *data, char *buff, int len)
 {
+	if (strlen(buff) >= (unsigned int)SEC_CMD_RESULT_STR_LEN_EXPAND) {
+		pr_err("%s %s: cmd length is over (%d)!!", SECLOG, __func__, (int)strlen(buff));
+		strncat(data->cmd_result, "NG", 2);
+		return;
+	}
+
+	data->cmd_result_expand = (int)strlen(buff) / SEC_CMD_RESULT_STR_LEN;
+	data->cmd_result_expand_count = 0;
+
 	strncat(data->cmd_result, buff, len);
 }
 
@@ -230,6 +239,9 @@ static void sec_cmd_store_function(struct sec_cmd_data *data)
 	} else {
 		pr_err("%s %s: left cmd is nothing\n", SECLOG, __func__);
 		mutex_unlock(&data->fifo_lock);
+		mutex_lock(&data->cmd_lock);
+		data->cmd_is_running = false;
+		mutex_unlock(&data->cmd_lock);
 		return;
 	}
 	mutex_unlock(&data->fifo_lock);
@@ -307,6 +319,20 @@ static void sec_cmd_store_function(struct sec_cmd_data *data)
 
 	sec_cmd_ptr->cmd_func(data);
 
+	if (cmd_found && sec_cmd_ptr->cmd_log) {
+		char tbuf[32];
+		unsigned long long t;
+		unsigned long nanosec_rem;
+
+		memset(tbuf, 0x00, sizeof(tbuf));
+		t = local_clock();
+		nanosec_rem = do_div(t, 1000000000);
+		snprintf(tbuf, sizeof(tbuf), "[r:%lu.%06lu]",
+				(unsigned long)t,
+				nanosec_rem / 1000);
+
+		sec_debug_tsp_command_history(tbuf);
+	}
 }
 
 static ssize_t sec_cmd_store(struct device *dev, struct device_attribute *devattr,
@@ -314,6 +340,7 @@ static ssize_t sec_cmd_store(struct device *dev, struct device_attribute *devatt
 {
 	struct sec_cmd_data *data = dev_get_drvdata(dev);
 	struct command cmd = {{0}};
+	struct sec_cmd *sec_cmd_ptr = NULL;
 	int queue_size;
 
 	if (!data) {
@@ -334,6 +361,31 @@ static ssize_t sec_cmd_store(struct device *dev, struct device_attribute *devatt
 	}
 
 	strncpy(cmd.cmd, buf, count);
+
+	list_for_each_entry(sec_cmd_ptr, &data->cmd_list_head, list) {
+		if (!strncmp(cmd.cmd, sec_cmd_ptr->cmd_name, strlen(sec_cmd_ptr->cmd_name))) {
+			if (sec_cmd_ptr->cmd_log) {
+				char task_info[40];
+				char tbuf[32];
+				unsigned long long t;
+				unsigned long nanosec_rem;
+
+				memset(tbuf, 0x00, sizeof(tbuf));
+				t = local_clock();
+				nanosec_rem = do_div(t, 1000000000);
+				snprintf(tbuf, sizeof(tbuf), "[q:%lu.%06lu]",
+						(unsigned long)t,
+						nanosec_rem / 1000);
+
+				snprintf(task_info, 40, "\n[%d:%s]", current->pid, current->comm);
+				sec_debug_tsp_command_history(task_info);
+				sec_debug_tsp_command_history(cmd.cmd);
+				sec_debug_tsp_command_history(tbuf);
+
+			}
+			break;
+		}
+	}
 
 	mutex_lock(&data->fifo_lock);
 	queue_size = (kfifo_len(&data->cmd_queue) / sizeof(struct command));
@@ -363,6 +415,7 @@ static ssize_t sec_cmd_store(struct device *dev, struct device_attribute *devatt
 	}
 	mutex_unlock(&data->fifo_lock);
 
+	mutex_lock(&data->fs_lock);
 	/* check lock   */
 	mutex_lock(&data->cmd_lock);
 	data->cmd_is_running = true;
@@ -371,6 +424,7 @@ static ssize_t sec_cmd_store(struct device *dev, struct device_attribute *devatt
 	data->cmd_state = SEC_CMD_STATUS_RUNNING;
 	sec_cmd_store_function(data);
 
+	mutex_unlock(&data->fs_lock);
 	return count;
 }
 #endif
@@ -400,6 +454,9 @@ static ssize_t sec_cmd_show_status(struct device *dev,
 
 	else if (data->cmd_state == SEC_CMD_STATUS_NOT_APPLICABLE)
 		snprintf(buff, sizeof(buff), "NOT_APPLICABLE");
+
+	else if (data->cmd_state == SEC_CMD_STATUS_EXPAND)
+		snprintf(buff, sizeof(buff), "EXPAND");
 
 	pr_debug("%s %s: %d, %s\n", SECLOG, __func__, data->cmd_state, buff);
 
@@ -448,9 +505,16 @@ static ssize_t sec_cmd_show_result(struct device *dev,
 		return -EINVAL;
 	}
 
-	data->cmd_state = SEC_CMD_STATUS_WAITING;
-	pr_info("%s %s: %s\n", SECLOG, __func__, data->cmd_result);
-	size = snprintf(buf, SEC_CMD_RESULT_STR_LEN, "%s\n", data->cmd_result);
+	size = snprintf(buf, SEC_CMD_RESULT_STR_LEN, "%s\n", data->cmd_result
+								+ ((SEC_CMD_RESULT_STR_LEN - 1) * data->cmd_result_expand_count));
+
+	if (data->cmd_result_expand_count != data->cmd_result_expand) {
+		data->cmd_state = SEC_CMD_STATUS_EXPAND;
+		data->cmd_result_expand_count++;
+	} else
+		data->cmd_state = SEC_CMD_STATUS_WAITING;
+
+	pr_info("%s %s: %s\n", SECLOG, __func__, buf);
 
 	sec_cmd_set_cmd_exit(data);
 
@@ -538,10 +602,15 @@ int sec_cmd_init(struct sec_cmd_data *data, struct sec_cmd *cmds,
 	}
 
 	mutex_init(&data->cmd_lock);
+	mutex_init(&data->fs_lock);
 
 	mutex_lock(&data->cmd_lock);
 	data->cmd_is_running = false;
 	mutex_unlock(&data->cmd_lock);
+
+	data->cmd_result = kzalloc(SEC_CMD_RESULT_STR_LEN_EXPAND, GFP_KERNEL);
+	if (!data->cmd_result)
+		goto err_alloc_cmd_result;
 
 #ifdef USE_SEC_CMD_QUEUE
 	if (kfifo_alloc(&data->cmd_queue,
@@ -556,19 +625,16 @@ int sec_cmd_init(struct sec_cmd_data *data, struct sec_cmd *cmds,
 
 	if (devt == SEC_CLASS_DEVT_TSP) {
 		dev_name = SEC_CLASS_DEV_NAME_TSP;
-
 	} else if (devt == SEC_CLASS_DEVT_TKEY) {
 		dev_name = SEC_CLASS_DEV_NAME_TKEY;
-
 	} else if (devt == SEC_CLASS_DEVT_WACOM) {
 		dev_name = SEC_CLASS_DEV_NAME_WACOM;
-
 	} else {
 		pr_err("%s %s: not defined devt=%d\n", SECLOG, __func__, devt);
 		goto err_get_dev_name;
 	}
 
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	data->fac_dev = sec_device_create(data, dev_name);
 #else
 	data->fac_dev = device_create(sec_class, NULL, devt, data, dev_name);
@@ -589,7 +655,7 @@ int sec_cmd_init(struct sec_cmd_data *data, struct sec_cmd *cmds,
 	return 0;
 
 err_sysfs_group:
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	sec_device_destroy(data->fac_dev->devt);
 #else
 	device_destroy(sec_class, devt);
@@ -601,6 +667,8 @@ err_get_dev_name:
 	kfifo_free(&data->cmd_queue);
 err_alloc_queue:
 #endif
+	kfree(data->cmd_result);
+err_alloc_cmd_result:
 	mutex_destroy(&data->cmd_lock);
 	list_del(&data->cmd_list_head);
 	return -ENODEV;
@@ -616,7 +684,7 @@ void sec_cmd_exit(struct sec_cmd_data *data, int devt)
 	pr_info("%s %s", SECLOG, __func__);
 	sysfs_remove_group(&data->fac_dev->kobj, &sec_fac_attr_group);
 	dev_set_drvdata(data->fac_dev, NULL);
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	sec_device_destroy(data->fac_dev->devt);
 #else
 	device_destroy(sec_class, devt);
@@ -637,8 +705,56 @@ void sec_cmd_exit(struct sec_cmd_data *data, int devt)
 	cancel_delayed_work_sync(&data->cmd_work);
 	flush_delayed_work(&data->cmd_work);
 #endif
+	kfree(data->cmd_result);
 	mutex_destroy(&data->cmd_lock);
 	list_del(&data->cmd_list_head);
+}
+
+void sec_cmd_send_event_to_user(struct sec_cmd_data *data, char *test, char *result)
+{
+	char *event[5];
+	char timestamp[32];
+	char feature[32];
+	char stest[32];
+	char sresult[32];
+	ktime_t calltime;
+	u64 realtime;
+	int curr_time;
+	char *eol = "\0";
+
+	calltime = ktime_get();
+	realtime = ktime_to_ns(calltime);
+	do_div(realtime, NSEC_PER_USEC);
+	curr_time = realtime / USEC_PER_MSEC;
+
+	snprintf(timestamp, 32, "TIMESTAMP=%d", curr_time);
+	strncat(timestamp, eol, 1);
+	snprintf(feature, 32, "FEATURE=TSP");
+	strncat(feature, eol, 1);
+	if (!test) {
+		snprintf(stest, 32, "TEST=NULL");
+	} else {
+		snprintf(stest, 32, "%s", test);
+	}
+	strncat(stest, eol, 1);
+
+	if (!result) {
+		snprintf(sresult, 32, "RESULT=NULL");
+	} else {
+		snprintf(sresult, 32, "%s", result);
+	}
+	strncat(sresult, eol, 1);
+
+	pr_info("%s %s: time:%s, feature:%s, test:%s, result:%s\n",
+			SECLOG, __func__, timestamp, feature, stest, sresult);
+
+	event[0] = timestamp;
+	event[1] = feature;
+	event[2] = stest;
+	event[3] = sresult;
+	event[4] = NULL;
+
+	kobject_uevent_env(&data->fac_dev->kobj, KOBJ_CHANGE, event);
 }
 
 MODULE_DESCRIPTION("Samsung factory command");

@@ -22,14 +22,31 @@
 #include <linux/input.h>
 #include <linux/delay.h>
 
+#if defined(CONFIG_DRV_SAMSUNG)
+#include <linux/sec_class.h>
+#else
+extern struct class *sec_class;
+#endif
+
 #include "wacom.h"
+
+static void get_chip_name(void *device_data);
+static void fw_update(void *device_data);
+static void not_support_cmd(void *device_data);
+
+static struct sec_cmd sec_cmds[] = {
+	{SEC_CMD("get_chip_name", get_chip_name),},
+	{SEC_CMD("fw_update", fw_update),},
+	{SEC_CMD("not_support_cmd", not_support_cmd),},
+};
 
 #ifdef CONFIG_SEC_FACTORY
 static ssize_t epen_fac_select_firmware_store(struct device *dev,
 					  struct device_attribute *attr,
 					  const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	u8 fw_update_way = FW_NONE;
 	int ret = 0;
@@ -70,9 +87,10 @@ static ssize_t epen_firm_update_status_show(struct device *dev,
 					    struct device_attribute *attr,
 					    char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
-	int status = wac_i2c->wac_feature->update_status;
+	int status = wac_i2c->update_status;
 	int ret = 0;
 
 	input_info(true, &client->dev, "%s:(%d)\n", __func__, status);
@@ -92,33 +110,37 @@ static ssize_t epen_firm_update_status_show(struct device *dev,
 static ssize_t epen_firm_version_show(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: 0x%x|0x%X\n", __func__,
-		   wac_i2c->wac_feature->fw_version, wac_i2c->fw_ver_file);
+		   wac_i2c->fw_ver_ic, wac_i2c->fw_ver_bin);
 
 	return snprintf(buf, PAGE_SIZE, "%04X\t%04X\n",
-			wac_i2c->wac_feature->fw_version, wac_i2c->fw_ver_file);
+			wac_i2c->fw_ver_ic, wac_i2c->fw_ver_bin);
 }
 
 static ssize_t epen_firmware_update_store(struct device *dev,
 					  struct device_attribute *attr,
 					  const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	u8 fw_update_way = FW_NONE;
 
 	input_info(true, &client->dev, "%s\n", __func__);
 
 	switch (*buf) {
-#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 	case 'i':
 	case 'I':
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 		fw_update_way = FW_IN_SDCARD;
-		break;
+#else
+		fw_update_way = FW_IN_SDCARD_SIGNED;
 #endif
+		break;
 	case 'k':
 	case 'K':
 		fw_update_way = FW_BUILT_IN;
@@ -143,11 +165,35 @@ static ssize_t epen_firmware_update_store(struct device *dev,
 	return count;
 }
 
+static ssize_t epen_firm_version_of_ic_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
+
+	input_info(true, &wac_i2c->client->dev, "%s: %X\n", __func__, wac_i2c->fw_ver_ic);
+
+	return snprintf(buf, PAGE_SIZE, "%04X", wac_i2c->fw_ver_ic);
+}
+
+static ssize_t epen_firm_version_of_bin_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
+
+	input_info(true, &wac_i2c->client->dev, "%s: %X\n", __func__, wac_i2c->fw_ver_bin);
+
+	return snprintf(buf, PAGE_SIZE, "%04X", wac_i2c->fw_ver_bin);
+}
+
+
 static ssize_t epen_reset_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val;
 
@@ -188,7 +234,8 @@ out:
 static ssize_t epen_reset_result_show(struct device *dev,
 				      struct device_attribute *attr, char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int ret = 0;
 
@@ -207,7 +254,8 @@ static ssize_t epen_checksum_store(struct device *dev,
 				   struct device_attribute *attr,
 				   const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val;
 
@@ -244,7 +292,8 @@ static ssize_t epen_checksum_result_show(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int ret;
 
@@ -264,7 +313,7 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 	struct i2c_client *client = wac_i2c->client;
 	u8 cmd = 0;
 	u8 buf[COM_COORD_NUM + 1] = { 0, };
-	int ret = 0, retry = 0;
+	int ret = 0, retry = 0, retval = 0;
 
 	wac_i2c->connection_check = false;
 	wac_i2c->fail_channel = 0;
@@ -274,9 +323,10 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 
 	cmd = COM_SAMPLERATE_STOP;
 	ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
-	if (ret <= 0) {
-		input_err(true, &client->dev, "failed to send stop command\n");
-		return -1;
+	if (ret != 1) {
+		input_err(true, &client->dev, "failed to send data(%02x)\n", cmd);
+		retval = -1;
+		goto err;
 	}
 
 	wac_i2c->samplerate_state = false;
@@ -284,17 +334,19 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 
 	retry = 5;
 	while (retry--) {
+		/* clear garbage irq */
 		if (wacom_get_irq_state(wac_i2c) > 0) {
-			u8 data[COM_COORD_NUM + 1] = { 0, };
+			u8 data[COM_COORD_NUM] = { 0, };
 
-			ret = wacom_i2c_recv(wac_i2c, data, COM_COORD_NUM + 1,
+			ret = wacom_i2c_recv(wac_i2c, data, COM_COORD_NUM,
 						WACOM_I2C_MODE_NORMAL);
-			if (ret < 0) {
+			if (ret != COM_COORD_NUM) {
 				input_err(true, &client->dev,
-					  "%s: failed to receive\n", __func__);
+					  "%s: failed to recv\n", __func__);
 			} else {
-				input_err(true, &client->dev,
-					  "%s: ignore gabage data\n", __func__);
+				input_info(true, &client->dev,
+					  "%s: ignore garbage data(%02x %02x)\n",
+					  __func__, data[0], data[1]);
 			}
 		} else {
 			break;
@@ -303,11 +355,19 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 		usleep_range(4500, 5500);
 	}
 
+	wacom_enable_irq(wac_i2c, false);
+	wacom_enable_pdct_irq(wac_i2c, false);
+
 	cmd = COM_OPEN_CHECK_START;
 	ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
-	if (ret <= 0) {
-		input_err(true, &client->dev, "failed to send stop command\n");
-		return -1;
+	if (ret != 1) {
+		input_err(true, &client->dev, "failed to send data(%02x)\n", cmd);
+		retval = -1;
+	
+		wacom_enable_irq(wac_i2c, true);
+		wacom_enable_pdct_irq(wac_i2c, true);
+
+		goto err;
 	}
 
 	msleep(2000);
@@ -315,20 +375,20 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 	retry = 10;
 	cmd = COM_OPEN_CHECK_STATUS;
 	do {
-		input_info(true, &client->dev,
-			   "read status, retry %d\n", retry);
+		input_info(true, &client->dev, "read status, retry %d\n", retry);
 		ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
 		if (ret != 1) {
 			input_err(true, &client->dev,
-				  "failed to send cmd(ret:%d)\n", ret);
+				  "failed to send data(%02x)\n", cmd);
 			usleep_range(4500, 5500);
 			continue;
 		}
+
 		usleep_range(500, 500);
+
 		ret = wacom_i2c_recv(wac_i2c, buf, COM_COORD_NUM, WACOM_I2C_MODE_NORMAL);
 		if (ret != COM_COORD_NUM) {
-			input_err(true, &client->dev,
-				  "failed to recv data(ret:%d)\n", ret);
+			input_err(true, &client->dev, "failed to recv\n");
 			usleep_range(4500, 5500);
 			continue;
 		}
@@ -341,18 +401,25 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 		 *      3 : Fail (All coil function error)
 		 */
 		if (buf[0] == 1) {
-			input_info(true, &client->dev, "Pass\n");
+			input_info(true, &client->dev, "Open check Pass\n");
 			break;
 		}
 
 		msleep(50);
 	} while (retry--);
 
-	if (ret > 0) {
-		wac_i2c->connection_check = ((buf[0] == 1) && !buf[4]);
+	wacom_enable_irq(wac_i2c, true);
+	wacom_enable_pdct_irq(wac_i2c, true);
+
+	if (ret == COM_COORD_NUM) {
+		if (wac_i2c->pdata->module_ver == 0x2)
+			wac_i2c->connection_check = ((buf[0] == 1) && !buf[4]);
+		else
+			wac_i2c->connection_check = (buf[0] == 1);
 	} else {
 		wac_i2c->connection_check = false;
-		return -1;
+		retval = -1;
+		goto err;
 	}
 
 	wac_i2c->fail_channel = buf[1];
@@ -365,46 +432,55 @@ int wacom_open_test(struct wacom_i2c *wac_i2c)
 		   __func__, wac_i2c->connection_check ? "Pass" : "Fail",
 		   buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
+	if (!wac_i2c->connection_check)
+		retval = -1;
+
+err:
 	cmd = COM_SAMPLERATE_STOP;
 	ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
-	if (ret <= 0) {
-		input_err(true, &client->dev,
-			  "failed to send stop cmd for end\n");
-		return -2;
+	if (ret != 1) {
+		input_err(true, &client->dev, "failed to send data(%02x)\n", cmd);
+		retval = -2;
+		goto out;
 	}
 
 	cmd = COM_SAMPLERATE_START;
 	ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
-	if (ret <= 0) {
-		input_err(true, &client->dev,
-			  "failed to send start cmd for end\n");
-		return -2;
+	if (ret != 1) {
+		input_err(true, &client->dev, "failed to send data(%02x)\n", cmd);
+		retval = -2;
+		goto out;
 	}
 
 	wac_i2c->samplerate_state = true;
 
-	if (retry <= 0)
-		return -1;
+out:
 
-	return 0;
+	return retval;
 }
 
 static ssize_t epen_connection_show(struct device *dev,
 				    struct device_attribute *attr, char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int retry = 2;
-	int ret, module_ver = 2;
-
+	int ret;
+#if 0
+#ifdef CONFIG_SEC_FACTORY
+	ret = wacom_check_ub(wac_i2c);
+	if (!ret) {
+		input_info(true, &client->dev, "%s: digitizer is not attached\n", __func__);
+		goto out;
+	}
+#endif
+#endif
 	mutex_lock(&wac_i2c->lock);
 
 	input_info(true, &client->dev, "%s\n", __func__);
 
 	wac_i2c->is_open_test = true;
-
-	wacom_enable_irq(wac_i2c, false);
-	wacom_enable_pdct_irq(wac_i2c, false);
 
 	if (wac_i2c->fullscan_mode) {
 		input_info(true, &wac_i2c->client->dev, "%s: full scan OUT\n", __func__);
@@ -438,8 +514,20 @@ static ssize_t epen_connection_show(struct device *dev,
 		}
 	}
 
-	wacom_enable_irq(wac_i2c, true);
-	wacom_enable_pdct_irq(wac_i2c, true);
+	if (!wac_i2c->samplerate_state) {
+		char cmd = COM_SAMPLERATE_START;
+
+		input_info(true, &client->dev, "%s: samplerate state is %d, need to recovery\n",
+			   __func__, wac_i2c->samplerate_state);
+
+		ret = wacom_i2c_send(wac_i2c, &cmd, 1, WACOM_I2C_MODE_NORMAL);
+		if (ret < 0) {
+			input_err(true, &client->dev,
+				  "failed to sned start cmd %d\n", ret);
+		} else {
+			wac_i2c->samplerate_state = true;
+		}
+	}
 
 	mutex_unlock(&wac_i2c->lock);
 
@@ -447,19 +535,31 @@ static ssize_t epen_connection_show(struct device *dev,
 		   "connection_check : %d\n", wac_i2c->connection_check);
 
 	wac_i2c->is_open_test = false;
-
-	return snprintf(buf, PAGE_SIZE, "%s %d %d %d %s %d\n",
-			wac_i2c->connection_check ? "OK" : "NG",
-			module_ver, wac_i2c->fail_channel,
-			wac_i2c->min_adc_val, wac_i2c->error_cal ? "NG" : "OK",
-			wac_i2c->min_cal_val);
+#if 0
+#ifdef CONFIG_SEC_FACTORY
+out:
+#endif
+#endif
+	if (wac_i2c->pdata->module_ver == 0x2) {
+		return snprintf(buf, PAGE_SIZE, "%s %d %d %d %s %d\n",
+				wac_i2c->connection_check ? "OK" : "NG",
+				wac_i2c->pdata->module_ver, wac_i2c->fail_channel,
+				wac_i2c->min_adc_val, wac_i2c->error_cal ? "NG" : "OK",
+				wac_i2c->min_cal_val);
+	} else {
+		return snprintf(buf, PAGE_SIZE, "%s %d %d %d\n",
+				wac_i2c->connection_check ? "OK" : "NG",
+				wac_i2c->pdata->module_ver, wac_i2c->fail_channel,
+				wac_i2c->min_adc_val);
+	}
 }
 
 static ssize_t epen_saving_mode_store(struct device *dev,
 				      struct device_attribute *attr,
 				      const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	static u64 call_count;
 	int val;
@@ -471,14 +571,6 @@ static ssize_t epen_saving_mode_store(struct device *dev,
 			  __func__);
 		return count;
 	}
-
-#ifdef CONFIG_SEC_FACTORY
-	input_info(true, &client->dev,
-		   "%s : Not support power saving mode(%d) in Factory Bin [%lu]\n",
-		   __func__, val, call_count);
-
-	return count;
-#endif
 
 	wac_i2c->battery_saving_mode = !(!val);
 
@@ -509,7 +601,8 @@ static ssize_t epen_insert_show(struct device *dev,
 				struct device_attribute *attr,
 				char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	int pen_state = (wac_i2c->function_result & EPEN_EVENT_PEN_OUT);
 
 	input_info(true, &wac_i2c->client->dev, "%s : pen is %s\n", __func__,
@@ -522,7 +615,8 @@ static ssize_t epen_screen_off_memo_enable_store(struct device *dev,
 						 struct device_attribute *attr,
 						 const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val = 0;
 
@@ -563,7 +657,8 @@ static ssize_t epen_aod_enable_store(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val = 0;
 
@@ -604,7 +699,8 @@ static ssize_t epen_aod_lcd_onoff_status_store(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val = 0;
 
@@ -637,7 +733,10 @@ static ssize_t epen_aod_lcd_onoff_status_store(struct device *dev,
 				== EPEN_SETMODE_AOP_OPTION_AOD_LCD_OFF) {
 			forced_release_fullscan(wac_i2c);
 		}
+
+		mutex_lock(&wac_i2c->mode_lock);
 		wacom_i2c_set_survey_mode(wac_i2c, wac_i2c->survey_mode);
+		mutex_unlock(&wac_i2c->mode_lock);
 	}
 
 out:
@@ -652,7 +751,8 @@ static ssize_t epen_aot_enable_store(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val = 0;
 
@@ -693,7 +793,8 @@ static ssize_t epen_wcharging_mode_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: %s\n", __func__,
@@ -707,7 +808,8 @@ static ssize_t epen_wcharging_mode_store(struct device *dev,
 					 struct device_attribute *attr,
 					 const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int retval = 0;
 
@@ -739,88 +841,90 @@ static ssize_t epen_wcharging_mode_store(struct device *dev,
 
 }
 
+char ble_charge_command[] = {
+	COM_BLE_C_DISABLE, /* Disable charge (charging mode enable) */
+	COM_BLE_C_ENABLE, /* Enable charge (charging mode disable) */
+	COM_BLE_C_RESET, /* Reset (make reset pattern + 1m charge) */
+	COM_BLE_C_START, /* Start (make start patter + 1m charge) */
+	COM_BLE_C_KEEP_ON, /* Keep on charge (you need send this cmd within a minute after Start cmd) */
+	COM_BLE_C_KEEP_Off, /* Keep off charge */
+	COM_BLE_C_M_RETURN, /* Request charging mode */
+	COM_RESET_DSP, /* DSP reset */
+	COM_BLE_C_FULL, /* Full charge (depend on fw) */
+};
 
-/*
-BLE Charge Mode
-
-0xE8 : Disable charge
-0xE9 : Enable charge
-0xEA : Reset ( 60s charge -> 4s/2min )
-0xEB : Fast charge ( 9s/10s charge/off -> 4s/2min )
-0xEC : Slow charge 1 (4s/2min )
-0xED : Slow charge 2 (6s/2min )
-0xEE : None
-0xEF : Reset DSP
-*/
-void wacom_ble_charge_mode(struct wacom_i2c *wac_i2c, char mode)
+int wacom_ble_charge_mode(struct wacom_i2c *wac_i2c, int mode)
 {
 	struct i2c_client *client = wac_i2c->client;
 	int ret = 0;
-	char data[2] = { 0, 0 };
+	char data;
 
 	if (wac_i2c->is_open_test) {
-		input_err(true, &client->dev, "%s: other cmd is working\n", __func__);
-		return;
+		input_err(true, &client->dev, "%s: other cmd is working\n",
+			  __func__);
+		return -EPERM;
 	}
 
-	if (mode >= EPEN_BLE_C_MAX || mode == EPEN_BLE_C_NONE) {
-		input_err(true, &client->dev,
-			  "%s: wrong mode, %d\n", __func__,
-			  mode);
-		return;
+	if (mode >= EPEN_BLE_C_MAX || mode < EPEN_BLE_C_DIABLE) {
+		input_err(true, &client->dev, "%s: wrong mode, %d\n",
+			  __func__,mode);
+		return -EINVAL;
 	}
 
 	if (mode == EPEN_BLE_C_DSPX) {
 		/* add abnormal ble reset case (while pen in status, do not ble charge) */
-		input_err(true, &client->dev, "%s: ble mode(%d)\n", __func__, mode);
-
-		data[0] = COM_SURVEYEXIT;
-		ret = wacom_i2c_send(wac_i2c, &data[0], 1, WACOM_I2C_MODE_NORMAL);
-		if (ret != 1) {
-			input_err(true, &client->dev,
-				  "%s: failed to send 0x%x cmd(%d)\n", __func__,
-				  data[0], ret);
-			return;
-		}
-
-		input_info(true, &client->dev, "%s: %02X\n", __func__, data[0]);
+		mutex_lock(&wac_i2c->mode_lock);
+		ret = wacom_i2c_set_survey_mode(wac_i2c, EPEN_SURVEY_MODE_NONE);
+		mutex_unlock(&wac_i2c->mode_lock);
+		if (ret)
+			return ret;
 
 		msleep(250);
 
-		data[0] = COM_PEN_CHECK_OUT + mode;
-		ret = wacom_i2c_send(wac_i2c, &data[0], 1, WACOM_I2C_MODE_NORMAL);
+		data = ble_charge_command[mode];
+		ret = wacom_i2c_send(wac_i2c, &data, 1, WACOM_I2C_MODE_NORMAL);
 		if (ret != 1) {
-			input_err(true, &client->dev,
-				  "%s: failed to send 0x%x cmd(%d)\n", __func__,
-				  data[0], ret);
+			input_err(true, &client->dev, "%s: failed to send data(%02x %d)\n",
+				  __func__, data, ret);
+			wacom_select_survey_mode(wac_i2c, wac_i2c->screen_on);
+			return ret;
 		}
-
-		input_info(true, &client->dev, "%s: %02X\n", __func__, data[0]);
 
 		msleep(130);
 
 		wacom_select_survey_mode(wac_i2c, wac_i2c->screen_on);
 	} else {
-		data[0] = COM_PEN_CHECK_OUT + mode;
-		ret = wacom_i2c_send(wac_i2c, &data[0], 1, WACOM_I2C_MODE_NORMAL);
+		data = ble_charge_command[mode];
+		ret = wacom_i2c_send(wac_i2c, &data, 1, WACOM_I2C_MODE_NORMAL);
 		if (ret != 1) {
-			input_err(true, &client->dev,
-				  "%s: failed to send 0x%x cmd(%d)\n", __func__,
-				  data[0], ret);
+			input_err(true, &client->dev, "%s: failed to send data(%02x %d)\n",
+				  __func__, data, ret);
+			return ret;
 		}
+
 	}
 
-	input_info(true, &client->dev, "%s: now %02X, prev %02X\n", __func__, data[0],
+	input_info(true, &client->dev, "%s: now %02X, prev %02X\n", __func__, data,
 		   wac_i2c->ble_mode ? wac_i2c->ble_mode : 0);
 
-	wac_i2c->ble_mode = mode + COM_PEN_CHECK_OUT;
+	wac_i2c->ble_mode = ble_charge_command[mode];
+
+	return 0;
+}
+
+static ssize_t epen_ble_charging_mode_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "NA\n");
 }
 
 static ssize_t epen_ble_charging_mode_store(struct device *dev,
 					 struct device_attribute *attr,
 					 const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int retval = 0;
 
@@ -836,7 +940,7 @@ static ssize_t epen_ble_charging_mode_store(struct device *dev,
 		return count;
 	}
 
-	wacom_ble_charge_mode(wac_i2c, (char)retval);
+	wacom_ble_charge_mode(wac_i2c, retval);
 
 	return count;
 }
@@ -845,7 +949,8 @@ static ssize_t epen_keyboard_mode_store(struct device *dev,
 				      struct device_attribute *attr,
 				      const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val;
 
@@ -957,7 +1062,8 @@ static ssize_t epen_disable_mode_store(struct device *dev,
 				       struct device_attribute *attr,
 				       const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val = 0;
 
@@ -976,109 +1082,11 @@ static ssize_t epen_disable_mode_store(struct device *dev,
 	return count;
 }
 
-static ssize_t epen_dex_enable_show(struct device *dev,
-					struct device_attribute *attr,
-					char *buf)
-{
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
-	struct i2c_client *client = wac_i2c->client;
-
-	input_info(true, &client->dev, "%s: %d\n",
-			__func__, wac_i2c->dex_mode);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", wac_i2c->dex_mode);
-}
-
-static ssize_t epen_dex_enable_store(struct device *dev,
-					 struct device_attribute *attr,
-					 const char *buf, size_t count)
-{
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
-	struct i2c_client *client = wac_i2c->client;
-	int retval = 0;
-
-	if (!wac_i2c->pdata->support_dex) {
-		input_err(true, &client->dev, "%s: not support DeX mode\n",
-				__func__);
-		return count;
-	}
-
-	if (kstrtoint(buf, 0, &retval)) {
-		input_err(true, &client->dev, "%s: failed to get param\n",
-				__func__);
-		return count;
-	}
-
-	if (retval < 0 || retval > DEX_MODE_ALL) {
-		input_err(true, &client->dev, "%s: invalid param %d\n",
-				__func__, retval);
-		return count;
-	}
-
-	forced_release(wac_i2c);
-
-	wac_i2c->dex_mode = retval;
-	if (wac_i2c->dex_mode & DEX_MODE_MOUSE)
-		wac_i2c->input_dev = wac_i2c->input_dev_pad;
-	else
-		wac_i2c->input_dev = wac_i2c->input_dev_pen;
-
-	input_info(true, &client->dev, "%s: %s (%s mode%s%s)\n",
-			__func__, wac_i2c->dex_mode ? "on" : "off",
-			wac_i2c->dex_mode & DEX_MODE_MOUSE ? "mouse" : "stylus",
-			wac_i2c->dex_mode & DEX_MODE_EDGE_CROP ? ", edge crop" : "",
-			wac_i2c->dex_mode & DEX_MODE_IRIS ? ", Iris" : "");
-
-	return count;
-
-}
-
-/* change&show dex_rate for test */
-static ssize_t epen_dex_rate_show(struct device *dev,
-					struct device_attribute *attr,
-					char *buf)
-{
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
-	struct i2c_client *client = wac_i2c->client;
-
-	input_info(true, &client->dev, "%s: %d\n",
-			__func__, wac_i2c->pdata->dex_rate);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", wac_i2c->pdata->dex_rate);
-}
-
-static ssize_t epen_dex_rate_store(struct device *dev,
-					 struct device_attribute *attr,
-					 const char *buf, size_t count)
-{
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
-	struct i2c_client *client = wac_i2c->client;
-	int retval = 0;
-
-	if (!wac_i2c->pdata->support_dex) {
-		input_err(true, &client->dev, "%s: not support DeX mode\n",
-				__func__);
-		return count;
-	}
-
-	if (kstrtoint(buf, 0, &retval)) {
-		input_err(true, &client->dev, "%s: failed to get param\n",
-				__func__);
-		return count;
-	}
-
-	wac_i2c->pdata->dex_rate = retval;
-
-	input_info(true, &client->dev, "%s: %d\n", __func__, wac_i2c->pdata->dex_rate);
-
-	return count;
-
-}
-
 static ssize_t epen_pen_out_count_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: %u\n", __func__,
@@ -1091,7 +1099,8 @@ static ssize_t epen_clear_pen_out_count_store(struct device *dev,
 					      struct device_attribute *attr,
 					      const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	if (buf[0] != 'c') {
@@ -1111,7 +1120,8 @@ static ssize_t epen_abnormal_reset_count_show(struct device *dev,
 					      struct device_attribute *attr,
 					      char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: %u\n", __func__,
@@ -1125,7 +1135,8 @@ static ssize_t epen_clear_abnormal_reset_count_store(struct device *dev,
 						     const char *buf,
 						     size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	if (buf[0] != 'c') {
@@ -1145,7 +1156,8 @@ static ssize_t epen_i2c_fail_count_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: %u\n", __func__,
@@ -1158,7 +1170,8 @@ static ssize_t epen_clear_i2c_fail_count_store(struct device *dev,
 					       struct device_attribute *attr,
 					       const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	if (buf[0] != 'c') {
@@ -1178,7 +1191,8 @@ static ssize_t epen_connection_check_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: SDCONN:%d,SECCNT:%d,SADCVAL:%d,SECLVL:%d,SCALLVL:%d\n",
@@ -1198,7 +1212,8 @@ static ssize_t epen_fac_garage_mode_enable(struct device *dev,
 					   struct device_attribute *attr,
 					   const char *buf, size_t count)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int val;
 	u8 cmd;
@@ -1224,7 +1239,7 @@ static ssize_t epen_fac_garage_mode_enable(struct device *dev,
 
 		wac_i2c->fac_garage_mode = 0;
 
-		return count;
+		goto out;
 	}
 
 	wac_i2c->samplerate_state = false;
@@ -1240,7 +1255,7 @@ static ssize_t epen_fac_garage_mode_enable(struct device *dev,
 			input_err(true, &client->dev,
 				  "failed to sned start cmd %d\n",
 				  ret);
-			return count;
+			goto out;
 		}
 
 		wac_i2c->samplerate_state = true;
@@ -1249,13 +1264,17 @@ static ssize_t epen_fac_garage_mode_enable(struct device *dev,
 	input_info(true, &client->dev, "%s: %d\n", __func__, val);
 
 	return count;
+
+out:
+	return count;
 }
 
 static ssize_t epen_fac_garage_mode_show(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 
 	input_info(true, &client->dev, "%s: garage mode %s\n", __func__,
@@ -1269,7 +1288,8 @@ static ssize_t epen_fac_garage_rawdata_show(struct device *dev,
 					    struct device_attribute *attr,
 					    char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	char data[10] = { 0, };
 	int ret;
@@ -1339,7 +1359,8 @@ out:
 static ssize_t get_epen_pos_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
+	struct sec_cmd_data *sec = dev_get_drvdata(dev);
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
 	struct i2c_client *client = wac_i2c->client;
 	int max_x, max_y;
 
@@ -1369,6 +1390,9 @@ static DEVICE_ATTR(epen_firm_update_status, S_IRUGO,
 		   epen_firm_update_status_show, NULL);
 /* return firmware version */
 static DEVICE_ATTR(epen_firm_version, S_IRUGO, epen_firm_version_show, NULL);
+static DEVICE_ATTR(ver_of_ic, S_IRUGO, epen_firm_version_of_ic_show, NULL);
+static DEVICE_ATTR(ver_of_bin, S_IRUGO, epen_firm_version_of_bin_show, NULL);
+
 /* For SMD Test */
 static DEVICE_ATTR(epen_reset, (S_IWUSR | S_IWGRP), NULL, epen_reset_store);
 static DEVICE_ATTR(epen_reset_result, S_IRUGO, epen_reset_result_show, NULL);
@@ -1384,8 +1408,8 @@ static DEVICE_ATTR(epen_insert, S_IRUGO,
 			epen_insert_show, NULL);
 static DEVICE_ATTR(epen_wcharging_mode, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   epen_wcharging_mode_show, epen_wcharging_mode_store);
-static DEVICE_ATTR(epen_ble_charging_mode, (S_IWUSR | S_IWGRP),
-		   NULL, epen_ble_charging_mode_store);
+static DEVICE_ATTR(epen_ble_charging_mode, (S_IRUGO | S_IWUSR | S_IWGRP),
+		   epen_ble_charging_mode_show, epen_ble_charging_mode_store);
 static DEVICE_ATTR(keyboard_mode, (S_IWUSR | S_IWGRP),
 		   NULL, epen_keyboard_mode_store);
 static DEVICE_ATTR(epen_disable_mode, (S_IWUSR | S_IWGRP),
@@ -1400,10 +1424,6 @@ static DEVICE_ATTR(aod_lcd_onoff_status, (S_IWUSR | S_IWGRP),
 		   NULL, epen_aod_lcd_onoff_status_store);
 static DEVICE_ATTR(aot_enable, (S_IWUSR | S_IWGRP),
 		   NULL, epen_aot_enable_store);
-static DEVICE_ATTR(dex_enable, (S_IRUGO | S_IWUSR | S_IWGRP),
-		   epen_dex_enable_show, epen_dex_enable_store);
-static DEVICE_ATTR(dex_rate, (S_IRUGO | S_IWUSR | S_IWGRP),
-		   epen_dex_rate_show, epen_dex_rate_store);
 static DEVICE_ATTR(pen_out_count, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   epen_pen_out_count_show, epen_clear_pen_out_count_store);
 static DEVICE_ATTR(abnormal_reset_count, (S_IRUGO | S_IWUSR | S_IWGRP),
@@ -1411,7 +1431,7 @@ static DEVICE_ATTR(abnormal_reset_count, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   epen_clear_abnormal_reset_count_store);
 static DEVICE_ATTR(i2c_fail_count, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   epen_i2c_fail_count_show, epen_clear_i2c_fail_count_store);
-static DEVICE_ATTR(epen_connection_check, 0444,
+static DEVICE_ATTR(epen_connection_check, S_IRUGO,
 		   epen_connection_check_show, NULL);
 #ifdef CONFIG_SEC_FACTORY
 static DEVICE_ATTR(epen_fac_select_firmware, (S_IWUSR | S_IWGRP),
@@ -1426,6 +1446,8 @@ static struct attribute *epen_attributes[] = {
 	&dev_attr_epen_firm_update.attr,
 	&dev_attr_epen_firm_update_status.attr,
 	&dev_attr_epen_firm_version.attr,
+	&dev_attr_ver_of_ic.attr,
+	&dev_attr_ver_of_bin.attr,
 	&dev_attr_epen_reset.attr,
 	&dev_attr_epen_reset_result.attr,
 	&dev_attr_epen_checksum.attr,
@@ -1442,8 +1464,6 @@ static struct attribute *epen_attributes[] = {
 	&dev_attr_aod_enable.attr,
 	&dev_attr_aod_lcd_onoff_status.attr,
 	&dev_attr_aot_enable.attr,
-	&dev_attr_dex_enable.attr,
-	&dev_attr_dex_rate.attr,
 	&dev_attr_pen_out_count.attr,
 	&dev_attr_abnormal_reset_count.attr,
 	&dev_attr_i2c_fail_count.attr,
@@ -1460,47 +1480,161 @@ static struct attribute_group epen_attr_group = {
 	.attrs = epen_attributes,
 };
 
+static void get_chip_name(void *device_data)
+{
+	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
+	char buff[SEC_CMD_STR_LEN] = { 0 };
+
+	sec_cmd_set_default_result(sec);
+
+	if (wac_i2c->pdata->ic_type == MPU_W9018)
+		snprintf(buff, sizeof(buff), "W9018");
+	else if (wac_i2c->pdata->ic_type == MPU_W9019)
+		snprintf(buff, sizeof(buff), "W9019");
+	else if (wac_i2c->pdata->ic_type == MPU_W9020)
+		snprintf(buff, sizeof(buff), "W9020");
+	else if (wac_i2c->pdata->ic_type == MPU_W9021)
+		snprintf(buff, sizeof(buff), "W9021");
+	else
+		snprintf(buff, sizeof(buff), "N/A");
+
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+	sec->cmd_state = SEC_CMD_STATUS_OK;
+}
+
+enum {
+	WACOM_BUILT_IN = 0,
+	WACOM_UMS,
+	WACOM_NONE,
+	WACOM_SPU,
+};
+
+/* Factory cmd for firmware update
+ * argument represent what is source of firmware like below.
+ *
+ * 0 : [BUILT_IN] Getting firmware which is for user.
+ * 1 : [UMS] Getting firmware from sd card.
+ * 2 : none
+ * 3 : [FFU] Getting firmware from apk.
+ */
+
+static void fw_update(void *device_data)
+{
+	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
+	struct wacom_i2c *wac_i2c = container_of(sec, struct wacom_i2c, sec);
+	char buff[SEC_CMD_STR_LEN] = { 0 };
+	int ret = 0;
+
+	sec_cmd_set_default_result(sec);
+
+	if (!wac_i2c->power_enable) {
+		input_err(true, &wac_i2c->client->dev, "%s: [ERROR] Wacom is stopped\n", __func__);
+		goto err_out;
+	}
+
+	if (sec->cmd_param[0] < 0 || sec->cmd_param[0] > WACOM_SPU) {
+		input_err(true, &wac_i2c->client->dev, "%s: [ERROR] parm error![%d]\n",
+						__func__, sec->cmd_param[0]);
+		goto err_out;
+	}
+
+	switch (sec->cmd_param[0]) {
+	case WACOM_BUILT_IN:
+		ret = wacom_fw_update(wac_i2c, FW_BUILT_IN, true);
+		break;
+	case WACOM_UMS:
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		ret = wacom_fw_update(wac_i2c, FW_IN_SDCARD, true);
+#else
+		ret = wacom_fw_update(wac_i2c, FW_IN_SDCARD_SIGNED, true);
+#endif
+		break;
+	case WACOM_SPU:
+		ret = wacom_fw_update(wac_i2c, FW_SPU, true);
+		break;
+	default:
+		input_err(true, &wac_i2c->client->dev, "%s: Not support command[%d]\n",
+				__func__, sec->cmd_param[0]);
+		goto err_out;
+	}
+
+	if (ret) {
+		input_err(true, &wac_i2c->client->dev, "%s: Wacom fw upate(%d) fail ret [%d]\n",
+					__func__, sec->cmd_param[0], ret);
+		goto err_out;
+	}
+
+	input_info(true, &wac_i2c->client->dev, "%s: Wacom fw upate[%d]\n", __func__, sec->cmd_param[0]);
+
+	snprintf(buff, sizeof(buff), "OK\n");
+	sec->cmd_state = SEC_CMD_STATUS_OK;
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+
+	input_info(true, &wac_i2c->client->dev, "%s: Done\n", __func__);
+
+	return;
+
+err_out:
+	snprintf(buff, sizeof(buff), "NG");
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+	sec->cmd_state = SEC_CMD_STATUS_FAIL;
+	return;
+
+}
+
+static void not_support_cmd(void *device_data)
+{
+	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
+	char buff[SEC_CMD_STR_LEN] = { 0 };
+
+	sec_cmd_set_default_result(sec);
+	snprintf(buff, sizeof(buff), "NA");
+
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+	sec->cmd_state = SEC_CMD_STATUS_NOT_APPLICABLE;
+	sec_cmd_set_cmd_exit(sec);
+}
+
 int wacom_sec_init(struct wacom_i2c *wac_i2c)
 {
 	struct i2c_client *client = wac_i2c->client;
 	int retval = 0;
 
-	wac_i2c->dev = sec_device_create(wac_i2c, "sec_epen");
-	if (IS_ERR(wac_i2c->dev)) {
-		input_err(true, &client->dev, "failed to create device\n");
-		retval = -ENODEV;
+	retval = sec_cmd_init(&wac_i2c->sec, sec_cmds, ARRAY_SIZE(sec_cmds),
+			      SEC_CLASS_DEVT_WACOM);
+	if (retval < 0) {
+		input_err(true, &client->dev, "failed to sec_cmd_init\n");
 		return retval;
 	}
 
-	dev_set_drvdata(wac_i2c->dev, wac_i2c);
-
-	retval = sysfs_create_group(&wac_i2c->dev->kobj, &epen_attr_group);
+	retval = sysfs_create_group(&wac_i2c->sec.fac_dev->kobj, &epen_attr_group);
 	if (retval) {
-		input_err(true, &client->dev, "failed to create sysfs group\n");
+		input_err(true, &client->dev, "failed to create sysfs attributes\n");
 		goto err_sysfs_create_group;
 	}
 
-	retval = sysfs_create_link(&wac_i2c->dev->kobj,
+	retval = sysfs_create_link(&wac_i2c->sec.fac_dev->kobj,
 				   &wac_i2c->input_dev->dev.kobj, "input");
 	if (retval) {
 		input_err(true, &client->dev, "failed to create sysfs link\n");
 		goto err_create_symlink;
 	}
 
-	return retval;
+	return 0;
 
 err_create_symlink:
-	sysfs_remove_group(&wac_i2c->dev->kobj, &epen_attr_group);
+	sysfs_remove_group(&wac_i2c->sec.fac_dev->kobj, &epen_attr_group);
 err_sysfs_create_group:
-	sec_device_destroy(wac_i2c->dev->devt);
+	sec_cmd_exit(&wac_i2c->sec, SEC_CLASS_DEVT_WACOM);
 
 	return retval;
 }
 
 void wacom_sec_remove(struct wacom_i2c *wac_i2c)
 {
-	sysfs_delete_link(&wac_i2c->dev->kobj,
+	sysfs_delete_link(&wac_i2c->sec.fac_dev->kobj,
 			  &wac_i2c->input_dev->dev.kobj, "input");
-	sysfs_remove_group(&wac_i2c->dev->kobj, &epen_attr_group);
-	sec_device_destroy(wac_i2c->dev->devt);
+	sysfs_remove_group(&wac_i2c->sec.fac_dev->kobj, &epen_attr_group);
+	sec_cmd_exit(&wac_i2c->sec, SEC_CLASS_DEVT_WACOM);
 }

@@ -379,8 +379,8 @@ struct fimc_is_hw_mcsc_cap {
 };
 
 struct fimc_is_hw_mcsc {
-	struct	hw_api_scaler_setfile setfile[SENSOR_POSITION_END][FIMC_IS_MAX_SETFILE];
-	struct	hw_api_scaler_setfile *applied_setfile[SENSOR_POSITION_END];
+	struct	hw_api_scaler_setfile setfile[SENSOR_POSITION_MAX][FIMC_IS_MAX_SETFILE];
+	struct	hw_api_scaler_setfile *applied_setfile[SENSOR_POSITION_MAX];
 	struct	fimc_is_hw_mcsc_cap cap;
 
 	u32	in_img_format;
@@ -391,6 +391,7 @@ struct fimc_is_hw_mcsc {
 	u32	instance;
 	ulong	out_en;
 	ulong	blk_set_ctrl[FIMC_IS_STREAM_COUNT];
+	u32	prev_hwfc_output_ids;
 
 	/* for tdnr use */
 	enum mcsc_output_index	tdnr_output;
@@ -410,7 +411,7 @@ int fimc_is_hw_mcsc_probe(struct fimc_is_hw_ip *hw_ip, struct fimc_is_interface 
 	struct fimc_is_interface_ischain *itfc, int id, const char *name);
 
 int fimc_is_hw_mcsc_update_param(struct fimc_is_hw_ip *hw_ip,
-	struct mcs_param *param, u32 lindex, u32 hindex, u32 instance);
+	struct mcs_param *param, u32 instance);
 void fimc_is_hw_mcsc_frame_done(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame,
 	int done_type);
 int fimc_is_hw_mcsc_reset(struct fimc_is_hw_ip *hw_ip);
@@ -433,7 +434,7 @@ int fimc_is_hw_mcsc_dma_output(struct fimc_is_hw_ip *hw_ip, struct param_mcs_out
 int fimc_is_hw_mcsc_output_yuvrange(struct fimc_is_hw_ip *hw_ip, struct param_mcs_output *output,
 	u32 output_id, u32 instance);
 int fimc_is_hw_mcsc_hwfc_mode(struct fimc_is_hw_ip *hw_ip, struct param_mcs_input *input,
-	u32 hwfc_output_ids, u32 instance);
+	u32 hwfc_output_ids, u32 dma_output_ids, u32 instance);
 int fimc_is_hw_mcsc_hwfc_output(struct fimc_is_hw_ip *hw_ip, struct param_mcs_output *output,
 	u32 output_id, u32 instance);
 

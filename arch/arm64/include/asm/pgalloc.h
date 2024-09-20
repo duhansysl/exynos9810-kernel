@@ -23,13 +23,13 @@
 #include <asm/processor.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+
 #ifdef CONFIG_UH_RKP
 #include <linux/rkp.h>
 
 #define FIMC_VA	 (0xffffff80fa000000ULL)
-#define FIMC_SIZE	(0x780000)
+#define FIMC_SIZE	(0x880000)
 #endif
-
 #define check_pgt_cache()		do { } while (0)
 
 #define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)

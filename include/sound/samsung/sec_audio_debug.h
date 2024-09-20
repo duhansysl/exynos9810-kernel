@@ -56,9 +56,9 @@ void adev_dbg(struct device *dev, const char *fmt, ...);
 int register_debug_mixer(struct snd_soc_card *card);
 int alloc_sec_audio_log(struct sec_audio_log_data *p_dbg_log_data, size_t buffer_len);
 
-void sec_audio_log(int level, struct device *dev, const char *fmt, ...);
-void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...);
-void sec_audio_pmlog(int level, struct device *dev, const char *fmt, ...);
+void sec_audio_log(int level, const char *fmt, ...);
+void sec_audio_bootlog(int level, const char *fmt, ...);
+void sec_audio_pmlog(int level, const char *fmt, ...);
 
 #ifdef CHANGE_DEV_PRINT
 #ifdef dev_err
@@ -111,15 +111,15 @@ inline void free_sec_audio_log(struct sec_audio_log_data *p_dbg_log_data)
 {
 }
 
-inline void sec_audio_log(int level, struct device *dev, const char *fmt, ...)
+inline void sec_audio_log(int level, const char *fmt, ...)
 {
 }
 
-inline void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...)
+inline void sec_audio_bootlog(int level, const char *fmt, ...)
 {
 }
 
-inline void sec_audio_pmlog(int level, struct device *dev, const char *fmt, ...)
+inline void sec_audio_pmlog(int level, const char *fmt, ...)
 {
 }
 

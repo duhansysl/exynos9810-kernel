@@ -50,7 +50,11 @@
 #define FIMC_IS_CRANGE_FULL		0
 #define FIMC_IS_CRANGE_LIMITED		1
 
-#define NI_BACKUP_MAX			10
+#ifdef ENABLE_REMOSAIC_CAPTURE_WITH_ROTATION
+#define CHK_REMOSAIC_SCN(captureIntent)	\
+	(((captureIntent == AA_CAPTURE_INTENT_STILL_CAPTURE_REMOSAIC_SINGLE) \
+	|| (captureIntent == AA_CAPTURE_INTENT_STILL_CAPTURE_REMOSAIC_MFHDR_DYNAMIC_SHOT)) ? 1 : 0)
+#endif
 
 /*global state*/
 enum fimc_is_ischain_state {
@@ -198,9 +202,6 @@ int fimc_is_ischain_start_wrap(struct fimc_is_device_ischain *device,
 int fimc_is_ischain_stop_wrap(struct fimc_is_device_ischain *device,
 	struct fimc_is_group *group);
 
-void fimc_is_ischain_version(enum fimc_is_bin_type type, const char *load_bin, u32 size);
-char* fimc_is_ischain_get_version(enum fimc_is_bin_type type);
-
 /* 3AA subdev */
 int fimc_is_ischain_3aa_open(struct fimc_is_device_ischain *device,
 	struct fimc_is_video_ctx *vctx);
@@ -323,8 +324,10 @@ int fimc_is_itf_process_stop(struct fimc_is_device_ischain *device,
 	u32 group);
 int fimc_is_itf_force_stop(struct fimc_is_device_ischain *device,
 	u32 group);
+#ifdef ENABLE_IS_CORE
 int fimc_is_itf_map(struct fimc_is_device_ischain *device,
 	u32 group, u32 shot_addr, u32 shot_size);
+#endif
 int fimc_is_itf_grp_shot(struct fimc_is_device_ischain *device,
 	struct fimc_is_group *group,
 	struct fimc_is_frame *frame);

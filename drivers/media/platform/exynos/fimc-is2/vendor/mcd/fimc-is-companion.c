@@ -270,7 +270,7 @@ static int fimc_is_comp_check_crc32(struct fimc_is_core *core, char *name)
 	u32 checksum, from_checksum = 0;
 	u16 addr1, addr2, read_addr, data_size1, data_size2;
 	u16 result_data, cmd_data, temp_data;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 
 	fimc_is_sec_get_sysfs_finfo(&sysfs_finfo);
@@ -410,7 +410,7 @@ static int fimc_is_comp_load_binary(struct fimc_is_core *core, char *name)
 	char version_str[60];
 	u16 addr1, addr2;
 	char companion_ver[12] = {0, };
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 #ifdef USE_ION_ALLOC
 	struct ion_handle *handle = NULL;
 #endif
@@ -651,7 +651,7 @@ static int fimc_is_comp_load_cal(struct fimc_is_core *core, char *name)
 
 	int ret = 0, endian;
 	u32 data_size = 0, offset;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 	u16 data1, data2;
 	u32 comp_addr = 0;
@@ -717,7 +717,7 @@ static int fimc_is_comp_read_i2c_cal(struct fimc_is_core *core, u32 addr)
 	u16 data1, data2;
 	u8 read_data[2];
 
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 
 	fimc_is_sec_get_sysfs_finfo(&sysfs_finfo);
 
@@ -779,7 +779,7 @@ static int fimc_is_comp_load_i2c_cal(struct fimc_is_core *core, u32 addr)
 	u16 data1, data2, data3 = 0, data4 = 0xFFFF;
 	u32 comp_addr = 0;
 
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 
 	fimc_is_sec_get_sysfs_finfo(&sysfs_finfo);
@@ -946,7 +946,7 @@ int fimc_is_power_binning(void *core_data)
 		return -ENODEV;
 	}
 
-	ret = read_data_from_file(FIMC_IS_ISP_CV, buf, 1, &pos);
+	ret = read_data_rom_file(FIMC_IS_ISP_CV, buf, 1, &pos);
 	if(ret > 0) {
 		if (kstrtoint(buf, 10, &vout_sel))
 			err("convert fail");
@@ -1080,7 +1080,7 @@ u8 fimc_is_comp_is_compare_ver(void *core_data)
 {
 	struct fimc_is_core *core = core_data;
 	char *cal_buf;
-	u32 from_ver = 0, def_ver = 0;
+	u32 rom_ver = 0, def_ver = 0;
 	u8 ret = 0;
 	char ver[3] = {'V', '0', '0'};
 
@@ -1092,8 +1092,8 @@ u8 fimc_is_comp_is_compare_ver(void *core_data)
 	}
 
 	def_ver = ver[0] << 16 | ver[1] << 8 | ver[2];
-	from_ver = cal_buf[96] << 16 | cal_buf[97] << 8 | cal_buf[98];
-	if (from_ver == def_ver) {
+	rom_ver = cal_buf[96] << 16 | cal_buf[97] << 8 | cal_buf[98];
+	if (rom_ver == def_ver) {
 		return cal_buf[99];
 	} else {
 		err("FROM core version is invalid. version is %c%c%c%c", cal_buf[96], cal_buf[97], cal_buf[98], cal_buf[99]);
@@ -1106,7 +1106,7 @@ exit:
 int fimc_is_comp_loadcal(void *core_data)
 {
 	struct fimc_is_core *core = core_data;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	int ret = 0;
 	int retry_count = 3;
 	bool pdaf_valid = false;
@@ -1122,7 +1122,7 @@ int fimc_is_comp_loadcal(void *core_data)
 		goto p_err;
 	}
 
-	if (!fimc_is_sec_check_from_ver(core)) {
+	if (!fimc_is_sec_check_rom_ver(core)) {
 		err("%s: error, not implemented! skip..", __func__);
 		return 0;
 	}
@@ -1258,7 +1258,7 @@ int fimc_is_comp_loadfirm(void *core_data)
 	int retry_count = 3;
 	struct fimc_is_core *core = core_data;
 	struct exynos_platform_fimc_is *core_pdata = NULL;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 
 	core_pdata = dev_get_platdata(fimc_is_dev);
 	if (!core_pdata) {
@@ -1309,7 +1309,7 @@ retry:
 		err("fimc_is_comp_i2c_setf_write() fail");
 	}
 
-	if (fimc_is_sec_check_from_ver(core)) {
+	if (fimc_is_sec_check_rom_ver(core)) {
 		if (companion_ver == 0x00A0)
 			ret = fimc_is_comp_check_crc32(core, COMP_FW_EVT0);
 		else if (companion_ver == 0x00B0)
@@ -1333,7 +1333,7 @@ int fimc_is_comp_loadsetf(void *core_data)
 {
 	int ret = 0;
 	struct fimc_is_core *core = core_data;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 
 	if (!core->spi1.device) {
 		pr_debug("spi1 device is not available");

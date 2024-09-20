@@ -560,7 +560,6 @@ config ZSWAP
 	bool "Compressed cache for swap pages (EXPERIMENTAL)"
 	depends on FRONTSWAP && CRYPTO=y
 	select CRYPTO_LZO
-	select CRYPTO_LZ4
 	select ZPOOL
 	default n
 	help
@@ -576,28 +575,6 @@ config ZSWAP
 	  interactions don't cause any known issues on simple memory setups,
 	  they have not be fully explored on the large set of potential
 	  configurations and workloads that exist.
-
-config ZSWAP_MIGRATION_SUPPORT
-	bool "Support the migration of zsmalloc pages used by zswap"
-	depends on ZSWAP && ZSMALLOC && COMPACTION
-	default n
-	help
-	  By supporting the migration of zsmalloc pages, the compaction can migrate
-	  more pages (originally, only anon and fs pages) so that
-	  the compaction success rate may increase.
-
-config ZSWAP_ENABLE_WRITEBACK
-	bool "Enable zswap writeback"
-	depends on ZSWAP
-	default n
-
-config ZSWAP_SAME_PAGE_SHARING
-	bool "Enable same page sharing support in zswap"
-	depends on ZSWAP && !ZSWAP_ENABLE_WRITEBACK
-	default n
-	help
-	  This option adds a feature to share the compressed pages
-	  written to zswap if the pages are found to be same.
 
 config ZPOOL
 	tristate "Common API for compressed memory storage"
@@ -660,31 +637,6 @@ config ZSMALLOC_STAT
 	  statistics about whats happening in zsmalloc and exports that
 	  information to userspace via debugfs.
 	  If unsure, say N.
-
-config DIRECT_RECLAIM_FILE_PAGES_ONLY
-	bool "Reclaim file pages only on direct reclaim path"
-	depends on SWAP
-	default y
-
-config INCREASE_MAXIMUM_SWAPPINESS
-	bool "Allow swappiness to be set up to 200"
-	depends on SWAP
-	default y
-
-config FIX_INACTIVE_RATIO
-	bool "Fix active:inactive anon ratio to 1:1"
-	depends on ZSWAP
-	default n
-
-config SWAP_ENABLE_READAHEAD
-	bool "Enable readahead on page swap in"
-	depends on SWAP
-	default y
-	help
-	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
-	  also paged in expecting those pages will be used in near future.
-	  This behaviour is good at disk-based system, but not on in-memory
-	  compression (e.g. zram).
 
 config GENERIC_EARLY_IOREMAP
 	bool
@@ -767,32 +719,35 @@ config ARCH_USES_HIGH_VMA_FLAGS
 config ARCH_HAS_PKEYS
 	bool
 
-# IOPP-dirty_buffer-v2.0.4.4
-config LARGE_DIRTY_BUFFER
-       bool "Use large dirty_threshold value by enabling dirty_ratio"
-       default y
-       help
-        This config enables dirty_ratio/dirty_background_ratio,
-        and it means large dirty_threshold value in 64bit architectures.
-        If unsure, say N to use kernel default value
+config INCREASE_MAXIMUM_SWAPPINESS
+	bool "Allow swappiness to be set up to 200"
+	depends on SWAP
+	default y
 
-config MAX_DIRTY_THRESH_PAGES
-       int "The upper bound of VM dirty_thresh value in number of pages"
-	depends on LARGE_DIRTY_BUFFER
-       default 25600
-       help
-         This value is the upper bound of VM dirty-thresh. (0 means no limit.)
-         It is only effective when dirty_ratio is used.
-         (Setting dirty_bytes disables this option.)
+config DIRECT_RECLAIM_FILE_PAGES_ONLY
+	bool "Reclaim file pages only on direct reclaim path"
+	depends on SWAP
+	default y
 
 config BALANCE_ANON_FILE_RECLAIM
 	bool "During reclaim treat anon and file backed pages equally"
 	depends on SWAP
+	default y
 	help
 	  When performing memory reclaim treat anonymous and file backed pages
 	  equally.
 	  Swapping anonymous pages out to memory can be efficient enough to justify
 	  treating anonymous and file backed pages equally.
+
+config SWAP_ENABLE_READAHEAD
+	bool "Enable readahead on page swap in"
+	depends on SWAP
+	default y
+	help
+	  When a page fault occurs, adjacent pages of SWAP_CLUSTER_MAX are
+	  also paged in expecting those pages will be used in near future.
+	  This behaviour is good at disk-based system, but not on in-memory
+	  compression (e.g. zram).
 
 config MMAP_READAROUND_LIMIT
 	int "Limit mmap readaround upperbound"
@@ -829,10 +784,35 @@ config PAGE_BOOST_RECORDING
 	  As Android executes an app one by one, only allow 1 recording
 	  at a time.
 
-config VMPRESSURE_LEVEL_MED
-	int "Threshold to account memory pressure"
-	default 60
+config PROCESS_RECLAIM
+	bool "Enable process reclaim"
+	depends on PROC_FS
+	default y
 	help
-	  This supports to adjust vmpressure_level_med threshold value
+	 It allows to reclaim pages of the process by /proc/pid/reclaim.
 
-source "mm/sec_mm/Kconfig"
+	 (echo file > /proc/PID/reclaim) reclaims file-backed pages only.
+	 (echo anon > /proc/PID/reclaim) reclaims anonymous pages only.
+	 (echo all > /proc/PID/reclaim) reclaims all pages.
+
+	 (echo addr size-byte > /proc/PID/reclaim) reclaims pages in
+	 (addr, addr + size-bytes) of the process.
+
+	 Any other value is ignored.
+
+config LARGE_DIRTY_BUFFER
+	bool "Use large dirty_threshold value by enabling dirty_ratio"
+	default y
+	help
+	  This config enables dirty_ratio/dirty_background_ratio,
+	  and it means large dirty_threshold value in 64bit architectures.
+	  If unsure, say N to use kernel default value
+
+config MAX_DIRTY_THRESH_PAGES
+	int "The upper bound of VM dirty_thresh value in number of pages"
+	depends on LARGE_DIRTY_BUFFER
+	default 25600
+	help
+	  This value is the upper bound of VM dirty-thresh. (0 means no limit.)
+	  It is only effective when dirty_ratio is used.
+	  (Setting dirty_bytes disables this option.)

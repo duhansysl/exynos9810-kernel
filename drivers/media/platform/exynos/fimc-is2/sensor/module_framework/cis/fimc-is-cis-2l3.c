@@ -77,7 +77,7 @@ static bool sensor_2l3_cis_is_wdr_mode_on(cis_shared_data *cis_data)
 	if (!fimc_is_vender_wdr_mode_on(cis_data))
 		return false;
 
-	if (mode < 0 || mode >= SENSOR_2L3_MODE_MAX) {
+	if (mode >= SENSOR_2L3_MODE_MAX) {
 		err("invalid mode(%d)!!", mode);
 		return false;
 	}
@@ -2992,7 +2992,7 @@ int sensor_2l3_cis_get_super_slow_motion_threshold(struct v4l2_subdev *subdev, u
 		*threshold = 0;
 		return ret;
 	}
-	
+
 	*threshold = final_threshold;
 
 	pr_info("[%s] : super slow threshold(%d)\n", __func__, *threshold);
@@ -3112,9 +3112,9 @@ static struct fimc_is_cis_ops cis_ops_2l3 = {
 #endif
 	.cis_set_frs_control = sensor_2l3_cis_set_frs_control,
 	.cis_set_super_slow_motion_roi = sensor_2l3_cis_set_super_slow_motion_roi,
-	.cis_check_rev = sensor_2l3_cis_check_rev,
-	.cis_set_super_slow_motion_threshold = sensor_2l3_cis_set_super_slow_motion_threshold, 
-	.cis_get_super_slow_motion_threshold = sensor_2l3_cis_get_super_slow_motion_threshold, 
+	.cis_check_rev_on_init = sensor_cis_check_rev_on_init,
+	.cis_set_super_slow_motion_threshold = sensor_2l3_cis_set_super_slow_motion_threshold,
+	.cis_get_super_slow_motion_threshold = sensor_2l3_cis_get_super_slow_motion_threshold,
 };
 
 static int cis_2l3_probe(struct i2c_client *client,
@@ -3126,7 +3126,7 @@ static int cis_2l3_probe(struct i2c_client *client,
 	struct fimc_is_cis *cis = NULL;
 	struct fimc_is_device_sensor *device = NULL;
 	struct fimc_is_device_sensor_peri *sensor_peri = NULL;
-	u32 sensor_id[FIMC_IS_STREAM_COUNT] = {0, };
+	u32 sensor_id[FIMC_IS_SENSOR_COUNT] = {0, };
 	u32 sensor_id_len;
 	const u32 *sensor_id_spec;
 	char const *setfile;

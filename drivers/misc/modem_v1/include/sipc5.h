@@ -211,12 +211,12 @@ static inline bool sipc5_ipc_ch(u8 ch)
 
 /**
 @param ch	the channel ID
-@return		true if the channel ID is for DM channel
+@return		true if the channel ID is for LOG channel want to logging
 */
-static inline bool sipc5_dm_ch(u8 ch)
+static inline bool sipc5_log_ch(u8 ch)
 {
-	return (ch >= SIPC_CH_ID_CPLOG1 && ch <= SIPC_CH_ID_CPLOG2) ?
-		true : false;
+	return (ch >= SIPC_CH_ID_CPLOG1 && ch <= SIPC_CH_ID_CPLOG2)
+		? true : false;
 }
 
 struct sipc5_frame_data {

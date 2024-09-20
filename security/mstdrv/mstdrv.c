@@ -29,10 +29,6 @@
 #include "../../drivers/misc/tzdev/include/tzdev/tee_client_api.h"
 #endif
 
-#if defined(CONFIG_MFC_CHARGER)
-#include "../../drivers/battery_v2/include/sec_charging_common.h"
-#endif
-
 #define MST_LDO3_0 "MST_LEVEL_3.0V"
 #define MST_NOT_SUPPORT		(0x1 << 3)
 
@@ -79,7 +75,6 @@ EXPORT_SYMBOL_GPL(mst_drv_dev);
 #if defined(CONFIG_MFC_CHARGER)
 #define MST_MODE_ON		1
 #define MST_MODE_OFF		0
-#if 0
 static inline struct power_supply *get_power_supply_by_name(char *name)
 {
 	if (!name)
@@ -109,7 +104,6 @@ static inline struct power_supply *get_power_supply_by_name(char *name)
 	}    \
 }
 #endif
-#endif
 
 extern void mst_ctrl_of_mst_hw_onoff(bool on)
 {
@@ -136,10 +130,6 @@ extern void mst_ctrl_of_mst_hw_onoff(bool on)
 				POWER_SUPPLY_PROP_TECHNOLOGY, value);
 		printk("%s : MST_MODE_OFF notify : %d\n", __func__,
 				value.intval);
-
-		value.intval = 0;
-		psy_do_property("mfc-charger", set, POWER_SUPPLY_EXT_PROP_WPC_EN_MST, value);
-		printk("%s : MFC_IC Disable notify : %d\n", __func__, value.intval);
 #endif
 #if defined(CONFIG_MST_LPM_CONTROL)
 		/* PCIe LPM Enable */
@@ -168,11 +158,6 @@ static void of_mst_hw_onoff(bool on)
 
 	if (on) {
 #if defined(CONFIG_MFC_CHARGER)
-		printk("%s : MFC_IC Enable notify start\n", __func__);
-		value.intval = 1;
-		psy_do_property("mfc-charger", set, POWER_SUPPLY_EXT_PROP_WPC_EN_MST, value);
-		printk("%s : MFC_IC Enable notified : %d\n", __func__, value.intval);
-
 		printk("%s : MST_MODE_ON notify start\n", __func__);
 		value.intval = MST_MODE_ON;
 
@@ -228,10 +213,6 @@ static void of_mst_hw_onoff(bool on)
 				POWER_SUPPLY_PROP_TECHNOLOGY, value);
 		printk("%s : MST_MODE_OFF notify : %d\n", __func__,
 				value.intval);
-
-		value.intval = 0;
-		psy_do_property("mfc-charger", set, POWER_SUPPLY_EXT_PROP_WPC_EN_MST, value);
-		printk("%s : MFC_IC Disable notify : %d\n", __func__, value.intval);
 #endif
 
 #if defined(CONFIG_MST_LPM_CONTROL)

@@ -267,7 +267,6 @@ ssize_t max77705_chg_store_attrs(struct device *dev,
 
 #define REDUCE_CURRENT_STEP						100
 #define MINIMUM_INPUT_CURRENT					300
-#define SLOW_CHARGING_CURRENT_STANDARD          400
 
 #define WC_CURRENT_STEP		100
 #define WC_CURRENT_START	480
@@ -321,7 +320,6 @@ struct max77705_charger_data {
 	unsigned int	vbus_state;
 	bool	prev_aicl_mode;
 	int		aicl_on;
-	bool	slow_charging;
 	int		status;
 	int		charge_mode;
 	int uvlo_attach_flag;
@@ -370,7 +368,6 @@ struct max77705_charger_data {
 	int otg_limit_step;
 	int cpu_max_freq[MAX77705_LIMIT_STEP_NUM];
 #endif
-
 	int pmic_ver;
 	int input_curr_limit_step;
 	int wpc_input_curr_limit_step;

@@ -192,7 +192,6 @@ struct max77865_fuelgauge_data {
 
 	u32 fg_resistor;
 
-	u32 err_cnt;
 #if defined(CONFIG_BATTERY_CISD)
 	bool valert_count_flag;
 #endif

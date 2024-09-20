@@ -45,7 +45,7 @@ static int fimc_is_ischain_mxp_cfg(struct fimc_is_subdev *subdev,
 	struct fimc_is_device_ischain *device;
 	u32 width, height;
 	u32 crange;
-	int scenario_id;
+	int scenario_id = -1;
 
 	device = (struct fimc_is_device_ischain *)device_data;
 
@@ -69,16 +69,18 @@ static int fimc_is_ischain_mxp_cfg(struct fimc_is_subdev *subdev,
 	width = queue->framecfg.width;
 	height = queue->framecfg.height;
 	fimc_is_ischain_mxp_adjust_crop(device, incrop->w, incrop->h, &width, &height);
-	scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
 
 	if (queue->framecfg.quantization == V4L2_QUANTIZATION_FULL_RANGE) {
 		crange = SCALER_OUTPUT_YUV_RANGE_FULL;
 		msinfo("CRange:W\n", device, subdev);
 	} else {
 		crange = SCALER_OUTPUT_YUV_RANGE_NARROW;
-		if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
+#ifdef ENABLE_DVFS
+		scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
+#endif
+		if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS
+		    && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS)
 			msinfo("CRange:N\n", device, subdev);
-		}
 	}
 
 	mcs_output = fimc_is_itf_g_param(device, frame, subdev->param_dma_ot);
@@ -233,19 +235,16 @@ static int fimc_is_ischain_mxp_start(struct fimc_is_device_ischain *device,
 	u32 *indexes)
 {
 	int ret = 0;
-	struct fimc_is_fmt *format;
-	struct param_otf_input *otf_input;
+	struct fimc_is_fmt *format, *tmp_format;
+	struct param_otf_input *otf_input = NULL;
 	u32 crange;
-	int scenario_id;
+	u32 flip = mcs_output->flip;
+	int scenario_id = -1;
 
 	FIMC_BUG(!queue);
 	FIMC_BUG(!queue->framecfg.format);
 
 	format = queue->framecfg.format;
-
-	otf_input = NULL;
-
-	scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
 
 	/* if output DS, skip check a incrop & input mcs param
 	 * because, DS input size set to preview port output size
@@ -260,14 +259,46 @@ static int fimc_is_ischain_mxp_start(struct fimc_is_device_ischain *device,
 		mdbg_pframe("CRange:W\n", device, subdev, frame);
 	} else {
 		crange = SCALER_OUTPUT_YUV_RANGE_NARROW;
-		if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
+#ifdef ENABLE_DVFS
+		scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
+#endif
+		if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS
+		    && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS)
 			mdbg_pframe("CRange:N\n", device, subdev, frame);
+	}
+
+	if (node->pixelformat && format->pixelformat != node->pixelformat) { /* per-frame control for RGB */
+		tmp_format = fimc_is_find_format((u32)node->pixelformat, 0);
+		if (tmp_format) {
+			mdbg_pframe("pixelformat is changed(%c%c%c%c->%c%c%c%c)\n",
+				device, subdev, frame,
+				(char)((format->pixelformat >> 0) & 0xFF),
+				(char)((format->pixelformat >> 8) & 0xFF),
+				(char)((format->pixelformat >> 16) & 0xFF),
+				(char)((format->pixelformat >> 24) & 0xFF),
+				(char)((tmp_format->pixelformat >> 0) & 0xFF),
+				(char)((tmp_format->pixelformat >> 8) & 0xFF),
+				(char)((tmp_format->pixelformat >> 16) & 0xFF),
+				(char)((tmp_format->pixelformat >> 24) & 0xFF));
+			queue->framecfg.format = format = tmp_format;
+		} else {
+			mdbg_pframe("pixelformat is not found(%c%c%c%c)\n",
+				device, subdev, frame,
+				(char)((node->pixelformat >> 0) & 0xFF),
+				(char)((node->pixelformat >> 8) & 0xFF),
+				(char)((node->pixelformat >> 16) & 0xFF),
+				(char)((node->pixelformat >> 24) & 0xFF));
 		}
 	}
 
-	if (node->pixelformat) { /* per-frame control for RGB */
-		format = fimc_is_find_format((u32)node->pixelformat, 0);
-		queue->framecfg.format = format;
+	if ((index >= PARAM_MCS_OUTPUT0 && index < PARAM_MCS_OUTPUT5) &&
+		frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0] != mcs_output->flip) {
+		flip = frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0];
+		queue->framecfg.flip = flip << 1;
+		mdbg_pframe("flip is changed(%d->%d)\n",
+			device, subdev, frame,
+			mcs_output->flip,
+			flip);
 	}
 
 	mcs_output->otf_format = OTF_OUTPUT_FORMAT_YUV422;
@@ -295,7 +326,7 @@ static int fimc_is_ischain_mxp_start(struct fimc_is_device_ischain *device,
 					queue->framecfg.bytesperline[1]), 16);
 
 	mcs_output->yuv_range = crange;
-	mcs_output->flip = (u32)queue->framecfg.flip >> 1; /* Caution: change from bitwise to enum */
+	mcs_output->flip = flip;
 
 #ifdef ENABLE_HWFC
 	if (test_bit(FIMC_IS_ISCHAIN_REPROCESSING, &device->state))
@@ -398,6 +429,26 @@ static void fimc_is_ischain_mxp_otf_enable(struct fimc_is_device_ischain *device
 #endif
 }
 
+static void fimc_is_ischain_mxp_otf_disable(struct fimc_is_device_ischain *device,
+		struct fimc_is_subdev *subdev,
+		struct fimc_is_frame *frame,
+		struct param_mcs_output *mcs_output,
+		ulong index,
+		u32 *lindex,
+		u32 *hindex,
+		u32 *indexes)
+{
+#if !defined(USE_VRA_OTF)
+	mcs_output->otf_cmd = OTF_OUTPUT_COMMAND_DISABLE;
+
+	*lindex |= LOWBIT_OF(index);
+	*hindex |= HIGHBIT_OF(index);
+	(*indexes)++;
+
+	mdbg_pframe("OTF only disable\n", device, subdev, frame);
+#endif
+}
+
 static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 	void *device_data,
 	struct fimc_is_frame *ldr_frame,
@@ -414,8 +465,9 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 	u32 index, lindex, hindex, indexes;
 	u32 pixelformat = 0;
 	u32 *target_addr;
+	bool change_flip = false;
 	bool change_pixelformat = false;
-	int scenario_id;
+	int scenario_id = -1;
 
 	device = (struct fimc_is_device_ischain *)device_data;
 
@@ -450,27 +502,27 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 	switch (node->vid) {
 	case FIMC_IS_VIDEO_M0P_NUM:
 		index = PARAM_MCS_OUTPUT0;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc0TargetAddress;
+		target_addr = ldr_frame->sc0TargetAddress;
 		break;
 	case FIMC_IS_VIDEO_M1P_NUM:
 		index = PARAM_MCS_OUTPUT1;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc1TargetAddress;
+		target_addr = ldr_frame->sc1TargetAddress;
 		break;
 	case FIMC_IS_VIDEO_M2P_NUM:
 		index = PARAM_MCS_OUTPUT2;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc2TargetAddress;
+		target_addr = ldr_frame->sc2TargetAddress;
 		break;
 	case FIMC_IS_VIDEO_M3P_NUM:
 		index = PARAM_MCS_OUTPUT3;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc3TargetAddress;
+		target_addr = ldr_frame->sc3TargetAddress;
 		break;
 	case FIMC_IS_VIDEO_M4P_NUM:
 		index = PARAM_MCS_OUTPUT4;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc4TargetAddress;
+		target_addr = ldr_frame->sc4TargetAddress;
 		break;
 	case FIMC_IS_VIDEO_M5P_NUM:
 		index = PARAM_MCS_OUTPUT5;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sc5TargetAddress;
+		target_addr = ldr_frame->sc5TargetAddress;
 		break;
 	default:
 		mserr("vid(%d) is not matched", device, subdev, node->vid);
@@ -480,7 +532,6 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 
 	mcs_output = fimc_is_itf_g_param(device, ldr_frame, index);
 
-	scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
 
 	if (node->request) {
 		incrop = (struct fimc_is_crop *)node->input.cropRegion;
@@ -489,6 +540,10 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 			change_pixelformat = !COMPARE_FORMAT(pixelformat, node->pixelformat);
 			pixelformat = node->pixelformat;
 		}
+
+		if ((index >= PARAM_MCS_OUTPUT0 && index < PARAM_MCS_OUTPUT5) &&
+			ldr_frame->shot_ext->mcsc_flip[index - PARAM_MCS_OUTPUT0] != mcs_output->flip)
+			change_flip = true;
 
 		inparm.x = mcs_output->crop_offset_x;
 		inparm.y = mcs_output->crop_offset_y;
@@ -508,6 +563,7 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 
 		if (!COMPARE_CROP(incrop, &inparm) ||
 			!COMPARE_CROP(otcrop, &otparm) ||
+			change_flip ||
 			change_pixelformat ||
 			!test_bit(FIMC_IS_SUBDEV_RUN, &subdev->state) ||
 			test_bit(FIMC_IS_SUBDEV_FORCE_SET, &leader->state)) {
@@ -529,19 +585,24 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 				goto p_err;
 			}
 
-			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
+#ifdef ENABLE_DVFS
+			scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
+#endif
+			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS
+			    && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
 				mdbg_pframe("in_crop[%d, %d, %d, %d]\n", device, subdev, ldr_frame,
-					incrop->x, incrop->y, incrop->w, incrop->h);
+						incrop->x, incrop->y, incrop->w, incrop->h);
 				mdbg_pframe("ot_crop[%d, %d, %d, %d]\n", device, subdev, ldr_frame,
-					otcrop->x, otcrop->y, otcrop->w, otcrop->h);
+						otcrop->x, otcrop->y, otcrop->w, otcrop->h);
 			}
 		}
 
+		/* buf_tag should be set by unit of stride */
 		ret = fimc_is_ischain_buf_tag(device,
 			subdev,
 			ldr_frame,
 			pixelformat,
-			otcrop->w,
+			mcs_output->dma_stride_y,
 			otcrop->h,
 			target_addr);
 		if (ret) {
@@ -580,22 +641,25 @@ static int fimc_is_ischain_mxp_tag(struct fimc_is_subdev *subdev,
 				merr("fimc_is_ischain_mxp_stop is fail(%d)", device, ret);
 				goto p_err;
 			}
-			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
+
+#ifdef ENABLE_DVFS
+			scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
+#endif
+
+			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS
+			    && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS)
 				mdbg_pframe(" off\n", device, subdev, ldr_frame);
-			}
 		}
 
 		if ((node->vid - FIMC_IS_VIDEO_M0P_NUM)
-			== (ldr_frame->shot->uctl.scalerUd.mcsc_sub_blk_port[INTERFACE_TYPE_DS])) {
-			fimc_is_ischain_mxp_otf_enable(device,
-				subdev,
-				ldr_frame,
-				mcs_output,
-				index,
-				&lindex,
-				&hindex,
-				&indexes);
-		}
+			== (ldr_frame->shot->uctl.scalerUd.mcsc_sub_blk_port[INTERFACE_TYPE_DS]))
+			fimc_is_ischain_mxp_otf_enable(device, subdev,
+					ldr_frame, mcs_output, index,
+					&lindex, &hindex, &indexes);
+		else if (mcs_output->otf_cmd == OTF_OUTPUT_COMMAND_ENABLE)
+			fimc_is_ischain_mxp_otf_disable(device, subdev,
+					ldr_frame, mcs_output, index,
+					&lindex, &hindex, &indexes);
 
 		target_addr[0] = 0;
 		target_addr[1] = 0;

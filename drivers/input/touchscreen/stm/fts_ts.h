@@ -660,7 +660,7 @@ void fts_interrupt_set(struct fts_ts_info *info, int enable);
 void fts_release_all_finger(struct fts_ts_info *info);
 int fts_read_analog_chip_id(struct fts_ts_info *info, unsigned char id);
 
-#ifndef CONFIG_SEC_SYSFS
+#ifndef CONFIG_DRV_SAMSUNG
 extern struct class *sec_class;
 #endif
 #ifdef CONFIG_BATTERY_SAMSUNG

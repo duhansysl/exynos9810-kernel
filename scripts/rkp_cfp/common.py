@@ -1,5 +1,6 @@
 import re
 import pprint
+import os.path
 
 hex_re = r'(?:[a-f0-9]{16})'
 hex_rec = re.compile(hex_re)
@@ -96,10 +97,26 @@ skip_blr=set([
     'stext',
     '__primary_switch',
     '__primary_switched',
-    'start_kernel',
     'secondary_startup',
     'el0_svc_naked',
     '__sys_trace',
+
+    # skip __init calls
+    'start_kernel',
+    'do_one_initcall',
+    'console_init',
+    'of_irq_init',
+    'of_clk_init',
+    'security_init',
+    'do_early_param',
+    'unknown_bootoption',
+    'timer_probe',
+
+    # skip trace event
+    'event_create_dir',
+
+    #'pci_fixup_device',
+
     'fimc_is_lib_vra_os_funcs',
     'fimc_is_hw_vra_init',
     'fimc_is_hw_3aa_init',
@@ -137,3 +154,15 @@ skip_magic=set([
     'set_security_override',
     'set_security_override_from_ctx',
     ])
+
+func_file = './scripts/rkp_cfp/addr_taken_func';
+keep_magic= set([])
+
+if os.path.isfile(func_file):
+    #print "Reading ", func_file
+    with open(func_file) as f:
+        for line in f:
+            keep_magic.add(line.strip())
+else:
+    print "Skipping ", func_file
+       

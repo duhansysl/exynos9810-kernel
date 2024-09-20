@@ -26,20 +26,12 @@
 #define DSM_ID_FILTER_GET_AFE_PARAMS		0x00000000
 #define DSM_ID_FILTER_SET_AFE_CNTRLS		0x00000001
 #define DSM_ID_FILTER_GET_LOG_AFE_PARAMS	0x00000002
-#define DSM_ID_FILTER_GET_AFE_PARAMS_R		 0x00000003
-#define DSM_ID_FILTER_SET_AFE_CNTRLS_R		 0x00000004
-#define DSM_ID_FILTER_GET_LOG_AFE_PARAMS_R	 0x00000005
 
 #define FLAG_WRITE_ALL						0xabefcdab
 #define FLAG_WRITE_CAL_FROM_FILE			0xffff0000
 #define FLAG_WRITE_ONOFF_ONLY				0xcdababef
 #define FLAG_WRITE_RDC_CAL_ONLY				0xca00ca00
 #define FLAG_WRITE_FEATURE_ONLY				0xfea0fea0
-#define PARAM_WRITE_V_VALIDATION			0xFEB0FEB0
-#define PARAM_WRITE_OSM					0xCBA0CBA0
-#define PARAM_WRITE_SET_THERM_MIN_GAIN			0xCACACACA
-#define PARAM_WRITE_SET_PPR				0xCDCDCDCD
-#define PARAM_WRITE_AMP_SCREEN				0xFEBCFEBC
 
 #define RESERVED_ADDR_COUNT		0xFF
 #define START_ADDR_FOR_LSI		0x2A004C
@@ -48,35 +40,27 @@
 #define AFE_PORT_ID_START		0x1000
 #define AFE_PORT_ID_END			0x400d
 
-#define PARAM_DSM_5_0_MAX						185
+#define PARAM_DSM_5_0_MAX 						185
 #define PARAM_DSM_5_0_ABOX_WRITE_CB				0xDAAD
-#define PARAM_DSM_5_0_ABOX_GET_LOGGING			1850
-#define PARAM_DSM_5_0_ABOX_GET_LOGGING_R		2035
-#define PARAM_DSM_ABOX_SET_OSM 500
+#define PARAM_DSM_5_0_ABOX_GET_LOGGING			1000
 
-#define DSM_4_0_LSI_STEREO_OFFSET			410
+#define DSM_4_0_LSI_STEREO_OFFSET				410
 
-#define DSM_API_SETGET_ENABLE				1
-#define DSM_API_SETGET_COILTEMP_THRESHOLD		2
-#define DSM_API_SETGET_XCL_THRESHOLD			3
-#define DSM_API_SETGET_LIMITERS_RELTIME			4
-#define DSM_API_SETGET_MAKEUP_GAIN			5
-#define DSM_API_SETGET_RDC_AT_ROOMTEMP			6
-#define DSM_API_SETGET_COLDTEMP				8
-#define DSM_API_SETGET_PITONE_GAIN			9
-#define DSM_API_SETGET_LFX_GAIN				12
-#define DSM_API_GET_ADAPTIVE_DC_RES			18
-#define DSM_API_SETGET_ENABLE_RDC_CAL			25
-#define DSM_API_SETGET_PILOT_ENABLE			28
-#define DSM_API_SETGET_THERMAL_MIN_GAIN			49
-#define DSM_API_SETGET_PPR_XOVER_THRSH_DB		50
-#define DSM_API_SETGET_PPR_XOVER_FREQ_HZ		51
-#define DSM_API_SETGET_ENABLE_PPR			52
-#define DSM_API_SETGET_WRITE_FLAG			63
+#define DSM_API_SETGET_ENABLE 				   	1
+#define DSM_API_SETGET_COILTEMP_THRESHOLD 		2
+#define DSM_API_SETGET_XCL_THRESHOLD 		  	3
+#define DSM_API_SETGET_LIMITERS_RELTIME 	  	4
+#define DSM_API_SETGET_MAKEUP_GAIN 			  	5
+#define DSM_API_SETGET_RDC_AT_ROOMTEMP		  	6
+#define DSM_API_SETGET_COLDTEMP 				8
+#define DSM_API_SETGET_PITONE_GAIN 				9
+#define DSM_API_SETGET_LFX_GAIN 				12
+#define DSM_API_GET_ADAPTIVE_DC_RES 			18
+#define DSM_API_SETGET_ENABLE_RDC_CAL 			25
+#define DSM_API_SETGET_PILOT_ENABLE 			28
+#define DSM_API_SETGET_WRITE_FLAG 				63
 #define DSM_API_SETGET_ENABLE_SMART_PT			104
-#define DSM_API_SETGET_POWER_MEASUREMENT		136
-#define DSM_API_GET_V_VALIDATION			145
-#define DSM_API_SETGET_AMP_SCREEN_VALIDATION		64
+#define DSM_API_SETGET_POWER_MEASUREMENT 		136
 
 enum maxdsm_version {
 	VERSION_3_0 = 30,
@@ -86,8 +70,6 @@ enum maxdsm_version {
 	VERSION_4_0_B = 41,
 	VERSION_5_0_C,
 	VERSION_4_0_A_S = 50,
-	VERSION_4_0_B_S,
-	VERSION_5_0_C_S,
 	VERSION_MAX,
 };
 
@@ -113,10 +95,6 @@ enum maxdsm_ioctl_cmds {
 	MAXDSM_IOCTL_SET_RX_PORT_ID,
 	MAXDSM_IOCTL_GET_TX_PORT_ID,
 	MAXDSM_IOCTL_SET_TX_PORT_ID,
-	MAXDSM_IOCTL_GET_PARAM_ID,
-	MAXDSM_IOCTL_SET_PARAM_ID,
-	MAXDSM_IOCTL_GET_PARAM_OFFSET,
-	MAXDSM_IOCTL_SET_PARAM_OFFSET,
 };
 
 enum maxdsm_ignore_param {
@@ -133,14 +111,6 @@ enum maxdsm_offset {
 	PARAM_OFFSET_FILTER_SET,
 	PARAM_OFFSET_VERSION,
 	PARAM_OFFSET_MAX,
-};
-
-enum maxdsm_offset_ppr {
-	PARAM_OFFSET_PPR_TARGET_TEMP,
-	PARAM_OFFSET_PPR_TARGET_TEMP_R,
-	PARAM_OFFSET_PPR_EXIT_TEMP,
-	PARAM_OFFSET_PPR_EXIT_TEMP_R,
-	PARAM_OFFSET_PPR_MAX,
 };
 
 enum maxdsm_3_0_params {
@@ -252,32 +222,22 @@ enum maxdsm_4_0_params {
 	PARAM_SPK_FS_SZ,
 	PARAM_Q_GUARD_BAND,
 	PARAM_Q_GUARD_BAND_SZ,
-	PARAM_RESERVED_0,
-	PARAM_RESERVED_0_SZ,
-	PARAM_RESERVED_1,
-	PARAM_RESERVED_1_SZ,
-	PARAM_THERMAL_MIN_GAIN,
-	PARAM_THERMAL_MIN_GAIN_SZ,
-	PARAM_PPR_THRESHOLD_DB,
-	PARAM_PPR_THRESHOLD_DB_SZ,
-	PARAM_PPR_XOVER_FREQ,
-	PARAM_PPR_XOVER_FREQ_SZ,
-	PARAM_PPR_ENABLE,
-	PARAM_PPR_ENABLE_SZ,
+	PARAM_STIMPEDMODEL_COEFFS_A1,
+	PARAM_STIMPEDMODEL_COEFFS_A1_SZ,
+	PARAM_STIMPEDMODEL_COEFFS_A2,
+	PARAM_STIMPEDMODEL_COEFFS_A2_SZ,
+	PARAM_STIMPEDMODEL_COEFFS_B0,
+	PARAM_STIMPEDMODEL_COEFFS_B0_SZ,
+	PARAM_STIMPEDMODEL_COEFFS_B1,
+	PARAM_STIMPEDMODEL_COEFFS_B1_SZ,
+	PARAM_STIMPEDMODEL_COEFFS_B2,
+	PARAM_STIMPEDMODEL_COEFFS_B2_SZ,
+	PARAM_STIMPEDMODEL_FLAG,
+	PARAM_STIMPEDMODEL_FLAG_SZ,
 	PARAM_Q_NOTCH,
 	PARAM_Q_NOTCH_SZ,
-	PARAM_STEREO_CROSSOVER_ENABLE,
-	PARAM_STEREO_CROSSOVER_ENABLE_SZ,
-	PARAM_STEREO_CROSSOVER_FREQ,
-	PARAM_STEREO_CROSSOVER_FREQ_SZ,
-	PARAM_STEREO_CROSSOVER_Q,
-	PARAM_STEREO_CROSSOVER_Q_SZ,
 	PARAM_POWER_MEASUREMENT,
 	PARAM_POWER_MEASUREMENT_SZ,
-	PARAM_V_VALIDATION,
-	PARAM_V_VALIDATION_SZ,
-	PARAM_AMP_SCREEN_VALIDATION,
-	PARAM_AMP_SCREEN_VALIDATION_SZ,
 	PARAM_DSM_4_0_MAX,
 };
 
@@ -505,8 +465,6 @@ struct maxim_dsm {
 	uint32_t ignore_mask;
 	uint32_t spk_state;
 	uint32_t sub_reg;
-	uint32_t param_offset;
-	uint32_t osm_mode;
 };
 
 #ifdef CONFIG_SND_SOC_MAXIM_DSM
@@ -531,19 +489,10 @@ void maxdsm_deinit(void);
 uint32_t maxdsm_get_platform_type(void);
 uint32_t maxdsm_get_version(void);
 uint32_t maxdsm_is_stereo(void);
-int maxdsm_set_feature_en(int on, uint32_t wflag);
+int maxdsm_set_feature_en(int on);
 int maxdsm_set_rdc_temp(int rdc, int temp);
-int maxdsm_set_rdc_temp_ch(int rdc, int temp, int ch);
-int maxdsm_set_ppr_enable(int on, int freq, int db, int ch);
-int maxdsm_set_ppr_xover_freq(int freq, int ch);
-int maxdsm_set_ppr_threshold_db(int threshold_db, int ch);
-int maxdsm_set_thermal_min_gain(int enable);
-int maxdsm_get_thermal_min_gain(void);
-
 int maxdsm_set_dsm_onoff_status(int on);
 uint32_t maxdsm_get_dcresistance(void);
-uint32_t maxdsm_get_dcresistance_r(void);
-
 int maxdsm_set_cal_mode(int on);
 
 int maxdsm_update_info(uint32_t *pinfo);
@@ -557,18 +506,10 @@ void maxdsm_set_regmap(struct regmap *regmap);
 int maxdsm_update_feature_en_adc(int apply);
 
 int maxdsm_get_spk_state(void);
-void maxdsm_set_spk_state(int state, int osm_mode);
+void maxdsm_set_spk_state(int state);
 int maxdsm_set_pilot_signal_state(int on);
 uint32_t maxdsm_get_power_measurement(void);
-uint32_t maxdsm_get_power_measurement_r(void);
-void maxdsm_set_stereo_mode_configuration(unsigned int mode);
-int maxdsm_set_v_validation_mode(int on);
-uint32_t maxdsm_get_v_validation(void);
-uint32_t maxdsm_get_v_validation_r(void);
-uint32_t maxdsm_get_amp_screen_validation(void);
-uint32_t maxdsm_get_amp_screen_validation_r(void);
-int maxdsm_set_amp_screen_mode(unsigned int mode);
-int maxdsm_set_amp_screen_validation_mode(int on);
+void maxdsm_set_stereo_mode_configuration(unsigned int);
 
 #ifdef USE_DSM_LOG
 struct maxim_dsm_log_max_values {
@@ -580,17 +521,11 @@ struct maxim_dsm_log_max_values {
 };
 
 #define LOG_BUFFER_ARRAY_SIZE 10
-#define LOG_CHANNELS 2 /* Stereo */
-#define LOG_LEFT 0
-#define LOG_RIGHT 1
 
 /* BUFSIZE must be 4 bytes allignment*/
 #define BEFORE_BUFSIZE (4+(LOG_BUFFER_ARRAY_SIZE*2))
 #define AFTER_BUFSIZE (LOG_BUFFER_ARRAY_SIZE*4)
 #define LOGMAX_BUFSIZE 4
-
-extern int coil_temp_max_keep;
-extern int coil_temp_max_keep_r;
 
 int maxdsm_get_dump_status(void);
 void maxdsm_update_param(void);
@@ -599,9 +534,9 @@ void maxdsm_log_update(const void *byte_log_array,
 		const void *after_prob_byte_log_array,
 		const void *after_prob_int_log_array,
 		const void *int_log_max_array);
-ssize_t maxdsm_log_prepare(char *buf, int chan);
-void maxdsm_log_max_prepare(struct maxim_dsm_log_max_values *values, int chan);
-void maxdsm_log_max_refresh(int values, int chan);
+ssize_t maxdsm_log_prepare(char *buf);
+void maxdsm_log_max_prepare(struct maxim_dsm_log_max_values *values);
+void maxdsm_log_max_refresh(int values);
 void maxdsm_cal_update(const void *byte_log_array,
 		const void *int_log_array,
 		const void *after_prob_byte_log_array,
@@ -609,10 +544,10 @@ void maxdsm_cal_update(const void *byte_log_array,
 		const void *int_log_max_array);
 #else
 static inline void maxdsm_log_update(const void *byte_log_array,
-				     const void *int_log_array,
-				     const void *after_prob_byte_log_array,
-				     const void *after_prob_int_log_array,
-				     const void *int_log_max_array) {}
+  const void *int_log_array,
+  const void *after_prob_byte_log_array,
+  const void *after_prob_int_log_array,
+  const void *int_log_max_array) {}
 /* BUFSIZE must be 4 bytes allignment*/
 #define BEFORE_BUFSIZE 0
 #define AFTER_BUFSIZE 0

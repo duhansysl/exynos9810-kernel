@@ -193,8 +193,8 @@ static inline unsigned long make_jiffies(long secs)
 static void xfrm_policy_timer(unsigned long data)
 {
 	struct xfrm_policy *xp = (struct xfrm_policy *)data;
-	time64_t now = ktime_get_real_seconds();
-	time64_t next = TIME64_MAX;
+	unsigned long now = get_seconds();
+	long next = LONG_MAX;
 	int warn = 0;
 	int dir;
 
@@ -206,7 +206,7 @@ static void xfrm_policy_timer(unsigned long data)
 	dir = xfrm_policy_id2dir(xp->index);
 
 	if (xp->lft.hard_add_expires_seconds) {
-		time64_t tmo = xp->lft.hard_add_expires_seconds +
+		long tmo = xp->lft.hard_add_expires_seconds +
 			xp->curlft.add_time - now;
 		if (tmo <= 0)
 			goto expired;
@@ -214,7 +214,7 @@ static void xfrm_policy_timer(unsigned long data)
 			next = tmo;
 	}
 	if (xp->lft.hard_use_expires_seconds) {
-		time64_t tmo = xp->lft.hard_use_expires_seconds +
+		long tmo = xp->lft.hard_use_expires_seconds +
 			(xp->curlft.use_time ? : xp->curlft.add_time) - now;
 		if (tmo <= 0)
 			goto expired;
@@ -222,7 +222,7 @@ static void xfrm_policy_timer(unsigned long data)
 			next = tmo;
 	}
 	if (xp->lft.soft_add_expires_seconds) {
-		time64_t tmo = xp->lft.soft_add_expires_seconds +
+		long tmo = xp->lft.soft_add_expires_seconds +
 			xp->curlft.add_time - now;
 		if (tmo <= 0) {
 			warn = 1;
@@ -232,7 +232,7 @@ static void xfrm_policy_timer(unsigned long data)
 			next = tmo;
 	}
 	if (xp->lft.soft_use_expires_seconds) {
-		time64_t tmo = xp->lft.soft_use_expires_seconds +
+		long tmo = xp->lft.soft_use_expires_seconds +
 			(xp->curlft.use_time ? : xp->curlft.add_time) - now;
 		if (tmo <= 0) {
 			warn = 1;
@@ -244,7 +244,7 @@ static void xfrm_policy_timer(unsigned long data)
 
 	if (warn)
 		km_policy_expired(xp, dir, 0, 0);
-	if (next != TIME64_MAX &&
+	if (next != LONG_MAX &&
 	    !mod_timer(&xp->timer, jiffies + make_jiffies(next)))
 		xfrm_pol_hold(xp);
 
@@ -828,7 +828,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	}
 	policy->index = delpol ? delpol->index : xfrm_gen_index(net, dir, policy->index);
 	hlist_add_head(&policy->byidx, net->xfrm.policy_byidx+idx_hash(net, policy->index));
-	policy->curlft.add_time = ktime_get_real_seconds();
+	policy->curlft.add_time = get_seconds();
 	policy->curlft.use_time = 0;
 	if (!mod_timer(&policy->timer, jiffies + HZ))
 		xfrm_pol_hold(policy);
@@ -1374,7 +1374,7 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	old_pol = rcu_dereference_protected(sk->sk_policy[dir],
 				lockdep_is_held(&net->xfrm.xfrm_policy_lock));
 	if (pol) {
-		pol->curlft.add_time = ktime_get_real_seconds();
+		pol->curlft.add_time = get_seconds();
 		pol->index = xfrm_gen_index(net, XFRM_POLICY_MAX+dir, 0);
 		xfrm_sk_policy_link(pol, dir);
 	}
@@ -2334,7 +2334,7 @@ no_transform:
 	}
 
 	for (i = 0; i < num_pols; i++)
-		pols[i]->curlft.use_time = ktime_get_real_seconds();
+		pols[i]->curlft.use_time = get_seconds();
 
 	if (num_xfrms < 0) {
 		/* Prohibit the flow */
@@ -2567,7 +2567,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 		return 1;
 	}
 
-	pol->curlft.use_time = ktime_get_real_seconds();
+	pol->curlft.use_time = get_seconds();
 
 	pols[0] = pol;
 	npols++;
@@ -2581,7 +2581,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 				XFRM_INC_STATS(net, LINUX_MIB_XFRMINPOLERROR);
 				return 0;
 			}
-			pols[1]->curlft.use_time = ktime_get_real_seconds();
+			pols[1]->curlft.use_time = get_seconds();
 			npols++;
 		}
 	}
@@ -3138,8 +3138,7 @@ void __init xfrm_init(void)
 	synchronize_rcu();
 }
 
-// [ SEC_SELINUX_PORTING_COMMON - remove AUDIT_MAC_IPSEC_EVENT audit log, it conflict with security notification
-#if 0 // #ifdef CONFIG_AUDITSYSCALL
+#ifdef CONFIG_AUDITSYSCALL
 static void xfrm_audit_common_policyinfo(struct xfrm_policy *xp,
 					 struct audit_buffer *audit_buf)
 {
@@ -3203,7 +3202,6 @@ void xfrm_audit_policy_delete(struct xfrm_policy *xp, int result,
 }
 EXPORT_SYMBOL_GPL(xfrm_audit_policy_delete);
 #endif
-// ] SEC_SELINUX_PORTING_COMMON - remove AUDIT_MAC_IPSEC_EVENT audit log, it conflict with security notification
 
 #ifdef CONFIG_XFRM_MIGRATE
 static bool xfrm_migrate_selector_match(const struct xfrm_selector *sel_cmp,

@@ -8,11 +8,7 @@ obj-$(CONFIG_EXTCON_ADC_JACK)	+= extcon-adc-jack.o
 obj-$(CONFIG_EXTCON_ARIZONA)	+= extcon-arizona.o
 obj-$(CONFIG_EXTCON_AXP288)	+= extcon-axp288.o
 obj-$(CONFIG_EXTCON_GPIO)	+= extcon-gpio.o
-ifneq ($(CONFIG_EXTCON_PTT),y)
 obj-$(CONFIG_EXTCON_MADERA)	+= extcon-madera.o
-else
-obj-$(CONFIG_EXTCON_MADERA)	+= extcon-madera_ptt.o
-endif
 obj-$(CONFIG_EXTCON_MAX14577)	+= extcon-max14577.o
 obj-$(CONFIG_EXTCON_MAX3355)	+= extcon-max3355.o
 obj-$(CONFIG_EXTCON_MAX77693)	+= extcon-max77693.o

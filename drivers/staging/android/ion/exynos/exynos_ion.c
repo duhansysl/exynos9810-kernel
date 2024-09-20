@@ -130,6 +130,37 @@ static struct exynos_ion_platform_heap plat_heaps[ION_NUM_HEAPS];
 static struct gen_pool *secure_iova_pool;
 static DEFINE_SPINLOCK(siova_pool_lock);
 
+/*
+ * Parse the heap ids of camera and camera_contig heaps during boot up
+ * - SEC MOBILE, kernel core memory
+ */
+unsigned int camera_heap_id;
+unsigned int secure_camera_heap_id;
+unsigned int camera_contig_heap_id;
+
+static void exynos_ion_init_camera_heaps(void)
+{
+       int i;
+       for (i = 0; i < nr_heaps; i++) {
+               if (plat_heaps[i].heap) {
+                       struct ion_heap *heap = plat_heaps[i].heap;
+                       if (!strncmp(heap->name, "camera_contig", 13)) {
+                               WARN_ON(camera_contig_heap_id);
+                               camera_contig_heap_id = heap->id;
+                       } else if (!strncmp(heap->name, "secure_camera", 13)) {
+                               WARN_ON(camera_heap_id);
+                               secure_camera_heap_id = heap->id;
+                       } else if (!strncmp(heap->name, "camera", 6)) {
+                               WARN_ON(camera_heap_id);
+                               camera_heap_id = heap->id;
+                       }
+               }
+       }
+       pr_info("%s: [heap id] camera %d, secure_camera %d, camera_contig %d\n",
+                       __func__, camera_heap_id,
+                       secure_camera_heap_id, camera_contig_heap_id);
+}
+
 #define MAX_IOVA_ALIGNMENT	12
 static unsigned long find_first_fit_with_align(unsigned long *map,
 				unsigned long size, unsigned long start,
@@ -250,6 +281,7 @@ int ion_secure_protect(struct ion_buffer *buffer)
 {
 	struct ion_heap *heap = buffer->heap;
 	struct exynos_ion_platform_heap *pdata;
+	struct ion_buffer_info *info = (struct ion_buffer_info *)buffer->priv_virt;
 	int id;
 
 	id = __find_platform_heap_id(heap->id);
@@ -265,6 +297,10 @@ int ion_secure_protect(struct ion_buffer *buffer)
 						heap->name);
 		return -EPERM;
 	}
+
+       /* use same protection ID for both of camera & camera_contig heap */
+       if (info->prot_desc.flags == camera_contig_heap_id)
+               info->prot_desc.flags = camera_heap_id;
 
 	return	__ion_secure_protect_buffer(pdata, buffer);
 }
@@ -346,55 +382,6 @@ bool ion_is_heap_available(struct ion_heap *heap,
 				unsigned long flags, void *data)
 {
 	return true;
-}
-
-/*
- * Parse the heap ids of camera and camera_contig heaps during boot up
- * - SEC MOBILE, kernel core memory
- */
-unsigned int camera_heap_id;
-unsigned int camera_contig_heap_id;
-
-static void exynos_ion_init_camera_heaps(void)
-{
-	int i;
-	for (i = 0; i < nr_heaps; i++) {
-		if (plat_heaps[i].heap) {
-			struct ion_heap *heap = plat_heaps[i].heap;
-			if (!strncmp(heap->name, "camera_contig", 13)) {
-				WARN_ON(camera_contig_heap_id);
-				camera_contig_heap_id = heap->id;
-			} else if (!strncmp(heap->name, "camera", 6)) {
-				WARN_ON(camera_heap_id);
-				camera_heap_id = heap->id;
-			}
-		}
-	}
-	pr_info("%s: [heap id] camera %d, camera_contig %d\n",
-			__func__, camera_heap_id, camera_contig_heap_id);
-}
-
-/*
- * This function should be called with the final heap_id_mask before ion buffer alloc.
- * - SEC MOBILE, kernel core memory
- */
-unsigned int ion_buffer_flag_sanity_check(unsigned int heap_id_mask, unsigned int flags)
-{
-	/*
-	 * Buffer alloc request on "camera | camera_contig heap" id uses
-	 * ION_FLAG_PROTECTED to indicate which heap the request should go.
-	 * (with this bit, goto camera_contig.)
-	 * After deciding the target heap in ion_parse_heap_id(),
-	 * the flag is meaningless. So remove it.
-	 * This is the exynos9810-specific requirement.
-	 * - SEC MOBILE, kernel core memory
-	 */
-	if (flags && ION_FLAG_PROTECTED) {
-		if ((camera_heap_id && (heap_id_mask == (1 << camera_heap_id))) ||
-		    (camera_contig_heap_id && (heap_id_mask == (1 << camera_contig_heap_id))))
-			return flags & ~ION_FLAG_PROTECTED;
-	}
-	return flags;
 }
 
 unsigned int ion_parse_heap_id(unsigned int heap_id_mask, unsigned int flags)
@@ -693,28 +680,6 @@ static long exynos_custom_ioctl(struct ion_client *client, unsigned int cmd,
 	return ret;
 }
 
-static int ion_system_heap_size_notifier(struct notifier_block *nb,
-					 unsigned long action, void *data)
-{
-	show_ion_system_heap_size((struct seq_file *)data);
-	return 0;
-}
-
-static struct notifier_block ion_system_heap_nb = {
-	.notifier_call = ion_system_heap_size_notifier,
-};
-
-static int ion_system_heap_pool_size_notifier(struct notifier_block *nb,
-					      unsigned long action, void *data)
-{
-	show_ion_system_heap_pool_size((struct seq_file *)data);
-	return 0;
-}
-
-static struct notifier_block ion_system_heap_pool_nb = {
-	.notifier_call = ion_system_heap_pool_size_notifier,
-};
-
 static int __init exynos_ion_init(void)
 {
 	ion_exynos = ion_device_create(exynos_custom_ioctl);
@@ -726,8 +691,6 @@ static int __init exynos_ion_init(void)
 	if (register_oomdebug_notifier(&ion_oomdebug_nb) < 0)
 		pr_err("%s: failed to register oom debug notifier\n", __func__);
 
-	show_mem_extra_notifier_register(&ion_system_heap_nb);
-	show_mem_extra_notifier_register(&ion_system_heap_pool_nb);
 	return exynos_ion_populate_heaps(ion_exynos);
 }
 

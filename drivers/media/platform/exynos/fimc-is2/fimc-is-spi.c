@@ -22,6 +22,9 @@
 #include "fimc-is-core.h"
 #include "fimc-is-dt.h"
 #include "fimc-is-regs.h"
+#ifdef CONFIG_VENDER_MCD
+#include "fimc-is-vender-specific.h"
+#endif
 
 #define STREAM_TO_U16(var16, p)	{(var16) = ((u16)(*((u8 *)p+1)) + \
 				((u8)(*((u8 *)p) << 8))); }
@@ -169,6 +172,9 @@ static int fimc_is_spi_probe(struct spi_device *device)
 	int ret = 0;
 	struct fimc_is_core *core;
 	struct fimc_is_spi *spi;
+#ifdef CONFIG_VENDER_MCD
+	struct fimc_is_vender_specific *specific;
+#endif
 
 	if (fimc_is_dev == NULL) {
 		probe_warn("fimc_is_dev is not yet probed(spi)");
@@ -182,6 +188,10 @@ static int fimc_is_spi_probe(struct spi_device *device)
 		goto p_err;
 	}
 
+#ifdef CONFIG_VENDER_MCD
+	specific = core->vender.private_data;
+#endif
+
 	/* spi->bits_per_word = 16; */
 	if (spi_setup(device)) {
 		probe_err("failed to setup spi for fimc_is_spi\n");
@@ -193,6 +203,9 @@ static int fimc_is_spi_probe(struct spi_device *device)
 		spi = &core->spi0;
 		spi->node = "samsung,fimc_is_spi0";
 		spi->device = device;
+#ifdef CONFIG_VENDER_MCD
+		specific->rom_valid[0] = true;
+#endif
 		ret = fimc_is_spi_parse_dt(spi);
 		if (ret) {
 			probe_err("[%s] of_fimc_is_spi_dt parse dt failed\n", __func__);
@@ -210,6 +223,15 @@ static int fimc_is_spi_probe(struct spi_device *device)
 			return ret;
 		}
 	}
+
+#ifdef CONFIG_VENDER_MCD
+    if (device->dev.of_node) {
+		if(fimc_is_vendor_rom_parse_dt(device->dev.of_node, 0)) {
+			probe_err("parsing device tree is fail");
+			return -ENODEV;
+		}
+	}
+#endif
 
 p_err:
 	probe_info("[SPI] %s(%s):%d\n", __func__, device->modalias, ret);

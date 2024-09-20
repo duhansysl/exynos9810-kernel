@@ -12,7 +12,3 @@ ext4-y	:= balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o page-io.o \
 
 ext4-$(CONFIG_EXT4_FS_POSIX_ACL)	+= acl.o
 ext4-$(CONFIG_EXT4_FS_SECURITY)		+= xattr_security.o
-
-ifdef $(CONFIG_EXT4_DLP)
-ext4-y += ext4_dlp.o
-endif

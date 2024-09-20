@@ -354,7 +354,7 @@ static void sec_abc_work_func(struct work_struct *work)
 	}
 	sprintf(timestamp, "TIMESTAMP=%lu", ktime_ms);
 	uevent_str[idx++] = &timestamp[0];
-	uevent_str[idx] = '\0';
+	uevent_str[idx] = NULL;
 	strlcpy(event_type, uevent_str[1] + 6, sizeof(event_type));
 
 	ABC_PRINT("event type : %s\n", event_type);

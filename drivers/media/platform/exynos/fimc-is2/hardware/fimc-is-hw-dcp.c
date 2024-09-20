@@ -274,19 +274,20 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	struct dcp_param_set *param_set;
 	struct is_region *region;
 	struct dcp_param *param;
-	u32 lindex, hindex;
+	u32 lindex, hindex, instance;
 	bool frame_done = false;
 
 	FIMC_BUG(!hw_ip);
 	FIMC_BUG(!frame);
 
-	msdbgs_hw(2, "[F:%d]shot\n", frame->instance, hw_ip, frame->fcount);
+	instance = frame->instance;
+	msdbgs_hw(2, "[F:%d]shot\n", instance, hw_ip, frame->fcount);
 
 	if (!test_bit(hw_ip->id, &hw_map))
 		return 0;
 
 	if (!test_bit(HW_INIT, &hw_ip->state)) {
-		mserr_hw("not initialized!!\n", frame->instance, hw_ip);
+		mserr_hw("not initialized!!\n", instance, hw_ip);
 		return -EINVAL;
 	}
 
@@ -297,15 +298,15 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 
 	FIMC_BUG(!hw_ip->priv_info);
 	hw_dcp = (struct fimc_is_hw_dcp *)hw_ip->priv_info;
-	param_set = &hw_dcp->param_set[frame->instance];
-	region = hw_ip->region[frame->instance];
+	param_set = &hw_dcp->param_set[instance];
+	region = hw_ip->region[instance];
 	FIMC_BUG(!region);
 
 	param = &region->parameter.dcp;
 
 	if (frame->type == SHOT_TYPE_INTERNAL) {
-		hw_ip->internal_fcount = frame->fcount;
-		mserr_hw("[F:%d]frame->type(%d) invalid\n", frame->instance, hw_ip, frame->fcount,
+		hw_ip->internal_fcount[instance] = frame->fcount;
+		mserr_hw("[F:%d]frame->type(%d) invalid\n", instance, hw_ip, frame->fcount,
 			frame->type);
 		return 0;
 	} else {
@@ -315,23 +316,23 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 		lindex = frame->shot->ctl.vendor_entry.lowIndexParam;
 		hindex = frame->shot->ctl.vendor_entry.highIndexParam;
 
-		if (hw_ip->internal_fcount) {
-			hw_ip->internal_fcount = 0;
+		if (hw_ip->internal_fcount[instance]) {
+			hw_ip->internal_fcount[instance] = 0;
 			fimc_is_hw_dcp_check_param(param, param_set, &lindex, &hindex);
 		}
 	}
 
-	fimc_is_hw_dcp_update_param(param, param_set, lindex, hindex, frame->instance);
+	fimc_is_hw_dcp_update_param(param, param_set, lindex, hindex, instance);
 
 	/* DMA settings */
 	plane = param->dma_input_m.plane;
 	if (param_set->dma_input_m.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->input_dva[DCP_DMA_IN_GDC_MASTER][i] =
-				frame->dvaddr_buffer[i];
+				(typeof(**param_set->input_dva))frame->dvaddr_buffer[i];
 			if (param_set->input_dva[DCP_DMA_IN_GDC_MASTER][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_IN_GDC_MASTER plane[%d] dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
@@ -342,10 +343,10 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	if (param_set->dma_input_s.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->input_dva[DCP_DMA_IN_GDC_SLAVE][i] =
-				frame->shot->uctl.scalerUd.sourceAddress[i];
+				frame->sourceAddress[i];
 			if (param_set->input_dva[DCP_DMA_IN_GDC_SLAVE][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_IN_GDC_SLAVE plane[%d]dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
@@ -356,10 +357,10 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	if (param_set->dma_output_m.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->output_dva[DCP_DMA_OUT_MASTER][i] =
-				frame->shot->uctl.scalerUd.sccTargetAddress[i];
+				frame->sccTargetAddress[i];
 			if (param_set->output_dva[DCP_DMA_OUT_MASTER][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_OUT_MASTER plane[%d] dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
@@ -370,10 +371,10 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	if (param_set->dma_output_s.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->output_dva[DCP_DMA_OUT_SLAVE][i] =
-				frame->shot->uctl.scalerUd.scpTargetAddress[i];
+				frame->scpTargetAddress[i];
 			if (param_set->output_dva[DCP_DMA_OUT_SLAVE][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_OUT_SLAVE plane[%d] dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
@@ -387,10 +388,10 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 
 		/* disparity output: currnet data */
 		param_set->output_dva[DCP_DMA_OUT_DISPARITY][0] =
-			frame->shot->uctl.scalerUd.dxcTargetAddress[0];
+			frame->dxcTargetAddress[0];
 		if (param_set->output_dva[DCP_DMA_OUT_DISPARITY][0] == 0) {
 			mserr_hw("[F:%d]DCP_DMA_OUT_DISPARITY plane[%d] dva is zero",
-				frame->instance, hw_ip, frame->fcount, 0);
+				instance, hw_ip, frame->fcount, 0);
 			return -EINVAL;
 		}
 	}
@@ -400,11 +401,11 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	if (param_set->dma_output_m_ds.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->output_dva[DCP_DMA_OUT_MASTER_DS][i] =
-				frame->shot->uctl.scalerUd.sccTargetAddress[8 + i];
+				frame->sccTargetAddress[8 + i];
 
 			if (param_set->output_dva[DCP_DMA_OUT_MASTER_DS][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_OUT_MASTER_DS plane[%d] dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
@@ -415,16 +416,16 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 	if (param_set->dma_output_s_ds.cmd == DMA_INPUT_COMMAND_ENABLE) {
 		for (i = 0; i < plane; i++) {
 			param_set->output_dva[DCP_DMA_OUT_SLAVE_DS][i] =
-				frame->shot->uctl.scalerUd.scpTargetAddress[8 + i];
+				frame->scpTargetAddress[8 + i];
 			if (param_set->output_dva[DCP_DMA_OUT_SLAVE_DS][i] == 0) {
 				mserr_hw("[F:%d]DCP_DMA_OUT_SLAVE_DS plane[%d] dva is zero",
-					frame->instance, hw_ip, frame->fcount, i);
+					instance, hw_ip, frame->fcount, i);
 				return -EINVAL;
 			}
 		}
 	}
 
-	/* param_set->instance_id = frame->instance; */ /* TODO: remove */
+	/* param_set->instance_id = instance; */ /* TODO: remove */
 	param_set->fcount = frame->fcount;
 
 	/* multi-buffer: currently not support HFR */
@@ -435,12 +436,12 @@ int fimc_is_hw_dcp_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame *frame
 		return 0;
 
 	if (frame->shot) {
-		ret = fimc_is_lib_isp_set_ctrl(hw_ip, &hw_dcp->lib[frame->instance], frame);
+		ret = fimc_is_lib_isp_set_ctrl(hw_ip, &hw_dcp->lib[instance], frame);
 		if (ret)
-			mserr_hw("set_ctrl fail", frame->instance, hw_ip);
+			mserr_hw("set_ctrl fail", instance, hw_ip);
 	}
 
-	fimc_is_lib_isp_shot(hw_ip, &hw_dcp->lib[frame->instance],
+	fimc_is_lib_isp_shot(hw_ip, &hw_dcp->lib[instance],
 			param_set, frame->shot);
 
 	set_bit(HW_CONFIG, &hw_ip->state);
@@ -569,54 +570,46 @@ int fimc_is_hw_dcp_frame_ndone(struct fimc_is_hw_ip *hw_ip, struct fimc_is_frame
 	u32 instance, enum ShotErrorType done_type)
 {
 	int ret = 0;
-	bool flag_get_meta = true;
 
 	FIMC_BUG(!hw_ip);
 	FIMC_BUG(!frame);
 
 	if (test_bit(ENTRY_DC1S, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC1S_FDONE, ENTRY_DC1S, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC1S_FDONE, ENTRY_DC1S, done_type, false);
 	}
 
 
 	if (test_bit(ENTRY_DC0C, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC0C_FDONE, ENTRY_DC0C, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC0C_FDONE, ENTRY_DC0C, done_type, false);
 	}
 
 
 	if (test_bit(ENTRY_DC1C, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC1C_FDONE, ENTRY_DC1C, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC1C_FDONE, ENTRY_DC1C, done_type, false);
 	}
 
 
 	if (test_bit(ENTRY_DC2C, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC2C_FDONE, ENTRY_DC2C, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC2C_FDONE, ENTRY_DC2C, done_type, false);
 	}
 
 	if (test_bit(ENTRY_DC3C, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC3C_FDONE, ENTRY_DC3C, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC3C_FDONE, ENTRY_DC3C, done_type, false);
 	}
 
 	if (test_bit(ENTRY_DC4C, &frame->out_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			WORK_DC4C_FDONE, ENTRY_DC4C, done_type, flag_get_meta);
-		flag_get_meta = false;
+			WORK_DC4C_FDONE, ENTRY_DC4C, done_type, false);
 	}
 
 	if (test_bit(hw_ip->id, &frame->core_flag)) {
 		ret = fimc_is_hardware_frame_done(hw_ip, frame,
-			-1, FIMC_IS_HW_CORE_END, done_type, flag_get_meta);
-		flag_get_meta = false;
+			-1, FIMC_IS_HW_CORE_END, done_type, false);
 	}
 
 	return ret;
@@ -735,7 +728,6 @@ int fimc_is_hw_dcp_probe(struct fimc_is_hw_ip *hw_ip, struct fimc_is_interface *
 	hw_ip->itf  = itf;
 	hw_ip->itfc = itfc;
 	atomic_set(&hw_ip->fcount, 0);
-	hw_ip->internal_fcount = 0;
 	hw_ip->is_leader = true;
 	atomic_set(&hw_ip->status.Vvalid, V_BLANK);
 	atomic_set(&hw_ip->status.otf_start, 0);

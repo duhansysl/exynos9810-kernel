@@ -115,37 +115,12 @@ static ssize_t store_current_governor(struct device *dev,
 		return count;
 }
 
-#ifdef CONFIG_SEC_PM
-static ssize_t store_kick_all_cpus(struct device *dev,
-				      struct device_attribute *attr,
-				      const char *buf, size_t count)
-{
-	int ret;
-	bool enable;
-
-	ret = strtobool(buf, &enable);
-	if (ret)
-		return ret;
-
-	if (enable)
-		kick_all_cpus_sync();
-
-	return count;
-}
-#endif /* CONFIG_SEC_PM */
-
 static DEVICE_ATTR(current_driver, 0444, show_current_driver, NULL);
 static DEVICE_ATTR(current_governor_ro, 0444, show_current_governor, NULL);
-#ifdef CONFIG_SEC_PM
-static DEVICE_ATTR(kick_all_cpus, 0220, NULL, store_kick_all_cpus);
-#endif
 
 static struct attribute *cpuidle_default_attrs[] = {
 	&dev_attr_current_driver.attr,
 	&dev_attr_current_governor_ro.attr,
-#ifdef CONFIG_SEC_PM
-	&dev_attr_kick_all_cpus.attr,
-#endif
 	NULL
 };
 

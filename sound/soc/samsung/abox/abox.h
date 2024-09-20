@@ -556,10 +556,12 @@ struct abox_data {
 	unsigned int ipc_tx_ack_offset;
 	unsigned int ipc_rx_ack_offset;
 	unsigned int mailbox_offset;
+	unsigned int bootargs_offset;
 	unsigned int if_count;
 	unsigned int rdma_count;
 	unsigned int wdma_count;
 	unsigned int calliope_version;
+	const char *bootargs;
 	const struct firmware *firmware_sram;
 	const struct firmware *firmware_dram;
 	const struct firmware *firmware_iva;

@@ -17,7 +17,18 @@
 #include <linux/math64.h>
 #include <linux/string.h>
 #include "ssp_iio.h"
+
 #define BATCH_IOCTL_MAGIC		0xFC
+#define INJECTION_MODE_SENSOR_DATA				0	
+#define INJECTION_MODE_ADDITIONAL_INFO	 		1
+
+enum {
+	BRIGHTNESS_LEVEL1 = 1,
+	BRIGHTNESS_LEVEL2,
+	BRIGHTNESS_LEVEL3,
+	BRIGHTNESS_LEVEL4,
+	BRIGHTNESS_LEVEL5
+};
 
 struct batch_config {
 	int64_t timeout;
@@ -38,13 +49,13 @@ s32 SettingVDIS_Support(struct ssp_data *data, int64_t *dNewDelay)
 	s32 dMsDelay = 0;
 	int64_t NewDelay = *dNewDelay;
 
-	if ((NewDelay == CAMERA_GYROSCOPE_SYNC || NewDelay == CAMERA_GYROSCOPE_VDIS_SYNC)
-		&& !data->IsVDIS_Enabled) {
+	if ((NewDelay == CAMERA_GYROSCOPE_SYNC || NewDelay == CAMERA_GYROSCOPE_VDIS_SYNC
+		|| NewDelay == CAMERA_GYROSCOPE_SUPER_VDIS_SYNC) && !data->IsVDIS_Enabled) {
 		data->IsVDIS_Enabled = true;
 		data->ts_stacked_cnt = 0;
 		send_vdis_flag(data, data->IsVDIS_Enabled);
-	} else if (!(NewDelay == CAMERA_GYROSCOPE_SYNC || NewDelay == CAMERA_GYROSCOPE_VDIS_SYNC)
-		&& data->IsVDIS_Enabled) {
+	} else if (!(NewDelay == CAMERA_GYROSCOPE_SYNC || NewDelay == CAMERA_GYROSCOPE_VDIS_SYNC
+		|| NewDelay == CAMERA_GYROSCOPE_SUPER_VDIS_SYNC) && data->IsVDIS_Enabled) {
 		data->IsVDIS_Enabled = false;
 		data->ts_stacked_cnt = 0;
 		send_vdis_flag(data, data->IsVDIS_Enabled);
@@ -55,6 +66,10 @@ s32 SettingVDIS_Support(struct ssp_data *data, int64_t *dNewDelay)
 	} else if (NewDelay == CAMERA_GYROSCOPE_VDIS_SYNC) {
 		*dNewDelay = CAMERA_GYROSCOPE_VDIS_SYNC_DELAY;
 		data->cameraGyroSyncMode = true;
+	} else if (NewDelay == CAMERA_GYROSCOPE_SUPER_VDIS_SYNC) {
+		*dNewDelay = CAMERA_GYROSCOPE_SUPER_VDIS_SYNC_DELAY;
+		data->cameraGyroSyncMode = true;
+		initialize_super_vdis_setting();
 	} else {
 		data->cameraGyroSyncMode = false;
 		if ((data->adDelayBuf[GYROSCOPE_SENSOR] == NewDelay)
@@ -253,7 +268,13 @@ static int ssp_remove_sensor(struct ssp_data *data,
 			data->IsVDIS_Enabled = false;
 			send_vdis_flag(data, data->IsVDIS_Enabled);
 		}
+	} 
+#if defined(CONFIG_SENSORS_SABC)
+	else if (uChangedSensor == LIGHT_SENSOR) {
+		data->camera_lux_en = false;
+		report_camera_lux_data(data, -2);
 	}
+#endif
 
 	if (!data->bSspShutdown)
 		if (atomic64_read(&data->aSensorEnable) & (1ULL << uChangedSensor)) {
@@ -321,13 +342,16 @@ static ssize_t show_sensors_enable(struct device *dev,
 static ssize_t set_sensors_enable(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
-	int64_t dTemp;
+	u64 dTemp;
 	u64 uNewEnable = 0;
 	unsigned int uChangedSensor = 0;
 	struct ssp_data *data = dev_get_drvdata(dev);
+	int ret = kstrtoull(buf, 10, &dTemp); 
 
-	if (kstrtoll(buf, 10, &dTemp) < 0)
-		return -EINVAL;
+	if (ret < 0) {
+		pr_info("[SSP] %s - kstrtoull failed (%d)\n", __func__, ret);
+		return ret;
+	}
 
 	uNewEnable = (u64)dTemp;
 	ssp_dbg("[SSP]: %s - new_enable = %llu, old_enable = %llu\n", __func__,
@@ -579,12 +603,77 @@ static ssize_t set_mcu_power(struct device *dev,
 static ssize_t set_ssp_control(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
+	struct ssp_data *data = dev_get_drvdata(dev);
+	int iRet = 0;
+
 	pr_info("[SSP] SSP_CONTROL : %s\n", buf);
 
 	if (strstr(buf, SSP_DEBUG_TIME_FLAG_ON))
 		ssp_debug_time_flag = true;
 	else if (strstr(buf, SSP_DEBUG_TIME_FLAG_OFF))
 		ssp_debug_time_flag = false;
+	else if (strstr(buf, SSP_HALL_IC_ON) || strstr(buf, SSP_HALL_IC_OFF)) {
+		data->hall_ic_status = strstr(buf, SSP_HALL_IC_ON) ? 1 : 0;
+	
+		iRet = send_hall_ic_status(data->hall_ic_status);
+
+		if (iRet != SUCCESS) {
+			pr_err("[SSP]: %s - hall ic command, failed %d\n", __func__, iRet);
+			return iRet;
+		}
+
+		pr_info("[SSP] %s HALL IC ON/OFF, %d enabled %d\n", __func__, iRet, data->hall_ic_status);
+	} else if (strstr(buf, SSP_AUTO_ROTATION_ORIENTATION)) {
+		int len = strlen(SSP_AUTO_ROTATION_ORIENTATION);
+		int iRet = 0;
+		struct ssp_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+
+		if (msg == NULL) {
+			iRet = -ENOMEM;
+			pr_err("[SSP] %s, failed to alloc memory for ssp_msg\n",
+				__func__);
+			return iRet;
+		}
+		msg->cmd = MSG2SSP_AUTO_ROTATION_ORIENTATION;
+		msg->length = 1;
+		msg->options = AP2HUB_WRITE;
+		msg->buffer = (char *)(buf + len);
+		msg->free_buffer = 0;
+
+		iRet = ssp_spi_async(data, msg);
+
+		if (iRet != SUCCESS) {
+			pr_err("[SSP]: %s - i2c fail %d\n", __func__, iRet);
+			return size;
+		} else {
+			pr_err("[SSP] %s, AUTO_ROTATION_ORIENTATION send success\n", __func__);
+		}
+	} else if (strstr(buf, SSP_SAR_BACKOFF_MOTION_NOTI)) {
+		int len = strlen(SSP_SAR_BACKOFF_MOTION_NOTI);
+		int iRet = 0;
+		struct ssp_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+
+		if (msg == NULL) {
+			iRet = -ENOMEM;
+			pr_err("[SSP] %s, failed to alloc memory for ssp_msg\n",
+				__func__);
+			return iRet;
+		}
+		msg->cmd = MSG2SSP_AP_SAR_BACKOFF_MOTION_NOTI;
+		msg->length = 4;
+		msg->options = AP2HUB_WRITE;
+		msg->buffer = (char *)(buf + len);
+		msg->free_buffer = 0;
+
+		iRet = ssp_spi_async(data, msg);
+
+		if (iRet != SUCCESS) {
+			pr_err("[SSP]: %s - i2c fail %d\n", __func__, iRet);
+			return size;
+		} else {
+			pr_err("[SSP] %s, SSP_SAR_BACKOFF_MOTION_NOTI send success\n", __func__);
+		}
+	}
 
 	return size;
 }
@@ -1065,77 +1154,103 @@ static struct file_operations const ssp_batch_fops = {
 	.unlocked_ioctl = ssp_batch_ioctl,
 };
 
-static ssize_t ssp_data_injection_write(struct file *file, const char __user *buf,
-				size_t count, loff_t *pos)
+static int ssp_inject_additional_info(struct ssp_data *data,
+                                          const char *buf, int count)
 {
-	struct ssp_data *data
-		= container_of(file->private_data,
-			struct ssp_data, ssp_data_injection_device);
-
-	struct ssp_msg *msg;
 	int ret = 0;
-	char *send_buffer;
-	unsigned int sensor_type = 0;
-	size_t x = 0;
+#if defined(CONFIG_SENSORS_SABC)
+	char type = buf[0];
 
-	if (unlikely(count < 4)) {
-		pr_err("[SSP] %s data length err(%d)\n", __func__, (u32)count);
+	pr_info("[SSP]: %s:: type = %d", __func__, type);
+	if(type == UNCAL_LIGHT_SENSOR)
+	{
+		int32_t brightness;
+		if(count < 5) {
+			pr_err("[SSP]: brightness length error %d", count);
+			return -EINVAL;
+		}
+		brightness = *((int32_t*)(buf + 1));
+
+ 		pr_info("[SSP]: %s:: brightness %d", __func__, brightness);
+
+		data->brightness = brightness;
+		set_light_brightness(data);
+	} 
+	else if(type == LIGHT_SENSOR)
+	{
+		if(count < 5) {
+			pr_err("[SSP]: camera lux length error %d", count);
+			return -EINVAL;
+		}
+		data->camera_lux = *((int32_t*)(buf + 1));
+		pr_err("[SSP]: %s:: cam_lux %d", __func__, data->camera_lux);
+
+		if(data->camera_lux_en)
+		{
+			report_camera_lux_data(data, data->camera_lux);
+		}
+	}
+#endif
+	return ret;	
+}
+
+
+static ssize_t ssp_data_injection_write(struct file *file, const char __user *buf,
+                                   size_t count, loff_t *pos)
+{
+	struct ssp_data *data = container_of(file->private_data, struct ssp_data, ssp_data_injection_device);
+	int ret = 0;
+	char *buffer;
+
+
+//	pr_info("[SSP]: %s(count: %d) ++", __func__, count);
+/*
+	if (!is_sensorhub_working(data)) {
+		pr_err("[SSP]: stop inject data(is not working)");
+		return -EIO;
+	}
+*/
+	if (unlikely(count < 2)) {
+		pr_err("[SSP]: inject data length err(%d)", (int)count);
 		return -EINVAL;
 	}
 
-	send_buffer = kcalloc(count, sizeof(char), GFP_KERNEL);
-	if (unlikely(!send_buffer)) {
-		pr_err("[SSP] %s allocate memory for kernel buffer err\n", __func__);
-		return -ENOMEM;
-	}
+	buffer = kzalloc(count * sizeof(char), GFP_KERNEL);
 
-	ret = copy_from_user(send_buffer, buf, count);
+	ret = copy_from_user(buffer, buf, count);
 	if (unlikely(ret)) {
-		pr_err("[SSP] %s memcpy for kernel buffer err\n", __func__);
+		pr_err("[SSP]: memcpy for kernel buffer err");
 		ret = -EFAULT;
 		goto exit;
 	}
 
-	pr_info("[SSP] %s count %d endable %d\n", __func__, (u32)count, data->data_injection_enable);
-
-// sensorhub sensor type is enum, HAL layer sensor type is 1 << sensor_type. So it needs to change to enum format.
-	for (sensor_type = 0; sensor_type < SENSOR_MAX; sensor_type++) {
-		if (send_buffer[0] == (1 << sensor_type)) {
-			send_buffer[0] = sensor_type; // sensor type change to enum format.
-			pr_info("[SSP] %s sensor_type = %d %d\n", __func__, sensor_type, (1 << sensor_type));
-			break;
-		}
-		if (sensor_type == SENSOR_MAX - 1)
-			pr_info("[SSP] %s there in no sensor_type\n", __func__);
-	}
-
-	for (x = 0; x < count; x++)
-		pr_info("[SSP] %s Data Injection : %d 0x%x\n", __func__, send_buffer[x], send_buffer[x]);
-
-
-	// injection data send to sensorhub.
-	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
-	msg->cmd = MSG2SSP_AP_DATA_INJECTION_SEND;
-	msg->length = count;
-	msg->options = AP2HUB_WRITE;
-	msg->buffer = kzalloc(count, GFP_KERNEL);
-	msg->free_buffer = 1;
-
-	memcpy(msg->buffer, send_buffer, count);
-
-	ret = ssp_spi_async(data, msg);
-
-	if (ret != SUCCESS) {
-		pr_err("[SSP]: %s - Data Injection fail %d\n", __func__, ret);
+//	pr_info("[SSP]: %s:: buffer[0]: %d", __func__, buffer[0]);
+	if (buffer[0] == INJECTION_MODE_ADDITIONAL_INFO) {
+		ret = ssp_inject_additional_info(data, &buffer[1], count-1);
+	} else {
+		pr_err("[SSP]: invalid command from hal (%x)", (int)buffer[0]);
+		ret = -EINVAL;
 		goto exit;
-		//return ret;
 	}
 
-	pr_info("[SSP] %s Data Injection Success %d\n", __func__, ret);
+	if (unlikely(ret < 0)) {
+		pr_err("[SSP]: inject data err(%d)", ret);
+		if (ret == ERROR) {
+			ret = -EIO;
+		}
+		
+		else if (ret == FAIL) {
+			ret = -EAGAIN;
+		}
+
+		goto exit;
+	}
+
+	ret = count;
 
 exit:
-	kfree(send_buffer);
-	return ret >= 0 ? 0 : -1;
+	kfree(buffer);
+	return ret;
 }
 
 #if 0

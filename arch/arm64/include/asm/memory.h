@@ -46,11 +46,7 @@
  * requires its definition to be available at this point in the inclusion
  * chain, and it may not be a power of 2 in the first place.
  */
-#ifdef CONFIG_MEMCG
-	#define STRUCT_PAGE_MAX_SHIFT	7
-#else
 #define STRUCT_PAGE_MAX_SHIFT	6
-#endif
 
 /*
  * VMEMMAP_SIZE - allows the whole linear region to be covered by

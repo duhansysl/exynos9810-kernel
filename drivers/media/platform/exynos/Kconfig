@@ -18,7 +18,6 @@ if VIDEO_EXYNOS
         source "drivers/media/platform/exynos/camera-pp/Kconfig"
         source "drivers/media/platform/exynos/repeater/Kconfig"
         source "drivers/media/platform/exynos/tsmux/Kconfig"
-        source "drivers/media/platform/exynos/astc/Kconfig"
 endif
 
 config MEDIA_EXYNOS

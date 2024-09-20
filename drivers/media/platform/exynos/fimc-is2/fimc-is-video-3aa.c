@@ -429,10 +429,12 @@ static int fimc_is_3aa_video_prepare(struct file *file, void *priv,
 		goto p_err;
 	}
 
+#ifdef ENABLE_IS_CORE
 	if (!test_bit(FRAME_MEM_MAPPED, &frame->mem_state)) {
 		fimc_is_itf_map(device, GROUP_ID(device->group_3aa.id), frame->dvaddr_shot, frame->shot_size);
 		set_bit(FRAME_MEM_MAPPED, &frame->mem_state);
 	}
+#endif
 
 p_err:
 	minfo("[3%dS:V] %s(%d):%d\n", device, GET_3XS_ID(GET_VIDEO(vctx)), __func__, buf->index, ret);
@@ -542,16 +544,38 @@ static int fimc_is_3aa_video_s_ctrl(struct file *file, void *priv,
 	case V4L2_CID_IS_INTENT:
 		value = (unsigned int)ctrl->value;
 		captureIntent = (value >> 16) & 0x0000FFFF;
-		if (captureIntent == AA_CAPTURE_INTENT_STILL_CAPTURE_OIS_DYNAMIC_SHOT) {
+		switch (captureIntent) {
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_DEBLUR_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_OIS_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_EXPOSURE_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_MFHDR_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_LLHDR_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_SUPER_NIGHT_SHOT_HANDHELD:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_SUPER_NIGHT_SHOT_TRIPOD:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_LLHDR_VEHDR_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_VENR_DYNAMIC_SHOT:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_LLS_FLASH:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_SUPER_NIGHT_SHOT_HANDHELD_FAST:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_SUPER_NIGHT_SHOT_TRIPOD_FAST:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_SUPER_NIGHT_SHOT_TRIPOD_LE_FAST:
+		case AA_CAPTURE_INTENT_STILL_CAPTURE_CROPPED_REMOSAIC_DYNAMIC_SHOT:
 			captureCount = value & 0x0000FFFF;
-		} else {
+			break;
+		default:
 			captureIntent = ctrl->value;
 			captureCount = 0;
+			break;
 		}
 		device->group_3aa.intent_ctl.captureIntent = captureIntent;
 		device->group_3aa.intent_ctl.vendor_captureCount = captureCount;
+		if (captureIntent == AA_CAPTURE_INTENT_STILL_CAPTURE_OIS_MULTI) {
+			device->group_3aa.remainIntentCount = 2;
+		} else {
+			device->group_3aa.remainIntentCount = 0;
+		}
 
-		minfo("[3AA:V] s_ctrl intent(%d) count(%d)\n", vctx, captureIntent, captureCount);
+		minfo("[3AA:V] s_ctrl intent(%d) count(%d) remainIntentCount(%d)\n",
+			vctx, captureIntent, captureCount, device->group_3aa.remainIntentCount);
 		break;
 	case V4L2_CID_IS_FORCE_DONE:
 		set_bit(FIMC_IS_GROUP_REQUEST_FSTOP, &device->group_3aa.state);
@@ -634,6 +658,33 @@ static int fimc_is_3aa_video_s_ext_ctrl(struct file *file, void *priv,
 			}
 			break;
 #endif
+		case V4L2_CID_SENSOR_SET_CAPTURE_INTENT_INFO:
+		{
+			struct fimc_is_group *head;
+			struct capture_intent_info_t info;
+
+			ret = copy_from_user(&info, ext_ctrl->ptr, sizeof(struct capture_intent_info_t));
+			if (ret) {
+				err("fail to copy_from_user, ret(%d)\n", ret);
+				goto p_err;
+			}
+
+			head = GET_HEAD_GROUP_IN_DEVICE(FIMC_IS_DEVICE_ISCHAIN, (&device->group_3aa));
+
+			head->intent_ctl.captureIntent = info.captureIntent;
+			head->intent_ctl.vendor_captureCount = info.captureCount;
+			head->intent_ctl.vendor_captureEV = info.captureEV;
+
+			if (info.captureIntent == AA_CAPTURE_INTENT_STILL_CAPTURE_OIS_MULTI) {
+				head->remainIntentCount = 2;
+			} else {
+				head->remainIntentCount = 0;
+			}
+
+			info("s_ext_ctrl SET_CAPTURE_INTENT_INFO, intent(%d) count(%d) captureEV(%d) remainIntentCount(%d)\n",
+				info.captureIntent, info.captureCount, info.captureEV, head->remainIntentCount);
+			break;
+		}
 		default:
 			ctrl.id = ext_ctrl->id;
 			ctrl.value = ext_ctrl->value;
@@ -722,21 +773,6 @@ static int fimc_is_3aa_queue_setup(struct vb2_queue *vbq,
 		merr("fimc_is_queue_setup is fail(%d)", vctx, ret);
 
 	return ret;
-}
-
-static int fimc_is_3aa_buffer_prepare(struct vb2_buffer *vb)
-{
-	return fimc_is_queue_prepare(vb);
-}
-
-static inline void fimc_is_3aa_wait_prepare(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_prepare(vbq);
-}
-
-static inline void fimc_is_3aa_wait_finish(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_finish(vbq);
 }
 
 static int fimc_is_3aa_start_streaming(struct vb2_queue *vbq,
@@ -839,12 +875,12 @@ static void fimc_is_3aa_buffer_finish(struct vb2_buffer *vb)
 
 const struct vb2_ops fimc_is_3aa_qops = {
 	.queue_setup		= fimc_is_3aa_queue_setup,
-	.buf_init		= fimc_is_buffer_init,
-	.buf_prepare		= fimc_is_3aa_buffer_prepare,
+	.buf_init		= fimc_is_queue_buffer_init,
+	.buf_prepare		= fimc_is_queue_buffer_prepare,
 	.buf_queue		= fimc_is_3aa_buffer_queue,
 	.buf_finish		= fimc_is_3aa_buffer_finish,
-	.wait_prepare		= fimc_is_3aa_wait_prepare,
-	.wait_finish		= fimc_is_3aa_wait_finish,
+	.wait_prepare		= fimc_is_queue_wait_prepare,
+	.wait_finish		= fimc_is_queue_wait_finish,
 	.start_streaming	= fimc_is_3aa_start_streaming,
 	.stop_streaming		= fimc_is_3aa_stop_streaming,
 };

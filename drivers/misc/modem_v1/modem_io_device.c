@@ -436,9 +436,10 @@ static int rx_demux(struct link_device *ld, struct sk_buff *skb)
 		return -ENODEV;
 	}
 
-	if (sipc5_fmt_ch(ch))
+	if (sipc5_fmt_ch(ch)) {
+		iod->mc->receive_first_ipc = 1;
 		return rx_fmt_ipc(skb);
-	else if (sipc_ps_ch(ch))
+	} else if (sipc_ps_ch(ch))
 		return rx_multi_pdp(skb);
 	else
 		return rx_raw_misc(skb);
@@ -506,8 +507,10 @@ exit:
 	if (state == STATE_CRASH_RESET
 	    || state == STATE_CRASH_EXIT
 	    || state == STATE_NV_REBUILDING
-	    || state == STATE_CRASH_WATCHDOG)
-		wake_up(&iod->wq);
+	    || state == STATE_CRASH_WATCHDOG) {
+		if (atomic_read(&iod->opened) > 0)
+			wake_up(&iod->wq);
+	}
 }
 
 static void io_dev_sim_state_changed(struct io_device *iod, bool sim_online)
@@ -646,7 +649,8 @@ static unsigned int misc_poll(struct file *filp, struct poll_table_struct *wait)
 		break;
 
 	case STATE_OFFLINE:
-		/* fall through */
+		if (iod->id == SIPC_CH_ID_CASS)
+			return POLLHUP;
 	default:
 		break;
 	}
@@ -972,7 +976,7 @@ static ssize_t misc_write(struct file *filp, const char __user *data,
 		return -EINVAL;
 
 	if (unlikely(!cp_online(mc)) &&
-			(sipc5_ipc_ch(iod->id) || sipc5_dm_ch(iod->id))) {
+			(sipc5_ipc_ch(iod->id) || sipc5_log_ch(iod->id))) {
 		mif_debug("%s: ERR! %s->state == %s\n",
 			iod->name, mc->name, mc_state(mc));
 		return -EPERM;
@@ -985,6 +989,9 @@ static ssize_t misc_write(struct file *filp, const char __user *data,
 		cfg = 0;
 		headroom = 0;
 	}
+
+	if (unlikely(!mc->receive_first_ipc) && sipc5_log_ch(iod->id))
+		return -EBUSY;
 
 	while (copied < cnt) {
 		remains = cnt - copied;
@@ -1294,12 +1301,19 @@ static int vnet_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	ret = ld->send(ld, iod, skb_new);
 	if (unlikely(ret < 0)) {
+		static DEFINE_RATELIMIT_STATE(_rs, HZ, 100);
+
 		if (ret != -EBUSY) {
 			mif_err_limited("%s->%s: ERR! %s->send fail:%d "
 					"(tx_bytes:%d len:%d)\n",
 					iod->name, mc->name, ld->name, ret,
 					tx_bytes, count);
+			goto drop;
 		}
+
+		/* do 100-retry for every 1sec */
+		if (__ratelimit(&_rs))
+			goto retry;
 		goto drop;
 	}
 
@@ -1369,7 +1383,7 @@ static struct net_device_ops vnet_ops = {
 static void vnet_setup(struct net_device *ndev)
 {
 	ndev->netdev_ops = &vnet_ops;
-	ndev->type = ARPHRD_PPP;
+	ndev->type = ARPHRD_RAWIP;
 	ndev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 	ndev->addr_len = 0;
 	ndev->hard_header_len = 0;

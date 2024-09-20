@@ -54,6 +54,8 @@ struct bio {
 	bio_end_io_t		*bi_end_io;
 
 	void			*bi_private;
+	void			*bi_aux_private;
+
 #ifdef CONFIG_BLK_CGROUP
 	/*
 	 * Optional ioc and css associated with this bio.  Put on bio
@@ -69,19 +71,6 @@ struct bio {
 	};
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
-	struct {
-		int		private_enc_mode;	/* Encryption mode */
-		int 		private_algo_mode;	/* Encryption algorithm */
-		unsigned char	*key;		/* Encryption Key */
-		unsigned int	key_length;	/* Encryption Key length */
-
-		/*
-		 * When using dircet-io (O_DIRECT), we can't get the inode from a bio
-		 * by walking bio->bi_io_vec->bv_page->mapping->host
-		 * since the page is anon.
-		 */
-		struct inode	*bi_dio_inode;
-	} fmp_ci;
 
 	/*
 	 * Everything starting with bi_max_vecs will be preserved by bio_reset()
@@ -94,6 +83,10 @@ struct bio {
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
 	struct bio_set		*bi_pool;
+
+#ifdef CONFIG_DDAR
+	struct inode		*bi_dio_inode;
+#endif
 
 	/*
 	 * We can inline a number of vecs at the end of the bio, to avoid
@@ -134,10 +127,6 @@ struct bio {
 #define BIO_QUIET	6	/* Make BIO Quiet */
 #define BIO_CHAIN	7	/* chained bio, ->bi_remaining in effect */
 #define BIO_REFFED	8	/* bio has elevated ->bi_cnt */
-#ifdef CONFIG_JOURNAL_DATA_TAG
-/* XXX Be carefull not to touch BIO_RESET_BITS */
-#define BIO_JOURNAL    9       /* bio contains journal data */
-#endif
 
 /*
  * Flags starting here get preserved by bio_reset() - this includes
@@ -184,6 +173,7 @@ enum rq_flag_bits {
 	__REQ_INTEGRITY,	/* I/O includes block integrity payload */
 	__REQ_FUA,		/* forced unit access */
 	__REQ_PREFLUSH,		/* request for cache flush */
+	__REQ_CRYPT,		/* request inline crypt */
 
 	/* bio only flags */
 	__REQ_RAHEAD,		/* read ahead, can fail anytime */
@@ -239,6 +229,7 @@ enum rq_flag_bits {
 
 #define REQ_SORTED		(1ULL << __REQ_SORTED)
 #define REQ_SOFTBARRIER		(1ULL << __REQ_SOFTBARRIER)
+#define REQ_CRYPT		(1ULL << __REQ_CRYPT)
 #define REQ_FUA			(1ULL << __REQ_FUA)
 #define REQ_NOMERGE		(1ULL << __REQ_NOMERGE)
 #define REQ_STARTED		(1ULL << __REQ_STARTED)

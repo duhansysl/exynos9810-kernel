@@ -50,7 +50,6 @@
 #include <linux/rkp.h>
 #endif
 #endif
-
 u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
 
 u64 kimage_voffset __ro_after_init;
@@ -198,7 +197,6 @@ unsigned int is_rkp_ro_page(u64 addr)
 		return 0;
 }
 #endif
-
 static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
 				  unsigned long end, unsigned long pfn,
 				  pgprot_t prot,
@@ -482,13 +480,9 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
 	 * region accessible to subsystems such as hibernate, but
 	 * protects it from inadvertent modification or execution.
 	 */
-	// __create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
-	// 		     kernel_end - kernel_start, PAGE_KERNEL_RO,
-	// 		     early_pgtable_alloc, !debug_pagealloc_enabled());
-	__create_pgd_mapping(pgd, __pa(_text), __phys_to_virt(__pa(_text)), (_etext - _text),
-		PAGE_KERNEL_RO, early_pgtable_alloc, !debug_pagealloc_enabled());
-	__create_pgd_mapping(pgd, __pa(__start_rodata), __phys_to_virt(__pa(__start_rodata)),
-		(__init_begin - __start_rodata), PAGE_KERNEL_RO, early_pgtable_alloc, !debug_pagealloc_enabled());
+	__create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
+			     kernel_end - kernel_start, PAGE_KERNEL_RO,
+			     early_pgtable_alloc, !debug_pagealloc_enabled());
 }
 
 static void __init map_mem(pgd_t *pgd)
@@ -550,7 +544,6 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
 	vma->flags	= VM_MAP;
 	vma->caller	= __builtin_return_address(0);
 
-
 	vm_area_add_early(vma);
 }
 
@@ -577,10 +570,10 @@ static void __init map_kernel_text_segment(pgd_t *pgd, void *va_start, void *va_
 }
 #endif
 
-
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 static int __init map_entry_trampoline(void)
 {
+	int i;
 	extern char __entry_tramp_text_start[];
 
 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
@@ -591,11 +584,15 @@ static int __init map_entry_trampoline(void)
 
 	/* Map only the text into the trampoline page table */
 	memset(tramp_pg_dir, 0, PGD_SIZE);
-	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
-			     prot, pgd_pgtable_alloc, 0);
+	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS,
+			     entry_tramp_text_size(), prot, pgd_pgtable_alloc,
+			     0);
 
 	/* Map both the text and data into the kernel page table */
-	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
+	for (i = 0; i < DIV_ROUND_UP(entry_tramp_text_size(), PAGE_SIZE); i++)
+		__set_fixmap(FIX_ENTRY_TRAMP_TEXT1 - i,
+			     pa_start + i * PAGE_SIZE, prot);
+
 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
 		extern char __entry_tramp_data_start[];
 
@@ -660,6 +657,7 @@ void __init paging_init(void)
 {
 	phys_addr_t pgd_phys;
 	pgd_t *pgd;
+
 #ifdef CONFIG_UH_RKP
 	phys_addr_t pa;
 	void *va;
@@ -680,7 +678,6 @@ void __init paging_init(void)
 	empty_zero_page = rkp_ro_alloc();
 	BUG_ON(empty_zero_page == NULL);
 #endif
-
 	map_kernel(pgd);
 	map_mem(pgd);
 
@@ -959,18 +956,13 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 
 int __init arch_ioremap_pud_supported(void)
 {
-	/*
-	 * Only 4k granule supports level 1 block mappings.
-	 * SW table walks can't handle removal of intermediate entries.
-	 */
-	return IS_ENABLED(CONFIG_ARM64_4K_PAGES) &&
-	       !IS_ENABLED(CONFIG_ARM64_PTDUMP_DEBUGFS);
+	/* only 4k granule supports level 1 block mappings */
+	return IS_ENABLED(CONFIG_ARM64_4K_PAGES);
 }
 
 int __init arch_ioremap_pmd_supported(void)
 {
-	/* See arch_ioremap_pud_supported() */
-	return !IS_ENABLED(CONFIG_ARM64_PTDUMP_DEBUGFS);
+	return 1;
 }
 
 int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)

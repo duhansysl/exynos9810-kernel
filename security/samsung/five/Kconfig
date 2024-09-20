@@ -5,6 +5,7 @@ config FIVE
 	depends on INTEGRITY && DM_VERITY && BLK_DEV_LOOP
 	select CRYPTO
 	select CRYPTO_SHA1
+	select CRYPTO_SHA1_ARM64_CE if ARM64_CRYPTO && KERNEL_MODE_NEON
 	select CRYPTO_HASH_INFO
 	select INTEGRITY_SIGNATURE
 	select INTEGRITY_ASYMMETRIC_KEYS
@@ -15,6 +16,20 @@ config FIVE
 	  as they are read or executed. If an attacker manages
 	  to change the contents of an important system file
 	  being measured, we can tell.
+
+config FIVE_GKI_10
+	bool "GKI 1.0 compatible version of FIVE"
+	depends on FIVE
+	default n
+	help
+	 Build GKI 1.0 compatible version of FIVE
+
+config FIVE_GKI_20
+	bool "GKI 2.0 compatible version of FIVE"
+	depends on FIVE
+	default n
+	help
+	 Build GKI 2.0 compatible version of FIVE
 
 config FIVE_DEBUG
 	bool "FIVE Debug mode"

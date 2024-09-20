@@ -31,6 +31,15 @@
 #define HRTIMER_POSSIBLE		1
 #define VIRTUAL_COORDINATE_WIDTH		32768
 #define VIRTUAL_COORDINATE_HEIGHT		32768
+#define FIMC_IS_CIS_REV_MAX_LIST		3
+#define VENDOR_SOFT_LANDING_STEP_MAX	2
+
+#ifdef USE_CAMERA_ACT_DRIVER_SOFT_LANDING
+enum HW_SOFTLANDING_STATE {
+	HW_SOFTLANDING_PASS = 0,
+	HW_SOFTLANDING_FAIL = -200,
+};
+#endif
 
 struct fimc_is_cis {
 	u32				id;
@@ -44,6 +53,8 @@ struct fimc_is_cis {
 	u32				aperture_num;
 	bool				use_dgain;
 	bool				hdr_ctrl_by_again;
+	bool				use_wb_gain;
+	bool				use_3hdr;
 
 	struct fimc_is_sensor_ctl	sensor_ctls[CAM2P0_UCTL_LIST_SIZE];
 
@@ -58,6 +69,7 @@ struct fimc_is_cis {
 	u32				mode_chg_long_expo;
 	u32				mode_chg_long_again;
 	u32				mode_chg_long_dgain;
+	struct wb_gains			mode_chg_wb_gains;
 
 	/* expected dms */
 	camera2_lens_dm_t		expecting_lens_dm[EXPECT_DM_NUM];
@@ -66,12 +78,19 @@ struct fimc_is_cis {
 
 	/* expected udm */
 	camera2_lens_udm_t		expecting_lens_udm[EXPECT_DM_NUM];
+	camera2_sensor_udm_t		expecting_sensor_udm[EXPECT_DM_NUM];
 
 	/* For sensor status dump */
 	struct work_struct		cis_status_dump_work;
 
 	/* one more check_rev in mode_change */
 	bool				rev_flag;
+
+	/* For sensor revision checking */
+	u32 				rev_addr;
+	u32 				rev_byte;
+	u32 				rev_valid_count;
+	u32 				rev_valid_values[FIMC_IS_CIS_REV_MAX_LIST];
 
 	/* get a min, max fps to HAL */
 	u32				min_fps;
@@ -99,6 +118,11 @@ struct fimc_is_cis {
 	struct work_struct				factory_dramtest_work;
 	u32				factory_dramtest_section2_fcount;
 #endif
+
+	/* settings for initial AE */
+	bool				use_initial_ae;
+	ae_setting			init_ae_setting;
+	ae_setting			last_ae_setting;
 };
 
 struct fimc_is_actuator_data {
@@ -153,7 +177,10 @@ struct fimc_is_actuator {
 	u32				vendor_product_id;
 	u32				vendor_first_pos;
 	u32				vendor_first_delay;
+	u32				vendor_soft_landing_list[VENDOR_SOFT_LANDING_STEP_MAX * 2];
+	u32				vendor_soft_landing_list_len;
 	bool				vendor_use_sleep_mode;
+	bool				vendor_use_standby_mode;
 	bool				vendor_use_update_pid;
 };
 
@@ -182,6 +209,7 @@ struct fimc_is_flash_data {
 	struct work_struct		flash_fire_work;
 	struct timer_list		flash_expire_timer;
 	struct work_struct		flash_expire_work;
+	struct work_struct		work_flash_muic_ctrl_and_fire;
 };
 
 struct fimc_is_flash {
@@ -227,6 +255,31 @@ struct fimc_is_ois {
 	struct work_struct		ois_set_init_work;
 };
 
+struct fimc_is_mcu {
+	struct v4l2_subdev			*subdev; /* connected module subdevice */
+	struct i2c_client 			*client;
+	u32						id;
+	u32						device; /* connected sensor device */
+	u32						ver;
+	u32						name;
+	int						gpio_mcu_reset;
+	int						gpio_mcu_boot0;
+	u8						vdrinfo_bin[4];
+	u8						hw_bin[4];
+	u8						vdrinfo_mcu[4];
+	u8						hw_mcu[4];
+	char						load_fw_name[50];
+	struct fimc_is_ois			*ois;
+	struct v4l2_subdev			*subdev_ois;
+	struct fimc_is_device_ois	*ois_device;
+	struct fimc_is_aperture		*aperture;
+	struct v4l2_subdev		*subdev_aperture;
+	struct fimc_is_aperture_ops		*aperture_ops;
+	struct fimc_is_device_sensor_peri	*sensor_peri;
+	struct mutex				*i2c_lock;
+	void						*private_data;
+};
+
 struct fimc_is_preprocessor {
 	u32				id;
 	struct v4l2_subdev		*subdev; /* connected module subdevice */
@@ -238,7 +291,7 @@ struct fimc_is_preprocessor {
 	struct fimc_is_preproc_cfg	*cfg;
 
 	struct fimc_is_preprocessor_ops	*preprocessor_ops;
-#ifdef CONFIG_VENDER_MCD
+#if defined(CONFIG_VENDER_MCD)
 	void				*private_data;
 #endif
 	struct spi_device		*spi;
@@ -281,6 +334,9 @@ struct fimc_is_device_sensor_peri {
 
 	struct fimc_is_aperture		*aperture;
 	struct v4l2_subdev		*subdev_aperture;
+
+	struct fimc_is_mcu		*mcu;
+	struct v4l2_subdev		*subdev_mcu;
 
 	unsigned long			peri_state;
 
@@ -357,9 +413,12 @@ int fimc_is_sensor_peri_s_analog_gain(struct fimc_is_device_sensor *device,
 				u32 long_analog_gain, u32 short_analog_gain);
 int fimc_is_sensor_peri_s_digital_gain(struct fimc_is_device_sensor *device,
 				u32 long_digital_gain, u32 short_digital_gain);
+int fimc_is_sensor_peri_s_wb_gains(struct fimc_is_device_sensor *device,
+				struct wb_gains wb_gains);
 int fimc_is_sensor_peri_adj_ctrl(struct fimc_is_device_sensor *device,
 				u32 input, struct v4l2_control *ctrl);
-
+int fimc_is_sensor_set_test_pattern(struct fimc_is_device_sensor *device,
+				camera2_sensor_ctl_t *sensor_ctl);
 int fimc_is_sensor_peri_compensate_gain_for_ext_br(struct fimc_is_device_sensor *device,
 				u32 expo, u32 *again, u32 *dgain);
 

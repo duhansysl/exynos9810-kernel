@@ -19,7 +19,13 @@
 #include "five_state.h"
 #include "five_hooks.h"
 #include "five_cache.h"
+#ifndef FIVE_KUNIT_ENABLED
 #include "five_dsms.h"
+#else
+void five_dsms_reset_integrity(const char *task_name, int result,
+				const char *file_name);
+#endif
+#include "five_testing.h"
 
 enum task_integrity_state_cause {
 	STATE_CAUSE_UNKNOWN,
@@ -30,7 +36,8 @@ enum task_integrity_state_cause {
 	STATE_CAUSE_SYSTEM_LABEL,
 	STATE_CAUSE_NOCERT,
 	STATE_CAUSE_TAMPERED,
-	STATE_CAUSE_MISMATCH_LABEL
+	STATE_CAUSE_MISMATCH_LABEL,
+	STATE_CAUSE_FSV_PROTECTED
 };
 
 struct task_verification_result {
@@ -39,7 +46,8 @@ struct task_verification_result {
 	enum task_integrity_state_cause cause;
 };
 
-static const char *task_integrity_state_str(
+__visible_for_testing
+const char *task_integrity_state_str(
 		enum task_integrity_state_cause cause)
 {
 	const char *str = "unknown";
@@ -50,6 +58,9 @@ static const char *task_integrity_state_str(
 		break;
 	case STATE_CAUSE_DMV_PROTECTED:
 		str = "dmv_protected";
+		break;
+	case STATE_CAUSE_FSV_PROTECTED:
+		str = "fsv_protected";
 		break;
 	case STATE_CAUSE_TRUSTED:
 		str = "trusted";
@@ -77,7 +88,8 @@ static const char *task_integrity_state_str(
 	return str;
 }
 
-static enum task_integrity_reset_cause state_to_reason_cause(
+__visible_for_testing
+enum task_integrity_reset_cause state_to_reason_cause(
 		enum task_integrity_state_cause cause)
 {
 	enum task_integrity_reset_cause reset_cause;
@@ -104,7 +116,8 @@ static enum task_integrity_reset_cause state_to_reason_cause(
 	return reset_cause;
 }
 
-static int is_system_label(struct integrity_label *label)
+__visible_for_testing
+int is_system_label(struct integrity_label *label)
 {
 	if (label && label->len == 0)
 		return 1; /* system label */
@@ -112,13 +125,15 @@ static int is_system_label(struct integrity_label *label)
 	return 0;
 }
 
-static inline int integrity_label_cmp(struct integrity_label *l1,
+__visible_for_testing
+inline int integrity_label_cmp(struct integrity_label *l1,
 					struct integrity_label *l2)
 {
 	return 0;
 }
 
-static int verify_or_update_label(struct task_integrity *intg,
+__visible_for_testing
+int verify_or_update_label(struct task_integrity *intg,
 		struct integrity_iint_cache *iint)
 {
 	struct integrity_label *l;
@@ -160,7 +175,8 @@ out:
 	return rc;
 }
 
-static bool set_first_state(struct integrity_iint_cache *iint,
+__visible_for_testing
+bool set_first_state(struct integrity_iint_cache *iint,
 				struct task_integrity *integrity,
 				struct task_verification_result *result)
 {
@@ -182,12 +198,15 @@ static bool set_first_state(struct integrity_iint_cache *iint,
 			tint = INTEGRITY_PRELOAD;
 		}
 		break;
+	case FIVE_FILE_FSVERITY:
 	case FIVE_FILE_DMVERITY:
 		if (trusted_file) {
 			cause = STATE_CAUSE_TRUSTED;
 			tint = INTEGRITY_DMVERITY_ALLOW_SIGN;
 		} else {
-			cause = STATE_CAUSE_DMV_PROTECTED;
+			cause = (status == FIVE_FILE_FSVERITY)
+				? STATE_CAUSE_FSV_PROTECTED
+				: STATE_CAUSE_DMV_PROTECTED;
 			tint = INTEGRITY_DMVERITY;
 		}
 		break;
@@ -216,7 +235,8 @@ static bool set_first_state(struct integrity_iint_cache *iint,
 	return true;
 }
 
-static bool set_next_state(struct integrity_iint_cache *iint,
+__visible_for_testing
+bool set_next_state(struct integrity_iint_cache *iint,
 			   struct task_integrity *integrity,
 			   struct task_verification_result *result)
 {
@@ -224,6 +244,8 @@ static bool set_next_state(struct integrity_iint_cache *iint,
 	enum five_file_integrity status = five_get_cache_status(iint);
 	bool has_digsig = (status == FIVE_FILE_RSA);
 	bool dmv_protected = (status == FIVE_FILE_DMVERITY);
+	bool fsv_protected = (status == FIVE_FILE_FSVERITY);
+	bool xv_protected = dmv_protected || fsv_protected;
 	struct integrity_label *label = iint->five_label;
 	enum task_integrity_state_cause cause = STATE_CAUSE_UNKNOWN;
 	enum task_integrity_value state_tint = INTEGRITY_NONE;
@@ -257,8 +279,9 @@ static bool set_next_state(struct integrity_iint_cache *iint,
 	spin_lock(&integrity->value_lock);
 	switch (integrity->value) {
 	case INTEGRITY_PRELOAD_ALLOW_SIGN:
-		if (dmv_protected) {
-			cause = STATE_CAUSE_DMV_PROTECTED;
+		if (xv_protected) {
+			cause = fsv_protected ? STATE_CAUSE_FSV_PROTECTED
+						: STATE_CAUSE_DMV_PROTECTED;
 			state_tint = INTEGRITY_DMVERITY_ALLOW_SIGN;
 		} else if (is_system_label(label)) {
 			cause = STATE_CAUSE_SYSTEM_LABEL;
@@ -270,8 +293,9 @@ static bool set_next_state(struct integrity_iint_cache *iint,
 		is_newstate = true;
 		break;
 	case INTEGRITY_PRELOAD:
-		if (dmv_protected) {
-			cause = STATE_CAUSE_DMV_PROTECTED;
+		if (xv_protected) {
+			cause = fsv_protected ? STATE_CAUSE_FSV_PROTECTED
+						: STATE_CAUSE_DMV_PROTECTED;
 			state_tint = INTEGRITY_DMVERITY;
 		} else {
 			cause = STATE_CAUSE_HMAC;
@@ -280,21 +304,21 @@ static bool set_next_state(struct integrity_iint_cache *iint,
 		is_newstate = true;
 		break;
 	case INTEGRITY_MIXED_ALLOW_SIGN:
-		if (!dmv_protected && !is_system_label(label)) {
+		if (!xv_protected && !is_system_label(label)) {
 			cause = STATE_CAUSE_HMAC;
 			state_tint = INTEGRITY_MIXED;
 			is_newstate = true;
 		}
 		break;
 	case INTEGRITY_DMVERITY:
-		if (!dmv_protected) {
+		if (!xv_protected) {
 			cause = STATE_CAUSE_HMAC;
 			state_tint = INTEGRITY_MIXED;
 			is_newstate = true;
 		}
 		break;
 	case INTEGRITY_DMVERITY_ALLOW_SIGN:
-		if (!dmv_protected) {
+		if (!xv_protected) {
 			if (is_system_label(label)) {
 				cause = STATE_CAUSE_SYSTEM_LABEL;
 				state_tint = INTEGRITY_MIXED_ALLOW_SIGN;

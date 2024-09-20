@@ -6,5 +6,4 @@ obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS2)     += fimc-is2/
 obj-$(CONFIG_VIDEO_EXYNOS_CAMREA_POSTPROCESS)	+= camera-pp/
 obj-$(CONFIG_VIDEO_EXYNOS_REPEATER)    += repeater/
 obj-$(CONFIG_VIDEO_EXYNOS_TSMUX)       += tsmux/
-obj-$(CONFIG_VIDEO_EXYNOS_ASTC)         += astc/
 EXTRA_CLAGS += -Idrivers/media/video

@@ -66,8 +66,8 @@ extern int dual_role_set_prop(struct dual_role_phy_instance *dual_role,
 			      const unsigned int *val);
 extern int dual_role_is_writeable(struct dual_role_phy_instance *drp,
 				  enum dual_role_property prop);
-#endif
 extern void dp_detach(void *data);
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 // external functions in ccic_alternate.c
 ////////////////////////////////////////////////////////////////////////////////

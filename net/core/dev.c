@@ -4954,6 +4954,7 @@ static int process_backlog(struct napi_struct *napi, int quota)
 			input_queue_head_incr(sd);
 			if (++work >= quota)
 				goto state_changed;
+
 		}
 
 		local_irq_disable();
@@ -5305,13 +5306,19 @@ out_unlock:
 	return work;
 }
 
+#ifdef CONFIG_SEC_SIPC_MODEM_IF
 struct napi_struct *napi_get_current(void)
 {
+#ifdef CONFIG_MODEM_IF_NET_GRO
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
 	return sd->current_napi;
+#else
+	return NULL;
+#endif
 }
 EXPORT_SYMBOL(napi_get_current);
+#endif
 
 static __latent_entropy void net_rx_action(struct softirq_action *h)
 {
@@ -6498,11 +6505,7 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags)
 
 	dev->flags = (flags & (IFF_DEBUG | IFF_NOTRAILERS | IFF_NOARP |
 			       IFF_DYNAMIC | IFF_MULTICAST | IFF_PORTSEL |
-			       IFF_AUTOMEDIA
-#ifdef CONFIG_MPTCP
-					 | IFF_NOMULTIPATH | IFF_MPBACKUP
-#endif
-)) |
+			       IFF_AUTOMEDIA)) |
 		     (dev->flags & (IFF_UP | IFF_VOLATILE | IFF_PROMISC |
 				    IFF_ALLMULTI));
 

@@ -700,10 +700,9 @@ static int fimc_is_preproc_resume(struct device *dev)
 int fimc_is_preproc_runtime_suspend(struct device *dev)
 {
 	int ret = 0;
-	struct platform_device *pdev = to_platform_device(dev);
 	struct fimc_is_device_preproc *device;
 
-	device = (struct fimc_is_device_preproc *)platform_get_drvdata(pdev);
+	device = (struct fimc_is_device_preproc *)dev_get_drvdata(dev);
 	if (!device) {
 		err("device is NULL");
 		ret = -EINVAL;
@@ -745,10 +744,9 @@ p_err:
 int fimc_is_preproc_runtime_resume(struct device *dev)
 {
 	int ret = 0;
-	struct platform_device *pdev = to_platform_device(dev);
 	struct fimc_is_device_preproc *device;
 
-	device = (struct fimc_is_device_preproc *)platform_get_drvdata(pdev);
+	device = (struct fimc_is_device_preproc *)dev_get_drvdata(dev);
 	if (!device) {
 		err("device is NULL");
 		ret = -EINVAL;

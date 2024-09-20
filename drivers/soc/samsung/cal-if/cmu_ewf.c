@@ -65,7 +65,7 @@ int set_cmuewf(unsigned int index, unsigned int en)
 			reg &= ~(1 << index);
 			__raw_writel(reg, cmu_cmu + EARLY_WAKEUP_FORCED_ENABLE);
 		} else if (tmp < 0) {
-			pr_err("[EWF]%s ref count mismatch. ewf_index:%u\n", __func__, index);
+			pr_err("[EWF]%s ref count mismatch. ewf_index:%u\n",__func__,  index);
 
 			exynos_ss_clk(&ewf_clk, __func__, 1, ESS_FLAG_ON);
 			ret = -EINVAL;
@@ -90,7 +90,7 @@ static int cmuewf_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "cmuewf probe\n");
 
 	if (!node) {
-		dev_err(&pdev->dev, "driver doesn't support"
+		dev_err(&pdev->dev, "driver doesnt support"
 				"non-dt devices\n");
 		return -ENODEV;
 	}

@@ -223,21 +223,10 @@ efi_header_end:
 	 *  x19/x20    __primary_switch()         callee preserved temp registers
 	 */
 ENTRY(stext)
-#ifdef CONFIG_RELOCATABLE_KERNEL
-    mov     x22, x1                         // x1=PHYS_OFFSET
-    mov     x19, x2                         // x2=real TEXT_OFFSET
-	mov_q 	x24, KIMAGE_VADDR
-	sub x24, x24, x1
-#endif
 	bl	preserve_boot_args
 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
-
-#ifdef CONFIG_RELOCATABLE_KERNEL
-	sub	x23, x19, #TEXT_OFFSET		// x23 hold offset of KASLR
-#else
 	adrp	x23, __PHYS_OFFSET
 	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
-#endif
 	bl	set_cpu_boot_mode_flag
 	bl	__create_page_tables
 	/*
@@ -255,11 +244,18 @@ ENDPROC(stext)
  */
 preserve_boot_args:
 	mov	x21, x0				// x21=FDT
+
 	adr_l	x0, boot_args			// record the contents of
+#ifndef CONFIG_RANDOMIZE_BASE
 	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
 	stp	x2, x3, [x0, #16]
+#else
+	stp	x21, xzr, [x0]			// x0 .. x3 at kernel entry
+	stp	xzr, xzr, [x0, #16]
+#endif
 	dmb	sy				// needed before dc ivac with
 						// MMU off
+
 	add	x1, x0, #0x20			// 4 x 8 bytes
 	b	__inval_cache_range		// tail call
 ENDPROC(preserve_boot_args)
@@ -808,34 +804,13 @@ __relocate_kernel:
 ENDPROC(__relocate_kernel)
 #endif
 
-#ifdef CONFIG_RELOCATABLE_KERNEL
-__relocate_kernel:
-	adr_l 	x9, __reloc_start
-	add x9, x9, x24
-	adr_l x10, __reloc_end
-	add x10, x10, x24
-0:	cmp	x9, x10
-	b.hs	1f
-	ldp	x11, x12, [x9], #24
-	ldr	x13, [x9, #-8]
-	cmp	w12, #R_AARCH64_RELATIVE
-	b.ne	0b
-	add	x13, x13, x23			// relocate
-	str	x13, [x11, x23]
-	b	0b
-1:	ret
-ENDPROC(__relocate_kernel)
-#endif
-
 __primary_switch:
 #ifdef CONFIG_RANDOMIZE_BASE
 	mov	x19, x0				// preserve new SCTLR_EL1 value
 	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
 #endif
+
 	bl	__enable_mmu
-#ifdef CONFIG_RELOCATABLE_KERNEL
-	bl	__relocate_kernel
-#endif
 #ifdef CONFIG_RELOCATABLE
 	bl	__relocate_kernel
 #ifdef CONFIG_RANDOMIZE_BASE

@@ -1900,7 +1900,6 @@ static struct fimc_is_cis_ops cis_ops = {
 	.cis_update_mipi_info = sensor_3h1_cis_update_mipi_info,
 	.cis_get_mipi_clock_string = sensor_3h1_cis_get_mipi_clock_string,
 #endif
-	.cis_check_rev = sensor_3h1_cis_check_rev,
 };
 
 static int cis_3h1_probe(struct i2c_client *client,
@@ -1912,7 +1911,7 @@ static int cis_3h1_probe(struct i2c_client *client,
 	struct fimc_is_cis *cis = NULL;
 	struct fimc_is_device_sensor *device = NULL;
 	struct fimc_is_device_sensor_peri *sensor_peri = NULL;
-	u32 sensor_id[FIMC_IS_STREAM_COUNT] = {0, };
+	u32 sensor_id[FIMC_IS_SENSOR_COUNT] = {0, };
 	u32 sensor_id_len;
 	const u32 *sensor_id_spec;
 	char const *setfile;

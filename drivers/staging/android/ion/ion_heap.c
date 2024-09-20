@@ -71,10 +71,123 @@ void *ion_heap_map_kernel(struct ion_heap *heap,
 	return vaddr;
 }
 
+static void ion_buffer_dump_flags(unsigned long flags)
+{
+	if ((flags & ION_FLAG_CACHED) && !(flags & ION_FLAG_CACHED_NEEDS_SYNC))
+		pr_cont("cached|faultmap");
+	else if (flags & ION_FLAG_CACHED)
+		pr_cont("cached|needsync");
+	else
+		pr_cont("noncached");
+
+	if (flags & ION_FLAG_NOZEROED)
+		pr_cont("|nozeroed");
+
+	if (flags & ION_FLAG_PROTECTED)
+		pr_cont("|protected");
+}
+
+static void ion_buffer_dump_tasks(struct ion_buffer *buffer, char *str)
+{
+	struct ion_task *task, *tmp;
+	const char *delim = "|";
+	size_t total_len = 0;
+	int count = 0;
+
+	list_for_each_entry_safe(task, tmp, &buffer->master_list, list) {
+		const char *name;
+		size_t len = strlen(dev_name(task->master));
+
+		if (len > MAX_DUMP_NAME_LEN)
+			len = MAX_DUMP_NAME_LEN;
+		if (!strncmp(dev_name(task->master), "ion", len)) {
+			continue;
+		} else {
+			name = dev_name(task->master) + 9;
+			len -= 9;
+		}
+		if (total_len + len + 1 > MAX_DUMP_BUFF_LEN)
+			break;
+
+		strncat((char *)(str + total_len), name, len);
+		total_len += len;
+		if (!list_is_last(&task->list, &buffer->master_list))
+			str[total_len++] = *delim;
+
+		if (++count > MAX_DUMP_TASKS)
+			break;
+	}
+}
+
+static struct vmap_area *__find_vmap_area(unsigned long addr)
+{
+	struct rb_node *n = vmap_area_root.rb_node;
+
+	while (n) {
+		struct vmap_area *va;
+
+		va = rb_entry(n, struct vmap_area, rb_node);
+		if (addr < va->va_start)
+			n = n->rb_left;
+		else if (addr >= va->va_end)
+			n = n->rb_right;
+		else
+			return va;
+	}
+
+	return NULL;
+}
+
+static struct vmap_area *find_vmap_area(unsigned long addr)
+{
+	struct vmap_area *va;
+
+	spin_lock(&vmap_area_lock);
+	va = __find_vmap_area(addr);
+	spin_unlock(&vmap_area_lock);
+
+	return va;
+}
+
 void ion_heap_unmap_kernel(struct ion_heap *heap,
 			   struct ion_buffer *buffer)
 {
-	vunmap(buffer->vaddr);
+	struct vm_struct *area;
+	void *addr = buffer->vaddr;
+
+	if (!addr)
+		return;
+
+	area = find_vmap_area((unsigned long)addr)->vm;
+	if (unlikely(!area)) {
+		pr_info("%20.s %16.s %4.s %16.s %4.s %10.s %4.s %3.s %6.s "
+				"%24.s %9.s\n",
+				"heap", "task", "pid", "thread", "tid",
+				"size", "kmap", "ref", "handle",
+				"master", "flag");
+		pr_info("------------------------------------------"
+				"----------------------------------------"
+				"----------------------------------------"
+				"--------------------------------------\n");
+
+		mutex_lock(&buffer->lock);
+		memset(master_name, 0, MAX_DUMP_BUFF_LEN);
+		ion_buffer_dump_tasks(buffer, master_name);
+		pr_info("%20.s %16.s %4u %16.s %4u %10zu %4d %3d %6d "
+				"%24.s %9lx", buffer->heap->name,
+				buffer->task_comm, buffer->pid,
+				buffer->thread_comm,
+				buffer->tid, buffer->size, buffer->kmap_cnt,
+				atomic_read(&buffer->ref.refcount),
+				buffer->handle_count, master_name,
+				buffer->flags);
+		pr_cont("(");
+		ion_buffer_dump_flags(buffer->flags);
+		pr_info(")\n");
+		mutex_unlock(&buffer->lock);
+	}
+
+	vunmap(addr);
 }
 
 int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,

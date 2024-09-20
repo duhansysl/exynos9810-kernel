@@ -112,6 +112,10 @@ static ssize_t fts_scrub_position(struct device *dev,
 static ssize_t fts_edge_x_position(struct device *dev,
 				struct device_attribute *attr, char *buf);
 
+#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
+static void tui_mode_cmd(struct fts_ts_info *info);
+#endif
+
 static void lcd_orientation(void *device_data);
 
 struct sec_cmd ft_commands[] = {
@@ -306,6 +310,22 @@ static ssize_t fts_edge_x_position(struct device *dev,
 	return snprintf(buf, SEC_CMD_BUF_SIZE, "%s\n", buff);
 }
 
+#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
+static void tui_mode_cmd(struct fts_ts_info *info)
+{
+	struct sec_cmd_data *sec = &info->sec;
+	char buff[16] = "TUImode:FAIL";
+
+	sec_cmd_set_default_result(sec);
+	sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
+
+	sec->cmd_state = SEC_CMD_STATUS_NOT_APPLICABLE;
+	sec_cmd_set_cmd_exit(sec);
+
+	input_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
+}
+#endif
+
 static void not_support_cmd(void *device_data)
 {
 	struct sec_cmd_data *sec = (struct sec_cmd_data *)device_data;
@@ -329,15 +349,6 @@ static void fw_update(void *device_data)
 	int retval = 0;
 
 	sec_cmd_set_default_result(sec);
-#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	if (sec->cmd_param[0] == 1) {
-		snprintf(buff, sizeof(buff), "%s", "OK");
-		sec_cmd_set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
-		sec->cmd_state = SEC_CMD_STATUS_OK;
-		input_info(true, &info->client->dev, "%s: user_ship, success\n", __func__);
-		return;
-	}
-#endif
 	if (info->touch_stopped) {
 		input_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n",
 			__func__);

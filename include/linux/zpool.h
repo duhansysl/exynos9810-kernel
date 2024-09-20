@@ -32,9 +32,6 @@ enum zpool_mapmode {
 	ZPOOL_MM_RW, /* normal read-write mapping */
 	ZPOOL_MM_RO, /* read-only (no copy-out at unmap time) */
 	ZPOOL_MM_WO, /* write-only (no copy-in at map time) */
-#ifdef CONFIG_ZSWAP_SAME_PAGE_SHARING
-	ZPOOL_MM_RO_NOWAIT, /*read-only (no wait if the handle is busy*/
-#endif
 
 	ZPOOL_MM_DEFAULT = ZPOOL_MM_RW
 };

@@ -50,10 +50,6 @@
 #include <asm/tlb.h>
 #include <asm/alternative.h>
 
-#ifdef CONFIG_RELOCATABLE_KERNEL
-#include <linux/memblock.h>
-#endif
-
 /*
  * We need to be able to catch inadvertent references to memstart_addr
  * that occur (potentially in generic code) before arm64_memblock_init()
@@ -62,8 +58,6 @@
  */
 s64 memstart_addr __ro_after_init = -1;
 phys_addr_t arm64_dma_phys_limit __ro_after_init;
-
-extern int rkp_cred_enable;
 
 #ifdef CONFIG_BLK_DEV_INITRD
 static int __init early_initrd(char *p)
@@ -495,11 +489,6 @@ void free_initmem(void)
 	 * is not supported by kallsyms.
 	 */
 	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
- 
-#ifdef CONFIG_UH_RKP
-	uh_call(UH_APP_RKP, RKP_DEFERRED_START, 0, 0, 0, 0);
-#endif
-
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -519,30 +508,6 @@ static int __init keepinitrd_setup(char *__unused)
 }
 
 __setup("keepinitrd", keepinitrd_setup);
-#endif
-
-#if defined(CONFIG_RELOCATABLE_KERNEL) || defined(CONFIG_RELOCATABLE)
-static unsigned long kaslr_mem  __initdata;
-static unsigned long kaslr_size  __initdata;
-
-static int __init set_kaslr_region(char *str)
-{
-	char *endp;
-
-	kaslr_size = memparse(str, &endp);
-	if (*endp == '@')
-		kaslr_mem = memparse(endp+1, NULL);
-
-	if (memblock_reserve(kaslr_mem, kaslr_size)) {
-		pr_err("%s: failed reserving size %lx at base 0x%lx\n", __func__,
-			kaslr_size, kaslr_mem);
-		return -1;
-	}
-	pr_info("kaslr :%s, base:%lx, size:%lx \n", __func__, kaslr_mem,
-		kaslr_size);
-	return 0;
-}
-__setup("kaslr_region=", set_kaslr_region);
 #endif
 
 /*

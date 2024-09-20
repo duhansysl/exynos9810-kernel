@@ -19,7 +19,7 @@ struct adc_list {
 	int prev_value;
 };
 
-static struct adc_list batt_adc_list[] = {
+static struct adc_list batt_adc_list[SEC_BAT_ADC_CHANNEL_NUM] = {
 	{.name = "adc-cable"},
 	{.name = "adc-bat"},
 	{.name = "adc-temp"},
@@ -33,6 +33,7 @@ static struct adc_list batt_adc_list[] = {
 	{.name = "adc-wpc-temp"}, /* coil therm */
 	{.name = "adc-slave-chg-temp"},
 	{.name = "adc-usb-temp"},
+	{.name = "adc-blkt-temp"},
 };
 
 static void sec_bat_adc_ap_init(struct platform_device *pdev)
@@ -254,7 +255,8 @@ int sec_bat_get_charger_type_adc
 bool sec_bat_get_value_by_adc(
 				struct sec_battery_info *battery,
 				enum sec_battery_adc_channel channel,
-				union power_supply_propval *value)
+				union power_supply_propval *value,
+				enum sec_battery_temp_check check_type)
 {
 	int temp = 0;
 	int temp_adc;
@@ -266,7 +268,7 @@ bool sec_bat_get_value_by_adc(
 
 	temp_adc = sec_bat_get_adc_data(battery, channel, battery->pdata->adc_check_count);
 	if (temp_adc < 0)
-		return true;
+		return false;
 
 	switch (channel) {
 	case SEC_BAT_ADC_CHANNEL_TEMP:
@@ -293,12 +295,11 @@ bool sec_bat_get_value_by_adc(
 			battery->pdata->chg_temp_adc_table_size;
 		battery->chg_temp_adc = temp_adc;
 		break;
-	case SEC_BAT_ADC_CHANNEL_WPC_TEMP: /* Coil Therm */
+	case SEC_BAT_ADC_CHANNEL_WPC_TEMP:
 		temp_adc_table = battery->pdata->wpc_temp_adc_table;
 		temp_adc_table_size =
 			battery->pdata->wpc_temp_adc_table_size;
 		battery->wpc_temp_adc = temp_adc;
-		battery->coil_temp_adc = temp_adc;
 		break;
 	case SEC_BAT_ADC_CHANNEL_SLAVE_CHG_TEMP:
 		temp_adc_table = battery->pdata->slave_chg_temp_adc_table;
@@ -306,11 +307,11 @@ bool sec_bat_get_value_by_adc(
 			battery->pdata->slave_chg_temp_adc_table_size;
 		battery->slave_chg_temp_adc = temp_adc;
 		break;
-	case SEC_BAT_ADC_CHANNEL_INBAT_VOLTAGE:
-		temp_adc_table = battery->pdata->inbat_adc_table;
+	case SEC_BAT_ADC_CHANNEL_BLKT_TEMP:
+		temp_adc_table = battery->pdata->blkt_temp_adc_table;
 		temp_adc_table_size =
-			battery->pdata->inbat_adc_table_size;
-		battery->inbat_adc = temp_adc;
+			battery->pdata->blkt_temp_adc_table_size;
+		battery->blkt_temp_adc = temp_adc;
 		break;
 	default:
 		dev_err(battery->dev,
@@ -346,13 +347,79 @@ bool sec_bat_get_value_by_adc(
 		(temp_adc_table[low].adc - temp_adc_table[high].adc);
 
 temp_by_adc_goto:
-	value->intval = temp;
+	if (check_type == SEC_BATTERY_TEMP_CHECK_FAKE)	
+		value->intval = 300;
+	else
+		value->intval = temp;
 
-	dev_dbg(battery->dev,
-		"%s: Temp(%d), Temp-ADC(%d)\n",
-		__func__, temp, temp_adc);
+	dev_info(battery->dev,
+		"%s:[%d] Temp(%d), Temp-ADC(%d)\n",
+		__func__,channel, temp, temp_adc);
 
 	return true;
+}
+
+int sec_bat_get_inbat_vol_by_adc(struct sec_battery_info *battery)
+{
+	int inbat = 0;
+	int inbat_adc;
+	int low = 0;
+	int high = 0;
+	int mid = 0;
+	const sec_bat_adc_table_data_t *inbat_adc_table;
+	unsigned int inbat_adc_table_size;
+
+	if (!battery->pdata->inbat_adc_table) {
+		dev_err(battery->dev, "%s: not designed to read in-bat voltage\n", __func__);
+		return -1;
+	}
+
+	inbat_adc_table = battery->pdata->inbat_adc_table;
+	inbat_adc_table_size =
+		battery->pdata->inbat_adc_table_size;
+
+	inbat_adc = sec_bat_get_adc_data(battery, SEC_BAT_ADC_CHANNEL_INBAT_VOLTAGE, battery->pdata->adc_check_count);
+	if (inbat_adc <= 0)
+		return inbat_adc;
+	battery->inbat_adc = inbat_adc;
+
+	if (inbat_adc_table[0].adc <= inbat_adc) {
+		inbat = inbat_adc_table[0].data;
+		goto inbat_by_adc_goto;
+	} else if (inbat_adc_table[inbat_adc_table_size-1].adc >= inbat_adc) {
+		inbat = inbat_adc_table[inbat_adc_table_size-1].data;
+		goto inbat_by_adc_goto;
+	}
+
+	high = inbat_adc_table_size - 1;
+
+	while (low <= high) {
+		mid = (low + high) / 2;
+		if (inbat_adc_table[mid].adc < inbat_adc)
+			high = mid - 1;
+		else if (inbat_adc_table[mid].adc > inbat_adc)
+			low = mid + 1;
+		else {
+			inbat = inbat_adc_table[mid].data;
+			goto inbat_by_adc_goto;
+		}
+	}
+
+	inbat = inbat_adc_table[high].data;
+	inbat +=
+		((inbat_adc_table[low].data - inbat_adc_table[high].data) *
+		 (inbat_adc - inbat_adc_table[high].adc)) /
+		(inbat_adc_table[low].adc - inbat_adc_table[high].adc);
+
+	if (inbat < 0)
+		inbat = 0;
+
+inbat_by_adc_goto:
+	dev_info(battery->dev,
+			"%s: inbat(%d), inbat-ADC(%d)\n",
+			__func__, inbat, inbat_adc);
+
+	return inbat;
 }
 
 bool sec_bat_check_vf_adc(struct sec_battery_info *battery)
@@ -370,13 +437,69 @@ bool sec_bat_check_vf_adc(struct sec_battery_info *battery)
 		battery->check_adc_value = adc;
 
 	if ((battery->check_adc_value <= battery->pdata->check_adc_max) &&
-		(battery->check_adc_value >= battery->pdata->check_adc_min)) {
+		(battery->check_adc_value > battery->pdata->check_adc_min)) {
 		return true;
 	} else {
 		dev_info(battery->dev, "%s: adc (%d)\n", __func__, battery->check_adc_value);
 		return false;
 	}
 }
+
+#if defined(CONFIG_DIRECT_CHARGING)
+int sec_bat_get_direct_chg_temp_adc(struct sec_battery_info *battery,
+			int adc_data, int count)
+{
+	int temp = 0;
+	int temp_adc;
+	int low = 0;
+	int high = 0;
+	int mid = 0;
+	const sec_bat_adc_table_data_t *temp_adc_table = {0 , };
+	unsigned int temp_adc_table_size = 0;
+
+	temp_adc = adc_data;
+	if (temp_adc < 0)
+		return 0;
+
+	temp_adc_table = battery->pdata->dchg_temp_adc_table;
+	temp_adc_table_size =
+		battery->pdata->dchg_temp_adc_table_size;
+	battery->dchg_temp_adc = temp_adc;
+
+	if (temp_adc_table[0].adc >= temp_adc) {
+			temp = temp_adc_table[0].data;
+			goto direct_chg_temp_goto;
+	} else if (temp_adc_table[temp_adc_table_size-1].adc <= temp_adc) {
+		temp = temp_adc_table[temp_adc_table_size-1].data;
+		goto direct_chg_temp_goto;
+	}
+	
+	high = temp_adc_table_size - 1;
+	while (low <= high) {
+		mid = (low + high) / 2;
+		if (temp_adc_table[mid].adc > temp_adc)
+			high = mid - 1;
+		else if (temp_adc_table[mid].adc < temp_adc)
+			low = mid + 1;
+		else {
+			temp = temp_adc_table[mid].data;
+			goto direct_chg_temp_goto;
+		}
+	}
+
+	temp = temp_adc_table[high].data;
+	temp += ((temp_adc_table[low].data - temp_adc_table[high].data) *
+		 (temp_adc - temp_adc_table[high].adc)) /
+		(temp_adc_table[low].adc - temp_adc_table[high].adc);
+
+direct_chg_temp_goto:
+	dev_info(battery->dev,
+			"%s: temp(%d), direct-chg-temp-ADC(%d)\n",
+			__func__, temp, temp_adc);
+
+	return temp;
+}
+#endif
 
 void adc_init(struct platform_device *pdev, struct sec_battery_info *battery)
 {

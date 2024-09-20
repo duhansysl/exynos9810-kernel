@@ -15,9 +15,9 @@
 
 #include <linux/cpufreq.h>
 #include <linux/cpufreq_times.h>
+#include <linux/cputime.h>
 #include <linux/hashtable.h>
 #include <linux/init.h>
-#include <linux/jiffies.h>
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/seq_file.h>
@@ -369,7 +369,7 @@ int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
 	struct pid *pid, struct task_struct *p)
 {
 	unsigned int cpu, i;
-	u64 cputime;
+	cputime_t cputime;
 	unsigned long flags;
 	struct cpu_freqs *freqs;
 	struct cpu_freqs *last_freqs = NULL;
@@ -388,14 +388,14 @@ int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
 			    p->time_in_state)
 				cputime = p->time_in_state[freqs->offset + i];
 			seq_printf(m, "%u %lu\n", freqs->freq_table[i],
-				   (unsigned long)nsec_to_clock_t(cputime));
+				   (unsigned long)cputime_to_clock_t(cputime));
 		}
 	}
 	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
 	return 0;
 }
 
-void cpufreq_acct_update_power(struct task_struct *p, u64 cputime)
+void cpufreq_acct_update_power(struct task_struct *p, cputime_t cputime)
 {
 	unsigned long flags;
 	unsigned int state;

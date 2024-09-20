@@ -117,6 +117,7 @@ struct decon_lcd {
 	struct lcd_mres_info dt_lcd_mres;
 	struct lcd_hdr_info dt_lcd_hdr;
 	unsigned int bpc;
+	int default_dsim;
 };
 
 struct decon_dsc {

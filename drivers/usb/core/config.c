@@ -213,7 +213,7 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno, int inum,
 	buffer += d->bLength;
 	size -= d->bLength;
 
-	if ((d->bmAttributes & 0x3) == 0x1) {
+	if (( d->bmAttributes & 0x3 ) == 0x1) {
 		if (d->bEndpointAddress & USB_ENDPOINT_DIR_MASK) {
 			to_usb_device(ddev)->hwinfo.in_ep = d->bEndpointAddress;
 			dev_info(ddev, " This is IN ISO endpoint #0%x \n", d->bEndpointAddress);
@@ -773,18 +773,21 @@ void usb_destroy_configuration(struct usb_device *dev)
 		return;
 
 	if (dev->rawdescriptors) {
-		for (i = 0; i < dev->descriptor.bNumConfigurations; i++)
+		for (i = 0; i < dev->descriptor.bNumConfigurations &&
+			i < USB_MAXCONFIG; i++)
 			kfree(dev->rawdescriptors[i]);
 
 		kfree(dev->rawdescriptors);
 		dev->rawdescriptors = NULL;
 	}
 
-	for (c = 0; c < dev->descriptor.bNumConfigurations; c++) {
+	for (c = 0; c < dev->descriptor.bNumConfigurations &&
+		c < USB_MAXCONFIG; c++) {
 		struct usb_host_config *cf = &dev->config[c];
 
 		kfree(cf->string);
-		for (i = 0; i < cf->desc.bNumInterfaces; i++) {
+		for (i = 0; i < cf->desc.bNumInterfaces &&
+			i < USB_MAXINTERFACES; i++) {
 			if (cf->intf_cache[i])
 				kref_put(&cf->intf_cache[i]->ref,
 					  usb_release_interface_cache);

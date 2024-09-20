@@ -34,7 +34,8 @@ fimc-is-objs	:= fimc-is-core.o \
 		fimc-is-dt.o \
 		fimc-is-clk-gate.o \
 		fimc-is-binary.o \
-		fimc-is-i2c-config.o
+		fimc-is-i2c-config.o \
+		fimc-is-work.o
 
 obj-$(CONFIG_COMPANION_USE) += fimc-is-device-preprocessor.o \
 			       fimc-is-video-preprocessor.o
@@ -89,7 +90,3 @@ subdir-ccflags-$(CONFIG_FIMC_IS_V6_0_0) += -Idrivers/media/platform/exynos/fimc-
 
 subdir-ccflags-$(CONFIG_VENDER_DEFAULT) += -Idrivers/media/platform/exynos/fimc-is2/vendor/default
 subdir-ccflags-$(CONFIG_VENDER_MCD) += -Idrivers/media/platform/exynos/fimc-is2/vendor/mcd
-subdir-ccflags-$(CONFIG_VENDER_PSV) += -Idrivers/media/platform/exynos/fimc-is2/vendor/psv
-
-subdir-ccflags-y += -Wno-sizeof-pointer-memaccess
-subdir-ccflags-y += -Wno-stringop-overflow

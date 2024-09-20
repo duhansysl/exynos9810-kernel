@@ -287,6 +287,7 @@ void __init parse_early_options(char *cmdline);
 #define deferred_module_init(fn) deferred_initcall(fn, 0)
 #define deferred_module_init_sync(fn) deferred_initcall(fn, 0s)
 #endif
+
 #else /* MODULE */
 
 #ifdef CONFIG_DEFERRED_INITCALLS

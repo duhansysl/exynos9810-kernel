@@ -55,7 +55,9 @@
 #include "muic_ccic.h"
 #endif
 
-#if defined(CONFIG_MUIC_HV) || defined(CONFIG_SUPPORT_QC30)
+#if defined(CONFIG_BATTERY_SAMSUNG_LEGO_STYLE)
+#include "../../battery/common/include/sec_charging_common.h"
+#elif defined(CONFIG_MUIC_HV) || defined(CONFIG_SUPPORT_QC30)
 #include "../../battery_v2/include/sec_charging_common.h"
 #endif
 

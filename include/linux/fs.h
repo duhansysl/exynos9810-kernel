@@ -452,14 +452,6 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
 				loff_t pos, unsigned len, unsigned copied,
 				struct page *page, void *fsdata);
 
-#define MAX_KEY_SIZE	64
-struct _fmp_ci {
-	unsigned char		*iv;		/* initial vector */
-	unsigned char		key[MAX_KEY_SIZE];	/* key */
-	unsigned int		key_length;	/* key length */
-	int 			private_algo_mode;	/* Encryption algorithm */
-};
-
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
@@ -478,8 +470,7 @@ struct address_space {
 	gfp_t			gfp_mask;	/* implicit gfp mask for allocations */
 	struct list_head	private_list;	/* ditto */
 	void			*private_data;	/* ditto */
-	struct _fmp_ci		fmp_ci;
-#ifdef CONFIG_SDP
+#if defined(CONFIG_SDP) && !defined(CONFIG_FSCRYPT_SDP)
 	int userid;
 #endif
 } __attribute__((aligned(sizeof(long))));
@@ -741,7 +732,6 @@ struct inode {
 #endif
 
 	void			*i_private; /* fs or device private pointer */
-
 };
 
 static inline unsigned int i_blocksize(const struct inode *node)
@@ -957,7 +947,6 @@ struct file {
 	struct list_head	f_tfile_llink;
 #endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
-
 #if defined(CONFIG_FIVE_PA_FEATURE) || defined(CONFIG_PROCA)
 	void *f_signature;
 #endif
@@ -1686,6 +1675,8 @@ struct fiemap_extent_info {
 int fiemap_fill_next_extent(struct fiemap_extent_info *info, u64 logical,
 			    u64 phys, u64 len, u32 flags);
 int fiemap_check_flags(struct fiemap_extent_info *fieinfo, u32 fs_flags);
+int fiemap_check_ranges(struct super_block *sb,
+			       u64 start, u64 len, u64 *new_len);
 
 /*
  * File types
@@ -1786,9 +1777,6 @@ struct file_operations {
 			u64);
 	ssize_t (*dedupe_file_range)(struct file *, u64, u64, struct file *,
 			u64);
-#if defined(CONFIG_ECRYPT_FS_PRIVATE)
-	struct file* (*get_lower_file)(struct file *f);
-#endif
 };
 
 struct inode_operations {
@@ -1863,6 +1851,7 @@ struct super_operations {
 	void *(*clone_mnt_data) (void *);
 	void (*copy_mnt_data) (void *, void *);
 	void (*umount_begin) (struct super_block *);
+	void (*umount_end) (struct super_block *, int);
 
 	int (*show_options)(struct seq_file *, struct dentry *);
 	int (*show_options2)(struct vfsmount *,struct seq_file *, struct dentry *);
@@ -1879,7 +1868,6 @@ struct super_operations {
 				  struct shrink_control *);
 	long (*free_cached_objects)(struct super_block *,
 				    struct shrink_control *);
-	long (*unlink_callback)(struct super_block *, char *);
 };
 
 /*
@@ -2008,6 +1996,10 @@ static inline bool HAS_UNMAPPED_ID(struct inode *inode)
  *			wb stat updates to grab mapping->tree_lock.  See
  *			inode_switch_wb_work_fn() for details.
  *
+ * I_SYNC_QUEUED	Inode is queued in b_io or b_more_io writeback lists.
+ *			Used to detect that mark_inode_dirty() should not move
+ * 			inode between dirty lists.
+ *
  * Q: What is the difference between I_WILL_FREE and I_FREEING?
  */
 #define I_DIRTY_SYNC		(1 << 0)
@@ -2028,6 +2020,7 @@ static inline bool HAS_UNMAPPED_ID(struct inode *inode)
 #define __I_DIRTY_TIME_EXPIRED	12
 #define I_DIRTY_TIME_EXPIRED	(1 << __I_DIRTY_TIME_EXPIRED)
 #define I_WB_SWITCH		(1 << 13)
+#define I_SYNC_QUEUED		(1 << 16)
 
 #define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
 #define I_DIRTY_ALL (I_DIRTY | I_DIRTY_TIME)
@@ -2122,12 +2115,6 @@ struct file_system_type {
 
 #define MODULE_ALIAS_FS(NAME) MODULE_ALIAS("fs-" NAME)
 
-#ifdef CONFIG_PROC_PARSE_OPTION_ON_MOUNT
-extern struct dentry *mount_ns_option(struct file_system_type *fs_type,
-	int flags, void *data, void *ns, struct user_namespace *user_ns,
-	int (*fill_super)(struct super_block *, void *, int),
-	int (*parse_options)(char *, struct pid_namespace *));
-#endif
 extern struct dentry *mount_ns(struct file_system_type *fs_type,
 	int flags, void *data, void *ns, struct user_namespace *user_ns,
 	int (*fill_super)(struct super_block *, void *, int));
@@ -2937,6 +2924,9 @@ enum {
 };
 
 void dio_end_io(struct bio *bio, int error);
+#ifdef CONFIG_DDAR
+struct inode *dio_bio_get_inode(struct bio *bio);
+#endif
 
 ssize_t __blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 			     struct block_device *bdev, struct iov_iter *iter,
@@ -3312,13 +3302,6 @@ static inline bool dir_relax_shared(struct inode *inode)
 extern bool path_noexec(const struct path *path);
 extern void inode_nohighmem(struct inode *inode);
 
-/* for Android O */
-#define AID_USE_SEC_RESERVED	KGIDT_INIT(4444)
-#if ANDROID_VERSION < 90000
-#define AID_USE_ROOT_RESERVED	KGIDT_INIT(5555)
-#else
-/* for Android P */
 #define AID_USE_ROOT_RESERVED	KGIDT_INIT(5678)
-#endif
 
 #endif /* _LINUX_FS_H */

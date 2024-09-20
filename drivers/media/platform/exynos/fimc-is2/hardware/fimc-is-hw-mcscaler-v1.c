@@ -320,9 +320,9 @@ static int fimc_is_hw_mcsc_shot(struct fimc_is_hw_ip *hw_ip, struct fimc_is_fram
 		lindex, hindex, frame->instance);
 
 	/* set mcsc dma out addr */
-	target_addr[0] = frame->shot->uctl.scalerUd.scpTargetAddress[0];
-	target_addr[1] = frame->shot->uctl.scalerUd.scpTargetAddress[1];
-	target_addr[2] = frame->shot->uctl.scalerUd.scpTargetAddress[2];
+	target_addr[0] = frame->scpTargetAddress[0];
+	target_addr[1] = frame->scpTargetAddress[1];
+	target_addr[2] = frame->scpTargetAddress[2];
 
 	msdbg_hw(2, "[F:%d]shot [T:%d] cmd[%d] addr[0x%x]\n",
 		frame->instance, hw_ip, frame->fcount, frame->type,
@@ -1302,7 +1302,6 @@ int fimc_is_hw_mcsc_probe(struct fimc_is_hw_ip *hw_ip, struct fimc_is_interface 
 	hw_ip->itf  = itf;
 	hw_ip->itfc = itfc;
 	atomic_set(&hw_ip->fcount, 0);
-	hw_ip->internal_fcount = 0;
 	hw_ip->is_leader = false;
 	atomic_set(&hw_ip->status.Vvalid, V_BLANK);
 	atomic_set(&hw_ip->rsccount, 0);

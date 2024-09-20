@@ -145,7 +145,6 @@ void fimc_is_hw_group_init(struct fimc_is_group *group)
 	group->subdev[ENTRY_M4P] = NULL;
 	group->subdev[ENTRY_VRA] = NULL;
 	group->subdev[ENTRY_DCP] = NULL;
-	group->subdev[ENTRY_SRDZ] = NULL;
 
 	INIT_LIST_HEAD(&group->subdev_list);
 }
@@ -332,6 +331,10 @@ int fimc_is_hw_group_open(void *group_data)
 	}
 
 	return ret;
+}
+
+void fimc_is_hw_camif_init(void)
+{
 }
 
 int fimc_is_hw_camif_cfg(void *sensor_data)
@@ -532,7 +535,7 @@ int fimc_is_hw_ischain_cfg(void *ischain_data)
 	FIMC_BUG(!csi);
 
 	/* checked single/dual camera */
-	for (i = 0; i < FIMC_IS_STREAM_COUNT; i++)
+	for (i = 0; i < FIMC_IS_SENSOR_COUNT; i++)
 		if (test_bit(FIMC_IS_SENSOR_OPEN, &(core->sensor[i].state)))
 			sensor_cnt++;
 
@@ -976,12 +979,6 @@ inline int fimc_is_hw_slot_id(int hw_id)
 		slot_id = 9;
 		break;
 #endif
-#if defined(SOC_SRDZ)
-#error implementation is needed!!!
-	case DEV_HW_SRDZ:
-		slot_id = 10;
-		break;
-#endif
 	default:
 		break;
 	}
@@ -1332,23 +1329,6 @@ int fimc_is_hw_get_address(void *itfc_data, void *pdev_data, int hw_id)
 
 		info_itfc("[ID:%2d] DCP VA(0x%p)\n", hw_id, itf_hwip->hw_ip->regs);
 		break;
-	case DEV_HW_SRDZ:
-		mem_res = platform_get_resource(pdev, IORESOURCE_MEM, IORESOURCE_SRDZ);
-		if (!mem_res) {
-			dev_err(&pdev->dev, "Failed to get io memory region\n");
-			return -EINVAL;
-		}
-
-		itf_hwip->hw_ip->regs_start = mem_res->start;
-		itf_hwip->hw_ip->regs_end = mem_res->end;
-		itf_hwip->hw_ip->regs = ioremap_nocache(mem_res->start, resource_size(mem_res));
-		if (!itf_hwip->hw_ip->regs) {
-			dev_err(&pdev->dev, "Failed to remap io region\n");
-			return -EINVAL;
-		}
-
-		info_itfc("[ID:%2d] SRDZ VA(0x%p)\n", hw_id, itf_hwip->hw_ip->regs);
-		break;
 	default:
 		probe_err("hw_id(%d) is invalid", hw_id);
 		return -EINVAL;
@@ -1492,13 +1472,6 @@ int fimc_is_hw_get_irq(void *itfc_data, void *pdev_data, int hw_id)
 			return -EINVAL;
 		}
 		break;
-	case DEV_HW_SRDZ:
-		itf_hwip->irq[INTR_HWIP1] = platform_get_irq(pdev, 18);
-		if (itf_hwip->irq[INTR_HWIP1] < 0) {
-			err("Failed to get irq srdz \n");
-			return -EINVAL;
-		}
-		break;
 	default:
 		probe_err("hw_id(%d) is invalid", hw_id);
 		return -EINVAL;
@@ -1581,9 +1554,6 @@ int fimc_is_hw_request_irq(void *itfc_data, int hw_id)
 	case DEV_HW_DCP:
 		ret = __fimc_is_hw_request_irq(itf_hwip, "dcp", INTR_HWIP1, fimc_is_isr1_dcp);
 		ret = __fimc_is_hw_request_irq(itf_hwip, "dcp", INTR_HWIP2, fimc_is_isr2_dcp);
-		break;
-	case DEV_HW_SRDZ:
-		ret = __fimc_is_hw_request_irq(itf_hwip, "srdz", INTR_HWIP1, fimc_is_isr1_srdz);
 		break;
 	default:
 		probe_err("hw_id(%d) is invalid", hw_id);

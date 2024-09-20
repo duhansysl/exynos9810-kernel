@@ -495,7 +495,7 @@ static int abox_wdma_ack(struct snd_pcm_substream *substream)
 	pcmtask_msg->param.pointer = (unsigned int)appl_bytes;
 	msg.task_id = pcmtask_msg->channel_id = id;
 
-	return abox_wdma_request_ipc(data, &msg, 0, 0);
+	return abox_wdma_request_ipc(data, &msg, 1, 0);
 }
 
 static struct snd_pcm_ops abox_wdma_ops = {

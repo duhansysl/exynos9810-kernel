@@ -170,7 +170,7 @@ struct zpool *zpool_create_pool(const char *type, const char *name, gfp_t gfp,
 		return NULL;
 	}
 
-	zpool = kmalloc(sizeof(*zpool), GFP_KERNEL);
+	zpool = kmalloc(sizeof(*zpool), gfp);
 	if (!zpool) {
 		pr_err("couldn't create zpool - out of memory\n");
 		zpool_put_driver(driver);

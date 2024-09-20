@@ -36,9 +36,7 @@
 #define S2MPB02_FLED_FLASH_TORCH_OFF 0x00
 #define S2MPB02_FLED_FLASH_ON 0x80
 #define S2MPB02_FLED_TORCH_ON 0xC0
-#define S2MPB02_FLED2_TORCH_ON 0xF0
 #define S2MPB02_FLED_ENABLE_MODE_MASK 0xC0
-#define S2MPB02_FLED2_ENABLE_MODE_MASK 0xFF
 
 #define S2MPB02_FLED_CTRL1_LV_EN_MASK 0x08
 #define S2MPB02_FLED_CTRL1_LV_ENABLE 1
@@ -65,7 +63,6 @@
 enum s2mpb02_led_id {
 	S2MPB02_FLASH_LED_1,
 	S2MPB02_TORCH_LED_1,
-	S2MPB02_TORCH_LED_2,
 	S2MPB02_LED_MAX,
 };
 
@@ -158,6 +155,7 @@ struct s2mpb02_led {
 	const char *name;
 	int id;
 	int brightness;
+	int brightness_cam;
 	int timeout;
 	int irda_off;
 	int torch_table_enable;

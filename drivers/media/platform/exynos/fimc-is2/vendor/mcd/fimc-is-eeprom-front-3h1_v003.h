@@ -24,6 +24,11 @@
 /* AWB referenced section */
 #define EEP_AWB_VER_START_ADDR_FRONT				0x420
 
+/* CAM1 PAF info addr */
+#define ROM_PAF_CAL_DATA_START_ADDR_FRONT			0x200
+#define ROM_PAF_CAL_ERR_CHECK_OFFSET				0x14
+#define ROM_CAL_PAF_ERROR_CHECK_CODE_ADDR_FRONT		0x214
+
 /* AP Shading referenced section */
 #define EEP_AP_SHADING_VER_START_ADDR_FRONT			0x1FE0
 

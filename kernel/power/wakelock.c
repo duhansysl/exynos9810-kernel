@@ -82,7 +82,7 @@ static inline void decrement_wakelocks_number(void) {}
 
 #ifdef CONFIG_PM_WAKELOCKS_GC
 #define WL_GC_COUNT_MAX	100
-#define WL_GC_TIME_SEC	120 /* default : 300s */
+#define WL_GC_TIME_SEC	300
 
 static void __wakelocks_gc(struct work_struct *work);
 static LIST_HEAD(wakelocks_lru_list);
@@ -203,11 +203,8 @@ int pm_wake_lock(const char *buf)
 	size_t len;
 	int ret = 0;
 
-#ifndef CONFIG_SEC_PM
-	/* Block the code because of userspace wakelock issue about ril, gps */
 	if (!capable(CAP_BLOCK_SUSPEND))
 		return -EPERM;
-#endif
 
 	while (*str && !isspace(*str))
 		str++;
@@ -252,10 +249,8 @@ int pm_wake_unlock(const char *buf)
 	size_t len;
 	int ret = 0;
 
-#ifndef CONFIG_SEC_PM
 	if (!capable(CAP_BLOCK_SUSPEND))
 		return -EPERM;
-#endif
 
 	len = strlen(buf);
 	if (!len)

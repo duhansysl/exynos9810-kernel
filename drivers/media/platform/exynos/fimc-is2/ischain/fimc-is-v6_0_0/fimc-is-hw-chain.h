@@ -144,10 +144,16 @@ enum c2sync_type {
 #define IORESOURCE_STAT_DMA	9
 
 #define FIMC_IS_RESERVE_LIB_SIZE	(0x00600000)	/* 6MB */
-#define FIMC_IS_TAAISP_SIZE		(0x00500000)	/* 5MB */
+/* 241,696 per instance */
+#if defined (USE_MS_PDAF)
+#define TAAISP_STAT_SIZE		(0x00140000)	/* 256KB + 1MB For MSPDAF */
+#else
+#define TAAISP_STAT_SIZE		(0x00040000)	/* 256KB */
+#endif
+/* ME/DRC DMA: 3,026,288 */
+#define TAAISP_MEDRC_SIZE		(0x00300000)	/* 3MB */
 #define FIMC_IS_VRA_SIZE		(0x00800000)	/* 8MB */
-
-#define FIMC_IS_HEAP_SIZE		(0x02A00000)	/* 42MB */
+#define FIMC_IS_HEAP_SIZE		(0x03C00000)	/* 60MB */
 
 #define SYSREG_ISPPRE_BASE_ADDR		0x16210000
 #define SYSREG_ISPLP_BASE_ADDR		0x16410000

@@ -1085,13 +1085,13 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 	 */
 #ifndef CONFIG_EXYNOS_HOTPLUG_GOVERNOR
 	if (!of_property_read_u32(dn, "max-freq", &val))
-		domain->max_freq = val;
+		domain->max_freq = min(domain->max_freq, val);
 #endif
 	if (!of_property_read_u32(dn, "min-freq", &val))
 		domain->min_freq = max(domain->min_freq, val);
 #ifdef CONFIG_SEC_PM
 	if (!of_property_read_u32(dn, "max-freq", &val))
-		domain->max_usable_freq = val;
+		domain->max_usable_freq = min(domain->max_freq, val);
 #endif
 
 	domain->boot_freq = cal_dfs_get_boot_freq(domain->cal_id);

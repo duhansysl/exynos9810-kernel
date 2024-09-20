@@ -326,7 +326,6 @@ static int max77865_i2c_remove(struct i2c_client *i2c)
 {
 	struct max77865_dev *max77865 = i2c_get_clientdata(i2c);
 
-	device_init_wakeup(max77865->dev, 0);
 	mfd_remove_devices(max77865->dev);
 	i2c_unregister_device(max77865->muic);
 	kfree(max77865);

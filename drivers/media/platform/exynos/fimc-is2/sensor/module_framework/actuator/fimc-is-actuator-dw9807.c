@@ -292,7 +292,7 @@ int sensor_dw9807_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	}
 
 	/* EEPROM AF calData address */
-	cal_addr = gPtr_lib_support.minfo->kvaddr_rear_cal + EEPROM_OEM_BASE;
+	cal_addr = gPtr_lib_support.minfo->kvaddr_cal[SENSOR_POSITION_REAR] + EEPROM_OEM_BASE;
 	cal_data = (struct fimc_is_caldata_list_dw9807 *)(cal_addr);
 
 	/* Read into EEPROM data or default setting */

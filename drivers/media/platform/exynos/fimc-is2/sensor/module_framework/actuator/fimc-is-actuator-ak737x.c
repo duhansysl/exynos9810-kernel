@@ -98,113 +98,6 @@ static void sensor_ak737x_print_log(int step)
 	}
 }
 
-#if defined (USE_CAMERA_UPDATE_ACTUATOR_PID)
-u8 sensor_ak737x_pid6_data[][2] =
-{
-	{0x10, 0x3C},
-	{0x11, 0x37},
-	{0x12, 0x50},
-	{0x13, 0x19},
-	{0x14, 0x1E},
-	{0x15, 0x2A},
-	{0x16, 0x14},
-	{0x17, 0x62},
-	{0x18, 0xDB},
-	{0x19, 0x00},
-	{0x1A, 0x00},
-	{0x1C, 0x00},
-	{0x1D, 0x00},
-	{0x1E, 0x00},
-	{0x20, 0x00},
-	{0x21, 0x37},
-	{0x22, 0x00},
-	{0x23, 0x14},
-	{0x24, 0x00},
-	{0x25, 0x00},
-};
-
-static int sensor_ak737x_actuator_update_pid(struct v4l2_subdev *subdev, int is_write)
-{
-	int ret = 0;
-	struct fimc_is_actuator *actuator;
-	struct i2c_client *client = NULL;
-	struct fimc_is_module_enum *module;
-	u8 data8;
-	int pid_data_len;
-	int i;
-
-	WARN_ON(!subdev);
-
-	actuator = (struct fimc_is_actuator *)v4l2_get_subdevdata(subdev);
-	WARN_ON(!actuator);
-
-	if (!actuator->vendor_use_update_pid) {
-		warn("There is no 'vendor_use_update_pid' in DT");
-		return 0;
-	}
-
-	module = actuator->sensor_peri->module;
-
-	client = actuator->client;
-	if (unlikely(!client)) {
-		err("client is NULL");
-		return -EINVAL;
-	}
-
-	I2C_MUTEX_LOCK(actuator->i2c_lock);
-
-	fimc_is_sensor_addr8_read8(client, 0x10, &data8);
-
-	pr_info("%s sensor position [%d], pid=0x%x write[%d]\n", __func__, actuator->device, data8, is_write);
-
-	/* SEM module & PID4 */
-	if (data8 == 0x55) {
-		pid_data_len = (sizeof(sensor_ak737x_pid6_data) / sizeof(sensor_ak737x_pid6_data[0]));
-		pr_info("%s SEM module & PID4 detected. update pid, pid_data_len =%d\n", __func__, pid_data_len);
-
-		/* enter setting mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0xAE, 0x3B);
-
-		/* PID6 Data Write */
-		for (i = 0; i < pid_data_len; i++) {
-			ret = fimc_is_sensor_addr8_write8(client, sensor_ak737x_pid6_data[i][0], sensor_ak737x_pid6_data[i][1]);
-			dbg_actuator("%s [0x%x]=[0x%x]\n", __func__, sensor_ak737x_pid6_data[i][0], sensor_ak737x_pid6_data[i][1]);
-		}
-
-		if (is_write) {
-			for (i = 0; i < 3; i++) {
-				pr_info("%s start writing pid to memory, retry[%d]\n", __func__, i);
-
-				/* PID STOMEM1 */
-				ret = fimc_is_sensor_addr8_write8(client, 0x03, 0x01);
-				msleep(90);
-
-				/* PID STOMEM2 */
-				ret = fimc_is_sensor_addr8_write8(client, 0x03, 0x02);
-				msleep(90);
-
-				/* PID STOMEM4 */
-				ret = fimc_is_sensor_addr8_write8(client, 0x03, 0x08);
-				msleep(36);
-
-				ret = fimc_is_sensor_addr8_read8(client, 0x4B, &data8);
-				if ((data8 & (1 << 2)) == 0) {
-					pr_info("%s complete writing pid to memory\n", __func__);
-					break;
-				}
-			}
-		}
-
-		/* release setting mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0xAE, 0x00);
-	}
-
-	I2C_MUTEX_UNLOCK(actuator->i2c_lock);
-
-	return ret;
-}
-#endif /* USE_CAMERA_UPDATE_ACTUATOR_PID */
-
 static int sensor_ak737x_init_position(struct i2c_client *client,
 		struct fimc_is_actuator *actuator)
 {
@@ -245,12 +138,34 @@ p_err:
 	return ret;
 }
 
+static int sensor_ak737x_soft_landing(struct i2c_client *client,
+		struct fimc_is_actuator *actuator)
+{
+	int ret = 0;
+	int i;
+
+	pr_info("[%s][%d] E\n", __func__, actuator->device);
+
+	for (i = 0; i < actuator->vendor_soft_landing_list_len; i += 2) {
+		ret = sensor_ak737x_write_position(client, actuator->vendor_soft_landing_list[i]);
+		if (ret < 0)
+			goto p_err;
+
+		msleep(actuator->vendor_soft_landing_list[i + 1]);
+	}
+
+p_err:
+	return ret;
+}
+
 int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 {
 	int ret = 0;
 	int i = 0;
 	struct fimc_is_actuator *actuator;
 	struct i2c_client *client = NULL;
+	struct fimc_is_module_enum *module;
+
 #ifdef USE_CAMERA_HW_BIG_DATA
 	struct cam_hw_param *hw_param = NULL;
 	struct fimc_is_device_sensor *device = NULL;
@@ -274,18 +189,13 @@ int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	actuator = (struct fimc_is_actuator *)v4l2_get_subdevdata(subdev);
 	WARN_ON(!actuator);
 
+	module = actuator->sensor_peri->module;
 	client = actuator->client;
 	if (unlikely(!client)) {
 		err("client is NULL");
 		ret = -EINVAL;
 		goto p_err;
 	}
-
-#if defined (USE_CAMERA_UPDATE_ACTUATOR_PID)
-	if (actuator->vendor_use_update_pid) {
-		sensor_ak737x_actuator_update_pid(subdev, false);
-	}
-#endif
 
 	dev = &client->dev;
 	dnode = dev->of_node;
@@ -309,6 +219,14 @@ int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 		goto p_err;
 	}
 
+	if (actuator->vendor_use_standby_mode) {
+		/* Go standby mode */
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_STANDBY);
+		if (ret < 0)
+			goto p_err;
+		msleep(1);
+	}
+
 	for (i = 0; i < product_id_len; i += 2) {
 		ret = fimc_is_sensor_addr8_read8(client, product_id_list[i], &product_id);
 		if (ret < 0) {
@@ -322,7 +240,7 @@ int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 			goto p_err;
 		}
 
-		pr_info("[%s][%d] dt[addr=%x,id=%x], module id=%x\n",
+		pr_info("[%s][%d] dt[addr=0x%X,id=0x%X], product_id=0x%X\n",
 				__func__, actuator->device, product_id_list[i], product_id_list[i+1], product_id);
 
 		if (product_id_list[i+1] == product_id) {
@@ -338,17 +256,18 @@ int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	}
 
 	/* ToDo: Cal init data from FROM */
-
 	if (actuator->vendor_use_sleep_mode) {
 		/* Go sleep mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0x02, 32);
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_SLEEP);
+		if (ret < 0)
+			goto p_err;
 	} else {
 		ret = sensor_ak737x_init_position(client, actuator);
 		if (ret < 0)
 			goto p_err;
 
 		/* Go active mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0x02, 0);
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_ACTIVE);
 		if (ret < 0)
 			goto p_err;
 	}
@@ -362,6 +281,15 @@ int sensor_ak737x_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	pr_info("[%s] time %lu us", __func__, (end.tv_sec - st.tv_sec) * 1000000 + (end.tv_usec - st.tv_usec));
 #endif
 
+#if defined(CAMERA_REAR2) && defined(CAMERA_ACTUATOR_DUAL_FOR_FIX_I2C_ERROR)
+	/* Add the setting delay for preventing i2c fail issue.
+	 * If this device is not sharing the i2c bus with others,
+	 * this delay could be removed.
+	 */
+	if (module->sensor_id == SENSOR_NAME_S5K2L2) {
+		usleep_range(600, 610);
+	}
+#endif
 p_err:
 	I2C_MUTEX_UNLOCK(actuator->i2c_lock);
 	return ret;
@@ -415,6 +343,8 @@ int sensor_ak737x_actuator_set_position(struct v4l2_subdev *subdev, u32 *info)
 	int ret = 0;
 	struct fimc_is_actuator *actuator;
 	struct i2c_client *client;
+	struct fimc_is_module_enum *module;
+
 	u32 position = 0;
 #ifdef DEBUG_ACTUATOR_TIME
 	struct timeval st, end;
@@ -435,6 +365,8 @@ int sensor_ak737x_actuator_set_position(struct v4l2_subdev *subdev, u32 *info)
 		goto p_err;
 	}
 
+	module = actuator->sensor_peri->module;
+
 	I2C_MUTEX_LOCK(actuator->i2c_lock);
 	position = *info;
 	if (position > AK737X_POS_MAX_SIZE) {
@@ -451,6 +383,16 @@ int sensor_ak737x_actuator_set_position(struct v4l2_subdev *subdev, u32 *info)
 	actuator->position = position;
 
 	dbg_actuator("%s [%d]: position(%d)\n", __func__, actuator->device, position);
+
+#if defined(CAMERA_REAR2) && defined(CAMERA_ACTUATOR_DUAL_FOR_FIX_I2C_ERROR)
+	/* Add the setting delay for preventing i2c fail issue.
+	 * If this device is not sharing the i2c bus with others,
+	 * this delay could be removed.
+	 */
+	if (module->sensor_id == SENSOR_NAME_S5K2L2) {
+		usleep_range(600, 610);
+	}
+#endif
 
 #ifdef DEBUG_ACTUATOR_TIME
 	do_gettimeofday(&end);
@@ -539,21 +481,41 @@ static int sensor_ak737x_actuator_set_active(struct v4l2_subdev *subdev, int ena
 
 	I2C_MUTEX_LOCK(actuator->i2c_lock);
 
+	if (!enable && actuator->vendor_soft_landing_list_len > 0) {
+		/* Go sleep mode */
+		sensor_ak737x_soft_landing(client, actuator);
+	}
+
+	if (actuator->vendor_use_standby_mode) {
+		/* Go standby mode */
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_STANDBY);
+		if (ret < 0)
+			goto p_err;
+		msleep(1);
+	}
+
 	if (enable) {
 		sensor_ak737x_init_position(client, actuator);
 
 		/* Go active mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0x02, 0);
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_ACTIVE);
 		if (ret < 0)
 			goto p_err;
-
 	} else {
 		/* Go sleep mode */
-		ret = fimc_is_sensor_addr8_write8(client, 0x02, 32);
+		ret = fimc_is_sensor_addr8_write8(client, AK737X_REG_CONT1, AK737X_MODE_SLEEP);
 		if (ret < 0)
 			goto p_err;
 	}
-
+#if defined(CAMERA_REAR2) && defined(CAMERA_ACTUATOR_DUAL_FOR_FIX_I2C_ERROR)
+	/* Add the setting delay for preventing i2c fail issue.
+	 * If this device is not sharing the i2c bus with others,
+	 * this delay could be removed.
+	 */
+	if (module->sensor_id == SENSOR_NAME_S5K2L2) {
+		usleep_range(600, 610);
+	}
+#endif
 p_err:
 	I2C_MUTEX_UNLOCK(actuator->i2c_lock);
 	return ret;
@@ -588,9 +550,10 @@ int sensor_ak737x_actuator_probe(struct i2c_client *client,
 	u32 first_pos = 0;
 	u32 first_delay = 0;
 	bool vendor_use_sleep_mode = false;
-	bool vendor_use_update_pid = false;
+	bool vendor_use_standby_mode = false;
 	struct device *dev;
 	struct device_node *dnode;
+	const u32 *vendor_soft_landing_list_spec;
 
 	WARN_ON(!fimc_is_dev);
 	WARN_ON(!client);
@@ -608,8 +571,8 @@ int sensor_ak737x_actuator_probe(struct i2c_client *client,
 	if (of_property_read_bool(dnode, "vendor_use_sleep_mode"))
 		vendor_use_sleep_mode = true;
 
-	if (of_property_read_bool(dnode, "vendor_use_update_pid"))
-		vendor_use_update_pid = true;
+	if (vendor_use_sleep_mode & of_property_read_bool(dnode, "vendor_use_standby_mode"))
+		vendor_use_standby_mode = true;
 
 	ret = of_property_read_u32(dnode, "vendor_first_pos", &first_pos);
 	if (ret) {
@@ -638,6 +601,18 @@ int sensor_ak737x_actuator_probe(struct i2c_client *client,
 		goto p_err;
 	}
 
+	vendor_soft_landing_list_spec = of_get_property(dnode, "vendor_soft_landing_list", &actuator->vendor_soft_landing_list_len);
+	if (vendor_soft_landing_list_spec) {
+		actuator->vendor_soft_landing_list_len /= (unsigned int)sizeof(*vendor_soft_landing_list_spec);
+
+		ret = of_property_read_u32_array(dnode, "vendor_soft_landing_list",
+											actuator->vendor_soft_landing_list, actuator->vendor_soft_landing_list_len);
+		if (ret)
+			err("vendor_soft_landing_list read is fail(%d)", ret);
+	} else {
+		actuator->vendor_soft_landing_list_len = 0;
+	}
+
 	subdev_actuator = kzalloc(sizeof(struct v4l2_subdev), GFP_KERNEL);
 	if (!subdev_actuator) {
 		err("subdev_actuator is NULL");
@@ -662,7 +637,7 @@ int sensor_ak737x_actuator_probe(struct i2c_client *client,
 	actuator->vendor_first_pos = first_pos;
 	actuator->vendor_first_delay = first_delay;
 	actuator->vendor_use_sleep_mode = vendor_use_sleep_mode;
-	actuator->vendor_use_update_pid = vendor_use_update_pid;
+	actuator->vendor_use_standby_mode = vendor_use_standby_mode;
 
 	device->subdev_actuator[sensor_id] = subdev_actuator;
 	device->actuator[sensor_id] = actuator;

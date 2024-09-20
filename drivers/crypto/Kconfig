@@ -554,6 +554,7 @@ config CRYPTO_DEV_ROCKCHIP
 	  Supporting cbc/ecb chainmode, and aes/des/des3_ede cipher mode.
 
 source "drivers/crypto/chelsio/Kconfig"
+
 source "drivers/crypto/fmp/Kconfig"
 
 endif # CRYPTO_HW

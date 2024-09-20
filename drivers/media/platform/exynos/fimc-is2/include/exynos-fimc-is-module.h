@@ -117,6 +117,14 @@ struct exynos_platform_fimc_is_module {
 	u32 ois_product_name;
 	u32 ois_i2c_addr;
 	u32 ois_i2c_ch;
+	u32 mcu_product_name;
+	u32 mcu_i2c_addr;
+	u32 mcu_i2c_ch;
+	u32 rom_id;
+	u32 rom_type;
+	u32 rom_cal_index;
+	u32 rom_dualcal_id;
+	u32 rom_dualcal_index;
 	u32 preprocessor_product_name;
 	u32 preprocessor_spi_channel;
 	u32 preprocessor_i2c_addr;

@@ -592,18 +592,26 @@ static void registerNetfilterHooks(void) {
 	nfho_ipv6_li_conntrack.pf = PF_INET6;
 	nfho_ipv6_li_conntrack.priority = NF_IP6_PRI_LAST;
 
-	nf_register_hook(&nfho_ipv4_pr_conntrack);
-	nf_register_hook(&nfho_ipv6_pr_conntrack);
-	nf_register_hook(&nfho_ipv4_li_conntrack);
-	nf_register_hook(&nfho_ipv6_li_conntrack);
+	/* For kernel versin below 4.13
+	nf_register_hook(&nfho_ipv4_pr_conntrack); nf_register_hook(&nfho_ipv6_pr_conntrack); nf_register_hook(&nfho_ipv4_li_conntrack); nf_register_hook(&nfho_ipv6_li_conntrack); */
+
+	/* For kernel version above 4.13 */
+	nf_register_net_hook(&init_net,&nfho_ipv4_pr_conntrack);
+	nf_register_net_hook(&init_net,&nfho_ipv6_pr_conntrack);
+	nf_register_net_hook(&init_net,&nfho_ipv4_li_conntrack);
+	nf_register_net_hook(&init_net,&nfho_ipv6_li_conntrack);
 }
 
 /* The function un-registers the netfilter hook */
 static void unregisterNetFilterHooks(void) {
-	nf_unregister_hook(&nfho_ipv4_pr_conntrack);
-	nf_unregister_hook(&nfho_ipv6_pr_conntrack);
-	nf_unregister_hook(&nfho_ipv4_li_conntrack);
-	nf_unregister_hook(&nfho_ipv6_li_conntrack);
+	/* For kernel version below 4.13
+	nf_unregister_hook(&nfho_ipv4_pr_conntrack); nf_unregister_hook(&nfho_ipv6_pr_conntrack); nf_unregister_hook(&nfho_ipv4_li_conntrack); nf_unregister_hook(&nfho_ipv6_li_conntrack); */
+
+	/* For kernel version above 4.13 */
+	nf_unregister_net_hook(&init_net,&nfho_ipv4_pr_conntrack);
+	nf_unregister_net_hook(&init_net,&nfho_ipv6_pr_conntrack);
+	nf_unregister_net_hook(&init_net,&nfho_ipv4_li_conntrack);
+	nf_unregister_net_hook(&init_net,&nfho_ipv6_li_conntrack);
 }
 
 /* Function to collect the conntrack meta-data information. This function is called from ncm.c during the flows first send data and nf_conntrack_core.c when flow is removed. */
@@ -681,6 +689,7 @@ void knox_collect_conntrack_data(struct nf_conn *ct, int startStop, int where) {
 		} else {
 			ksm->flow_type = 0;
 		}
+
 		insert_data_kfifo_kthread(ksm);
 	}
 }
@@ -840,14 +849,13 @@ static ssize_t ncm_read(struct file *file, char __user *buf, size_t count, loff_
 
 static ssize_t ncm_write(struct file *file, const char __user *buf, size_t count, loff_t *off) {
 	char intermediate_string[6];
-	int ret = 0;
 	int intermediate_value = 0;
 	if (!is_system_server()) {
 		NCM_LOGE("ncm_write failed:Caller is a non system process with uid %u \n", (current_uid().val));
 		return -EACCES;
 	}
 	memset(intermediate_string,'\0',sizeof(intermediate_string));
-	ret = copy_from_user(intermediate_string,buf,sizeof(intermediate_string)-1);
+	copy_from_user(intermediate_string,buf,sizeof(intermediate_string)-1);
 	intermediate_value = simple_strtol(intermediate_string, NULL, 10);
 	if (intermediate_value > 0) {
 		update_intermediate_timeout(intermediate_value);

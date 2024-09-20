@@ -124,6 +124,32 @@ extern void (*ufs_debug_func)(void *);
 
 static int ufs_shutdown_state = 0;
 
+static struct ufs_dev_fix ufs_fixups[] = {
+	/* UFS cards deviations table */
+	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL, UFS_DEVICE_NO_VCCQ),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_RECOVERY_FROM_DL_NAC_ERRORS),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
+		UFS_DEVICE_NO_FASTAUTO),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE),
+	UFS_FIX(UFS_VENDOR_TOSHIBA, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
+	UFS_FIX(UFS_VENDOR_TOSHIBA, "THGLF2G9C8KBADG",
+		UFS_DEVICE_QUIRK_PA_TACTIVATE),
+	UFS_FIX(UFS_VENDOR_TOSHIBA, "THGLF2G9D8KBADG",
+		UFS_DEVICE_QUIRK_PA_TACTIVATE),
+        	UFS_FIX(UFS_VENDOR_TOSHIBA, "THGAF8G9T43BAIR",
+		UFS_DEVICE_QUIRK_SUPPORT_QUERY_FATAL_MODE),
+	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL, UFS_DEVICE_NO_VCCQ),
+	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
+
+	END_FIX
+};
+
 enum {
 	UFSHCD_MAX_CHANNEL	= 0,
 	UFSHCD_MAX_ID		= 1,
@@ -228,30 +254,6 @@ ufs_get_pm_lvl_to_link_pwr_state(enum ufs_pm_level lvl)
 {
 	return ufs_pm_lvl_states[lvl].link_state;
 }
-
-static struct ufs_dev_fix ufs_fixups[] = {
-	/* UFS cards deviations table */
-	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
-	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL, UFS_DEVICE_NO_VCCQ),
-	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_RECOVERY_FROM_DL_NAC_ERRORS),
-	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
-		UFS_DEVICE_NO_FASTAUTO),
-	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE),
-	UFS_FIX(UFS_VENDOR_TOSHIBA, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
-	UFS_FIX(UFS_VENDOR_TOSHIBA, "THGLF2G9C8KBADG",
-		UFS_DEVICE_QUIRK_PA_TACTIVATE),
-	UFS_FIX(UFS_VENDOR_TOSHIBA, "THGLF2G9D8KBADG",
-		UFS_DEVICE_QUIRK_PA_TACTIVATE),
-	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL, UFS_DEVICE_NO_VCCQ),
-	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
-
-	END_FIX
-};
 
 static void ufshcd_tmc_handler(struct ufs_hba *hba);
 static void ufshcd_async_scan(void *data, async_cookie_t cookie);
@@ -950,9 +952,6 @@ static inline void ufshcd_hba_start(struct ufs_hba *hba)
 }
 
 #ifdef CUSTOMIZE_UPIU_FLAGS
-SIO_PATCH_VERSION(UPIU_customize, 1, 1, "");
-
-/* IOPP-ufs_cp-v1.0.4.9 */
 static void set_customized_upiu_flags(struct ufshcd_lrb *lrbp, u32 *upiu_flags)
 {
 	if (lrbp->command_type == UTP_CMD_TYPE_SCSI) {
@@ -1513,14 +1512,21 @@ ufshcd_wait_for_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 	unsigned long flags;
 	int index;
 
-	if (uic_cmd->command == UIC_CMD_DME_LINK_STARTUP)
+
+	switch (uic_cmd->command) {
+	case UIC_CMD_DME_LINK_STARTUP:
 		index = 0;
-	else if ((uic_cmd->command == UIC_CMD_DME_HIBER_ENTER))
+		break;
+	case UIC_CMD_DME_HIBER_ENTER:
 		index = 1;
-	else if ((uic_cmd->command == UIC_CMD_DME_HIBER_EXIT))
+		break;
+	case UIC_CMD_DME_HIBER_EXIT:
 		index = 2;
-	else
+		break;
+	default:
 		index = -1;
+		break;
+	}
 
 	if (wait_for_completion_timeout(&uic_cmd->done,
 				msecs_to_jiffies(UIC_CMD_TIMEOUT))) {
@@ -1612,7 +1618,6 @@ static int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	struct scsi_cmnd *cmd;
 	int sg_segments;
 	int i, ret;
-	int sector_offset = 0;
 
 #if defined(CONFIG_UFS_DATA_LOG)
 	unsigned int dump_index;
@@ -1698,18 +1703,16 @@ static int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 				cpu_to_le32(upper_32_bits(sg->dma_address));
 			prd_table[i].reserved = 0;
 			hba->transferred_sector += prd_table[i].size;
-
-			ret = ufshcd_vops_crypto_engine_cfg(hba, lrbp, sg, i, sector_offset);
-			if (ret) {
-				dev_err(hba->dev,
-					"%s: failed to configure crypto engine (%d)\n",
-					__func__, ret);
-				return ret;
-			}
-			sector_offset += UFSHCI_SECTOR_SIZE / MIN_SECTOR_SIZE;
 		}
 	} else {
 		lrbp->utr_descriptor_ptr->prd_table_length = 0;
+	}
+	ret = ufshcd_vops_crypto_engine_cfg(hba, lrbp);
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: failed to configure crypto engine (%d)\n",
+			__func__, ret);
+		return ret;
 	}
 
 	return 0;
@@ -2050,7 +2053,8 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	/* if error handling is in progress, don't issue commands */
 	if (ufshcd_eh_in_progress(hba)) {
-		err = SCSI_MLQUEUE_HOST_BUSY;
+		set_host_byte(cmd, DID_ERROR);
+		cmd->scsi_done(cmd);
 		goto out_unlock;
 	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
@@ -2792,11 +2796,6 @@ static int ufshcd_read_desc_param(struct ufs_hba *hba,
 	 * time.
 	 */
 	ret = ufshcd_map_desc_id_to_length(hba, desc_id, &buff_len);
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (desc_id == QUERY_DESC_IDN_VENDOR)
-		buff_len = param_size;
-	else
-#endif
 
 	/* Sanity checks */
 	if (ret || !buff_len) {
@@ -2828,21 +2827,6 @@ static int ufshcd_read_desc_param(struct ufs_hba *hba,
 
 		goto out;
 	}
-
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (desc_id == QUERY_DESC_IDN_VENDOR) {
-		if (desc_buf[3] != (UFS_VENDOR_SAMSUNG & 0xFF)) {
-			dev_err(hba->dev, "%s: desc_id 0x%x : Invalid Signature - 0x%x%x%x%x.\n",
-				__func__, desc_id, desc_buf[3], desc_buf[2], desc_buf[1], desc_buf[0]);
-			ret = -EINVAL;
-		} else
-			ret = 0;
-
-		if (is_kmalloc)
-			memcpy(param_read_buf, &desc_buf[param_offset], param_size);
-		goto out;
-	}
-#endif
 
 	/* Sanity check */
 	if (desc_buf[QUERY_DESC_DESC_TYPE_OFFSET] != desc_id) {
@@ -2954,44 +2938,6 @@ out:
 	return err;
 }
 EXPORT_SYMBOL(ufshcd_read_string_desc);
-
-#ifdef CONFIG_JOURNAL_DATA_TAG
-SIO_PATCH_VERSION(Journal_tag, 1, 0, "");
-/**
- * ufshcd_read_vendor_specific_desc - read vendor specific descriptor
- *
- * @hba: pointer to adapter instance
- * @desc_id: descriptor IDN
- * @desc_index: descriptor index
- * @buf: pointer to buffer where descriptor would be read
- * @size: size of buf
- *
- * Return 0 in case of success, non-zero otherwise
- */
-int ufshcd_read_vendor_specific_desc(struct ufs_hba *hba, enum desc_idn desc_id,
-				   int desc_index, u8 *buf, u32 size)
-{
-	int err = 0;
-	int retries;
-
-	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
-		/* Read descriptor*/
-		err = ufshcd_read_desc(hba,
-				       desc_id, desc_index, buf, size);
-		if (!err)
-			break;
-		if (err == QUERY_RESULT_INVALID_IDN)
-			break;
-		dev_dbg(hba->dev, "%s: error %d retrying\n", __func__, err);
-	}
-
-	if (err)
-		dev_err(hba->dev, "%s: reading Vendor Specific Desc(index=0x%x) failed. err = %d\n",
-			__func__, desc_index, err);
-
-	return err;
-}
-#endif
 
 /**
  * ufshcd_read_unit_desc_param - read the specified unit descriptor parameter
@@ -3730,18 +3676,19 @@ static int ufshcd_link_hibern8_ctrl(struct ufs_hba *hba, bool en)
 	if (hba->vops && hba->vops->hibern8_notify)
 		hba->vops->hibern8_notify(hba, en, PRE_CHANGE);
 
-	if (en){
+	if (en) {
 		ret = ufshcd_uic_hibern8_enter(hba);
 		if (ret)
 			goto err_chk;
 
 		if (hba->vops && hba->vops->hibern8_prepare)
 			ret = hba->vops->hibern8_prepare(hba, en, POST_CHANGE);
+
 	} else {
 		if (hba->vops && hba->vops->hibern8_prepare)
 			ret = hba->vops->hibern8_prepare(hba, en, PRE_CHANGE);
 
-		if(!ret)
+		if (!ret)
 			ret = ufshcd_uic_hibern8_exit(hba);
 	}
 
@@ -3753,7 +3700,6 @@ err_chk:
 
 		if (!ret)
 			ret = hba->saved_err;
-
 		goto out;
 	}
 
@@ -4891,10 +4837,6 @@ static int ufshcd_disable_ee(struct ufs_hba *hba, u16 mask)
 
 	val = hba->ee_ctrl_mask & ~mask;
 	val &= 0xFFFF; /* 2 bytes */
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	dev_info(hba->dev, "%s: ee_ctrl_mask=0x%x, mask=0x%x. val=0x%x.\n",
-			__func__, hba->ee_ctrl_mask, mask, val);
-#endif
 	err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
 			QUERY_ATTR_IDN_EE_CONTROL, 0, 0, &val);
 	if (!err)
@@ -4917,35 +4859,16 @@ static int ufshcd_enable_ee(struct ufs_hba *hba, u16 mask)
 {
 	int err = 0;
 	u32 val;
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	u32 status;
-#endif
 
 	if (hba->ee_ctrl_mask & mask)
 		goto out;
 
 	val = hba->ee_ctrl_mask | mask;
 	val &= 0xFFFF; /* 2 bytes */
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	dev_info(hba->dev, "%s: ee_ctrl_mask=0x%x, mask=0x%x. val=0x%x.\n",
-			__func__, hba->ee_ctrl_mask, mask, val);
-#endif
 	err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
 			QUERY_ATTR_IDN_EE_CONTROL, 0, 0, &val);
 	if (!err)
 		hba->ee_ctrl_mask |= mask;
-#ifdef CONFIG_JOURNAL_DATA_TAG
-#if defined(CONFIG_SCSI_UFS_QCOM)
-	err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
-			QUERY_ATTR_IDN_EE_CONTROL, 0, 0, &status);
-#else
-	err = ufshcd_query_attr(hba, UPIU_QUERY_OPCODE_READ_ATTR,
-			QUERY_ATTR_IDN_EE_CONTROL, 0, 0, &status);
-#endif
-	if (!err)
-		dev_info(hba->dev, "%s: EES = 0x%x.\n", __func__, status);
-#endif
-
 out:
 	return err;
 }
@@ -5192,52 +5115,6 @@ static void ufshcd_exception_event_handler(struct work_struct *work)
 		goto out;
 	}
 
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (status & MASK_EE_SYSPOOL_EVENT) {
-		struct ufshcd_lrb *lrbp;
-		struct scsi_cmnd *cmd;
-		unsigned long completed_reqs;
-		u32 tr_doorbell;
-		//int result;
-		int index;
-
-		dev_err(hba->dev, "%s: SYSPOOL_EXHAUSTED.\n", __func__);
-		/* To Do :
-		 * resp. UPIU's EVENT ALERT in Device info is checked already.
-		 * 1. unmap the system data
-		 *      __ufshcd_transfer_req_compl(hba, DID_ERROR);
-		 * ?. check again ee_status to confirm EXHAUSTED is released
-		 * in loop
-		 */
-		tr_doorbell = ufshcd_readl(hba, REG_UTP_TRANSFER_REQ_DOOR_BELL);
-		completed_reqs = tr_doorbell ^ hba->outstanding_reqs;
-
-		for_each_set_bit(index, &completed_reqs, hba->nutrs) {
-			lrbp = &hba->lrb[index];
-			cmd = lrbp->cmd;
-
-			if (cmd && (cmd->cmnd[6] & (1 << 4))) {/* Data Tag */
-				//result = ufshcd_transfer_rsp_status(hba, lrbp);
-				scsi_dma_unmap(cmd);
-				//cmd->result = result;
-				set_host_byte(cmd, DID_ERROR);
-				/* Mark completed command as NULL in LRB */
-				lrbp->cmd = NULL;
-				clear_bit_unlock(index, &hba->lrb_in_use);
-				/* Do not touch lrbp after scsi done */
-				cmd->scsi_done(cmd);
-#if defined(CONFIG_SCSI_UFS_QCOM)
-				__ufshcd_release(hba, false);
-				__ufshcd_pm_qos_release(hba, false);
-				__ufshcd_hibern8_release(hba, false);
-#else
-				__ufshcd_release(hba);
-#endif
-			}
-		}
-	}
-#endif
-
 	status &= hba->ee_ctrl_mask;
 
 	if (status & MASK_EE_URGENT_BKOPS)
@@ -5336,6 +5213,7 @@ out:
 static void ufshcd_err_handler(struct work_struct *work)
 {
 	struct ufs_hba *hba;
+	struct exynos_ufs *ufs;
 	unsigned long flags;
 	u32 err_xfer = 0;
 	u32 err_tm = 0;
@@ -5347,6 +5225,14 @@ static void ufshcd_err_handler(struct work_struct *work)
 
 	pm_runtime_get_sync(hba->dev);
 	ufshcd_hold(hba, false);
+
+	ufs = to_exynos_ufs(hba);
+	if (hba->saved_err & UIC_ERROR) {
+		dev_err(hba->dev, ": CLKSTOP CTRL(0x%04x):\t\t\t\t0x%08x\n",
+				HCI_CLKSTOP_CTRL, hci_readl(ufs, HCI_CLKSTOP_CTRL));
+		dev_err(hba->dev, ": FORCE HCS(0x%04x):\t\t\t\t0x%08x\n",
+				HCI_FORCE_HCS, hci_readl(ufs, HCI_FORCE_HCS));
+	}
 
 	/* Dump debugging information to system memory */
 	ufshcd_vops_dbg_register_dump(hba);
@@ -5375,9 +5261,9 @@ static void ufshcd_err_handler(struct work_struct *work)
 	if ((hba->saved_err & INT_FATAL_ERRORS) ||
 	    ((hba->saved_err & UIC_ERROR) &&
 	    (hba->saved_uic_err & (UFSHCD_UIC_DL_PA_INIT_ERROR |
-				UFSHCD_UIC_DL_ERROR |				   
-				UFSHCD_UIC_DL_NAC_RECEIVED_ERROR |
-				UFSHCD_UIC_DL_TCx_REPLAY_ERROR))))
+				   UFSHCD_UIC_DL_ERROR |
+				   UFSHCD_UIC_DL_NAC_RECEIVED_ERROR |
+				   UFSHCD_UIC_DL_TCx_REPLAY_ERROR))))
 		needs_reset = true;
 
 	/*
@@ -6349,9 +6235,6 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
         u8 str_desc_buf[QUERY_DESC_MAX_SIZE + 1] = {0};
         u8 desc_buf[hba->desc_size.dev_desc];
 	u8 health_buf[QUERY_DESC_HEALTH_MAX_SIZE];
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	u8 vendor_specific_buf[QUERY_DESC_VENDOR_SPECIFIC_SIZE];
-#endif
 	bool ascii_type;
 
 	err = ufshcd_read_device_desc(hba, desc_buf, hba->desc_size.dev_desc);
@@ -6378,27 +6261,6 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	hba->manufacturer_id = dev_desc->wmanufacturerid;
 	hba->lifetime = dev_desc->lifetime;
-
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (hba->manufacturer_id == UFS_VENDOR_SAMSUNG &&
-			hba->host->journal_tag == JOURNAL_TAG_UNKNOWN) {
-		vendor_specific_buf[4] = 0;
-		err = ufshcd_read_vendor_specific_desc(hba,
-				QUERY_DESC_IDN_VENDOR, 0, vendor_specific_buf,
-				QUERY_DESC_VENDOR_SPECIFIC_SIZE);
-		if (!err && (vendor_specific_buf[4] & 0x1)) {
-			dev_info(hba->dev, "%s: vendor_desc[4]=0x%x. setting UFS journal tag support to 1.\n",
-					__func__, vendor_specific_buf[4]);
-			hba->host->journal_tag = JOURNAL_TAG_ON;
-		} else {
-			dev_info(hba->dev, "%s: UFS does not support journal tag - vendor_desc[4]=0x%x.(err %d).\n",
-					__func__, vendor_specific_buf[4], err);
-			hba->host->journal_tag = JOURNAL_TAG_OFF;
-		}
-	}
-#endif
-
-	/*product name*/
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 
 	memset(str_desc_buf, 0, QUERY_DESC_STRING_MAX_SIZE);
@@ -6622,10 +6484,6 @@ retry:
 	if (ret)
 		goto out;
 
-#if defined(CONFIG_UFS_DATA_LOG)
-	dev_info(hba->dev, "UFS enable Data logging\n");
-#endif
-
 	dev_info(hba->dev, "UFS link established\n");
 
 	ufshcd_init_pwr_info(hba);
@@ -6645,18 +6503,23 @@ retry:
 	if (ret)
 		goto out;
 
-	/* Init check for device descriptor sizes */
-	ufshcd_init_desc_sizes(hba);
 	dev_info(hba->dev, "UFS device initialized\n");
 
-	ret = ufs_get_device_desc(hba, &card);
-	if (ret) {
-		dev_err(hba->dev, "%s: Failed getting device info. err = %d\n",
-			__func__, ret);
-		goto out;
+	if (!ufshcd_eh_in_progress(hba) && !hba->pm_op_in_progress
+			&& !hba->async_resume) {
+		/* Init check for device descriptor sizes */
+		ufshcd_init_desc_sizes(hba);
+
+		ret = ufs_get_device_desc(hba, &card);
+		if (ret) {
+			dev_err(hba->dev, "%s: Failed getting device info. err = %d\n",
+				__func__, ret);
+			goto out;
+		}
+
+		ufs_fixup_device_setup(hba, &card);
 	}
 
-	ufs_fixup_device_setup(hba, &card);
 	ufshcd_tune_unipro_params(hba);
 
 	ret = ufshcd_set_vccq_rail_unused(hba,
@@ -6664,10 +6527,6 @@ retry:
 	if (ret)
 		goto out;
 
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	if (hba->host->journal_tag == JOURNAL_TAG_ON)
-		hba->ee_ctrl_mask |= MASK_EE_SYSPOOL_EVENT;
-#endif
 	/* UFS device is also active now */
 	ufshcd_set_ufs_dev_active(hba);
 	ufshcd_force_reset_auto_bkops(hba);
@@ -7617,6 +7476,7 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 	struct scsi_device *sdp;
 	unsigned long flags;
 	int ret;
+	int retries = 0;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	sdp = hba->sdev_ufs_device;
@@ -7651,19 +7511,22 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 
 	cmd[4] = pwr_mode << 4;
 
-	/*
-	 * Current function would be generally called from the power management
-	 * callbacks hence set the REQ_PM flag so that it doesn't resume the
-	 * already suspended childs.
-	 */
-	ret = scsi_execute_req_flags(sdp, cmd, DMA_NONE, NULL, 0, &sshdr,
-				     UFS_START_STOP_TIMEOUT, 2, NULL, REQ_PM);
-	if (ret) {
-		sdev_printk(KERN_WARNING, sdp,
-			    "START_STOP failed for power mode: %d, result %x\n",
-			    pwr_mode, ret);
-		if (driver_byte(ret) & DRIVER_SENSE)
-			scsi_print_sense_hdr(sdp, NULL, &sshdr);
+	for (retries = 0; retries < 3; retries++) {
+		/*
+		 * Current function would be generally called from the power management
+		 * callbacks hence set the REQ_PM flag so that it doesn't resume the
+		 * already suspended childs.
+		 */
+		ret = scsi_execute_req_flags(sdp, cmd, DMA_NONE, NULL, 0, &sshdr,
+					     UFS_START_STOP_TIMEOUT, 2, NULL, REQ_PM);
+		if (ret) {
+			sdev_printk(KERN_WARNING, sdp,
+				    "START_STOP failed for power mode: %d, result %x\n",
+				    pwr_mode, ret);
+			if (driver_byte(ret) & DRIVER_SENSE)
+				scsi_print_sense_hdr(sdp, NULL, &sshdr);
+		} else
+			break;
 	}
 
 	if (!ret)
@@ -8542,7 +8405,6 @@ SEC_UFS_DATA_ATTR(SEC_UFS_err_sum, "\"OPERR\":\"%d\",\"UICCMD\":\"%d\",\"UICERR\
 		err_info->query_count.Query_err);
 #endif
 
-UFS_DEV_ATTR(lt,  "%01x", hba->lifetime);
 UFS_DEV_ATTR(sense_err_count, "\"MEDIUM\":\"%d\",\"HWERR\":\"%d\"\n",
 						hba->host->medium_err_cnt, hba->host->hw_err_cnt); 
 UFS_DEV_ATTR(sense_err_logging, "\"LBA0\":\"%lx\",\"LBA1\":\"%lx\",\"LBA2\":\"%lx\""
@@ -8555,6 +8417,37 @@ UFS_DEV_ATTR(sense_err_logging, "\"LBA0\":\"%lx\",\"LBA1\":\"%lx\",\"LBA2\":\"%l
 		, hba->host->issue_LBA_list[6], hba->host->issue_LBA_list[7]
 		, hba->host->issue_LBA_list[8], hba->host->issue_LBA_list[9]
 		, hba->host->issue_region_map);
+
+static ssize_t ufs_lt_info_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct Scsi_Host *host = container_of(dev, struct Scsi_Host, shost_dev);
+	struct ufs_hba *hba = shost_priv(host);
+	u8 health_buf[QUERY_DESC_MAX_SIZE];
+	int err = 0;
+
+	if (!hba) {
+		printk("skipping ufs lt read\n");
+		hba->lifetime = 0;
+	} else if (hba->ufshcd_state == UFSHCD_STATE_OPERATIONAL) {
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_read_health_desc(hba, health_buf,
+						hba->desc_size.hlth_desc);
+		pm_runtime_put(hba->dev);
+		if (err)
+			goto skip;
+		dev_info(hba->dev, "LT: 0x%02x \n", health_buf[3]<<4|health_buf[4]);
+
+		hba->lifetime = health_buf[HEALTH_DEVICE_DESC_PARAM_LIFETIMEA];
+	} else {
+		/* return previous LT value if not operational */
+		dev_info(hba->dev, "ufshcd_state : %d, old LT: %01x\n",
+					hba->ufshcd_state, hba->lifetime);
+	}
+
+skip:
+	return sprintf(buf, "%01x\n", hba->lifetime);
+}
+static DEVICE_ATTR(lt, 0444, ufs_lt_info_show, NULL);
 
 static ssize_t ufs_lc_info_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -8815,7 +8708,7 @@ static void ufs_sec_send_errinfo(void *data)
 {
 	static struct ufs_hba *hba;
 	struct SEC_UFS_counting *err_info;
-	char buf[22];
+	char buf[23];
 
 	if (data) {
 		hba = (struct ufs_hba *)data;
@@ -9014,7 +8907,6 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	ufshcd_set_ufs_dev_poweroff(hba);
 
 	async_schedule(ufshcd_async_scan, hba);
-
 	/*create sysfs related with ufs*/
 	ufshcd_add_sysfs_nodes(hba);
 

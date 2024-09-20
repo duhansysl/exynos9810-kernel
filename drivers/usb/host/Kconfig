@@ -806,7 +806,7 @@ config USB_HCD_TEST_MODE
 	  unsure, say N.
 
 config USB_HOST_L1_SUPPORT
-	boolean "USB2.0 Host Driver support L1 mode"
+	bool "USB2.0 Host Driver support L1 mode"
 	depends on USB_XHCI_HCD && USB
 	help
 	  some USB3.0 memory stick doesn't support L1 mode,

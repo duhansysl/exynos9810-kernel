@@ -66,7 +66,6 @@ struct exynos_cpufreq_domain {
 
 	/* for sysfs */
 	unsigned int			user_default_qos;
-	int				ucc_index;
 
 	/* freq boost */
 	bool				boost_supported;

@@ -1,0 +1,4 @@
+__crc___delay = 0x466c14a7 ;
+__crc___const_udelay = 0xeae3dfd6 ;
+__crc___udelay = 0x9e7d6bd0 ;
+__crc___ndelay = 0xdf8c695a ;

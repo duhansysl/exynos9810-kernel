@@ -1308,9 +1308,11 @@ drop:
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_MODEM_IF_NET_GRO
 	if (!(tun->flags & IFF_NO_PI))
 		if (pi.flags & htons(CHECKSUM_UNNECESSARY))
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+#endif
 
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case IFF_TUN:
@@ -2156,7 +2158,7 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		 * TUNSETIFF.
 		 */
 		// ------------- START of KNOX_VPN ------------------//
-		 	knox_flag |= IFF_META_HDR;
+		knox_flag |= IFF_META_HDR;
 		return put_user(IFF_TUN | IFF_TAP | TUN_FEATURES| knox_flag,
 				(unsigned int __user*)argp);
 		// ------------- END of KNOX_VPN -------------------//
@@ -2366,7 +2368,6 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		}
 		break;
 	// ------------- END of KNOX_VPN -------------------//
-
 	case TUNSETVNETHDRSZ:
 		if (copy_from_user(&vnet_hdr_sz, argp, sizeof(vnet_hdr_sz))) {
 			ret = -EFAULT;

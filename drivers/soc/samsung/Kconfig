@@ -181,12 +181,6 @@ config EXYNOS_SECURE_LOG
 	help
 	  Support Exynos Secure Log
 
-config SAMSUNG_VST_CAL
-	bool "Support NAD VST Calibration"
-	default n
-	help
-	  Support NAD VST Calibration
-
 config EXYNOS_KERNEL_PROTECTION
 	bool "Exynos Kernel Code Protection"
 	help
@@ -208,4 +202,5 @@ config SENSORS_FP_USI_NUMBER
 	depends on SENSORS_FINGERPRINT
 	int "Fingerprint usi gpio number"
 	default 0
+
 endif

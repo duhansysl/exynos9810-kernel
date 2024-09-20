@@ -97,6 +97,13 @@
 #define __S110  PAGE_SHARED_EXEC
 #define __S111  PAGE_SHARED_EXEC
 
+#ifdef CONFIG_UH_RKP
+#define PTE_RKP_RO          (_AT(pteval_t, 1) << 57)
+#define PAGE_KERNEL_RKP_RO  __pgprot(PROT_NORMAL | PTE_RKP_RO)
+#define pgprot_rkp_ro(prot) (!!(pgprot_val(prot) & (PTE_RKP_RO)))
+#define addr_rkp_ro(addr)   (!(addr & (PTE_RKP_RO)))
+#endif
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_PGTABLE_PROT_H */

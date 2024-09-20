@@ -105,11 +105,6 @@
 #define RTCA0E				(1<<2)
 #define RTCA1E				(1<<1)
 
-#if defined(CONFIG_RTC_ALARM_BOOT)
-#define RTC_WAKE_SHIFT			3
-#define RTC_WAKE_MASK			(1 << RTC_WAKE_SHIFT)
-#endif
-
 #define WTSR_TIMER_BITS(v)		(((v) << WTSRT_SHIFT) & WTSRT_MASK)
 #define SMPL_TIMER_BITS(v)		(((v) << SMPLT_SHIFT) & SMPLT_MASK)
 

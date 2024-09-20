@@ -277,9 +277,8 @@ extern unsigned int madera_mixer_values[MADERA_NUM_MIXER_INPUTS];
 
 #define MADERA_DSP_ROUTES(name)				\
 	{ name, NULL, name " Preloader"},		\
-	{ name " Preload", NULL, name " Preloader"},	\
-	{ name, NULL, "SYSCLK"},			\
-	{ name, NULL, "DSPCLK"},			\
+	{ name " Preloader", NULL, "SYSCLK"},		\
+	{ name " Preloader", NULL, "DSPCLK"},		\
 	{ name, NULL, name " Aux 1" },			\
 	{ name, NULL, name " Aux 2" },			\
 	{ name, NULL, name " Aux 3" },			\
@@ -459,7 +458,6 @@ int madera_init_inputs(struct snd_soc_codec *codec,
 		       const char * const *dmic_refs,
 		       int n_dmic_refs);
 int madera_init_outputs(struct snd_soc_codec *codec, int n_mono_routes);
-int madera_init_aif(struct snd_soc_codec *codec);
 int madera_init_bus_error_irq(struct madera_priv *priv, int dsp_num,
 			      irq_handler_t handler);
 void madera_destroy_bus_error_irq(struct madera_priv *priv, int dsp_num);
@@ -485,10 +483,4 @@ static inline int madera_unregister_notifier(struct snd_soc_codec *codec,
 	return blocking_notifier_chain_unregister(&madera->notifier, nb);
 }
 
-struct regmap *madera_get_regmap_dsp(struct snd_soc_codec *codec);
-
-bool madera_get_moisture_state(struct snd_soc_codec *codec);
-
-int madera_enable_force_bypass(struct snd_soc_codec *codec);
-int madera_disable_force_bypass(struct snd_soc_codec *codec);
 #endif

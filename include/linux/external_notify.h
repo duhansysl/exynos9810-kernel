@@ -22,7 +22,7 @@
  *
  */
 
-  /* usb notify layer v3.2 */
+  /* usb notify layer v3.3 */
 
 #ifndef __EXTERNAL_NOTIFY_H__
 #define __EXTERNAL_NOTIFY_H__
@@ -39,10 +39,13 @@ enum external_notify_cmd {
 	EXTERNAL_NOTIFY_MDMBLOCK_POST,
 	EXTERNAL_NOTIFY_POWERROLE,
 	EXTERNAL_NOTIFY_DEVICEADD,
+	EXTERNAL_NOTIFY_HOSTBLOCK_EARLY,
+	EXTERNAL_NOTIFY_VBUS_RESET,
 };
 
 /* external notifier call sequence,
- * largest priority number device will be called first. */
+ * largest priority number device will be called first.
+ */
 enum external_notify_device {
 	EXTERNAL_NOTIFY_DEV_MUIC,
 	EXTERNAL_NOTIFY_DEV_CHARGER,

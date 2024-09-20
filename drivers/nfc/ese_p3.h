@@ -43,6 +43,10 @@
 /* To swing(shake) cs */
 #define P3_SWING_CS _IOW(P3_MAGIC, 0x0D, unsigned long)
 
+#ifdef CONFIG_ESE_COLDRESET
+#define P3_WR_RESET _IOW(P3_MAGIC, 0xE, __s32)
+#endif
+
 #ifdef CONFIG_COMPAT
 /*#define P3_RW_SPI_DATA_32 _IOWR(P3_MAGIC, 0x07, unsigned int)*/
 struct spip3_ioc_transfer_32 {

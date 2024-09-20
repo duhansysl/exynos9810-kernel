@@ -2,15 +2,15 @@
 #define _LINUX_WACOM_H_
 
 #include <linux/wakelock.h>
-#include <linux/sec_sysfs.h>
+#include <linux/input/sec_cmd.h>
 
 #include "wacom_i2c.h"
 
 /* wacom features */
 #define USE_OPEN_CLOSE
 #define WACOM_USE_SURVEY_MODE /* SURVEY MODE is LPM mode : Only detect grage(pdct) & aop */
-#define WACOM_USE_SOFTKEY_BLOCK
 
+#define RETRY_COUNT			3
 
 #define WACOM_I2C_MODE_NORMAL		false
 #define WACOM_I2C_MODE_BOOT		true
@@ -50,26 +50,46 @@
 #define COM_REQUESTGARAGEDATA		0XE5
 #define COM_REQUESTSCANMODE		0xE6
 #define COM_LOW_SENSE_MODE2		0xE7
+#define COM_BLE_C_DISABLE		0XE8
+#define COM_BLE_C_ENABLE		0XE9
+#define COM_BLE_C_RESET			0XEA
+#define COM_BLE_C_START			0XEB
+#define COM_BLE_C_KEEP_ON		0XEC
+#define COM_BLE_C_KEEP_Off		0XED
+#define COM_BLE_C_M_RETURN		0XEE
+#define COM_RESET_DSP			0xEF
 
-/* pen ble charging */
-#define COM_PEN_CHECK_OUT		0xE8
-#define COM_PEN_CHECK_IN		0xE9
-
-#define COM_RESET_DSP		0xEF
-
-enum epen_ble_charge_mode {
-	EPEN_BLE_C_DIABLE	= 0,
-	EPEN_BLE_C_ENABLE	= 1,
-	EPEN_BLE_C_RESET	= 2,
-	EPEN_BLE_C_FAST		= 3,
-	EPEN_BLE_C_SLOW1	= 4,
-	EPEN_BLE_C_SLOW2	= 5,
-	EPEN_BLE_C_NONE		= 6,
-	EPEN_BLE_C_DSPX		= 7,
-	EPEN_BLE_C_MAX		= 8,
-};
+#define COM_BLE_C_FULL			0xF3
 
 #define COM_FLASH			0xFF
+
+/* pen ble charging */
+enum epen_ble_charge_mode {
+	EPEN_BLE_C_DIABLE	= 0,
+	EPEN_BLE_C_ENABLE,
+	EPEN_BLE_C_RESET,
+	EPEN_BLE_C_START,
+	EPEN_BLE_C_KEEP_ON,
+	EPEN_BLE_C_KEEP_OFF,
+	EPEN_BLE_C_M_RETURN,
+	EPEN_BLE_C_DSPX,
+	EPEN_BLE_C_FULL,
+	EPEN_BLE_C_MAX,
+};
+
+enum epen_ble_charge_state {
+	BLE_C_OFF	= 0,
+	BLE_C_START,
+	BLE_C_TRANSIT,
+	BLE_C_RESET,
+	BLE_C_AFTER_START,
+	BLE_C_AFTER_RESET,
+	BLE_C_ON_KEEP_1,
+	BLE_C_OFF_KEEP_1,
+	BLE_C_ON_KEEP_2,
+	BLE_C_OFF_KEEP_2,
+	BLE_C_FULL,
+};
 
 /* wacom data offset */
 #define COM_COORD_NUM			13
@@ -150,36 +170,12 @@ enum epen_virtual_event_mode {
 #define EPEN_SURVEY_MODE_GARAGE_AOP	EPEN_EVENT_AOP
 
 
-/* DeX mode : param of dex_enable command */
-#define DEX_MODE_STYLUS		(0 << 0) /* absolute coordinate */
-#define DEX_MODE_MOUSE		(1 << 0) /* relative coordinate */
-#define DEX_MODE_EDGE_CROP	(1 << 1) /* crop 10% each of both edge side*/
-#define DEX_MODE_IRIS		(1 << 2) /* Iris mode : only use an half of bottom side of screen */
-#define DEX_MODE_ALL		(DEX_MODE_MOUSE | DEX_MODE_EDGE_CROP | DEX_MODE_IRIS)
-
-
 #ifdef WACOM_USE_SURVEY_MODE
 #define EPEN_RESUME_DELAY		20
 #else
 #define EPEN_RESUME_DELAY		180
 #endif
 #define EPEN_OFF_TIME_LIMIT		10000 // usec
-
-
-#ifdef WACOM_USE_SOFTKEY_BLOCK
-#define SOFTKEY_BLOCK_DURATION		(HZ / 10)
-#endif
-
-/* LCD freq sync */
-#ifdef CONFIG_WACOM_LCD_FREQ_COMPENSATE
-/* NOISE from LDI. read Vsync at wacom firmware. */
-#define LCD_FREQ_SYNC
-#endif
-
-#ifdef LCD_FREQ_SYNC
-#define LCD_FREQ_BOTTOM			60100
-#define LCD_FREQ_TOP			60500
-#endif
 
 
 #define HSYNC_COUNTER_UMAGIC		0x96
@@ -202,23 +198,27 @@ enum epen_virtual_event_mode {
 #define EPEN_LOCAL_SCAN_MODE		0x01
 #define EPEN_HIGH_NOISE_MODE		0x02
 
+enum TABLE_SWAP {
+	TABLE_SWAP_DEX_STATION = 1,
+	TABLE_SWAP_KBD_COVER = 2,
+};
+
+#define MPU_W9018			0x42
+#define MPU_W9019			0x43
+#define MPU_W9020			0x44
+#define MPU_W9021			0x45
+
 #define FW_UPDATE_RUNNING		1
 #define FW_UPDATE_PASS			2
 #define FW_UPDATE_FAIL			-1
 
-/* Parameters for wacom own features */
-struct wacom_features {
-	char comstat;
-	unsigned int fw_version;
-	int update_status;
-};
-
 enum {
 	FW_NONE = 0,
 	FW_BUILT_IN,
+	FW_SPU,
 	FW_HEADER,
 	FW_IN_SDCARD,
-	FW_EX_SDCARD,
+	FW_IN_SDCARD_SIGNED,
 #ifdef CONFIG_SEC_FACTORY
 	FW_FACTORY_GARAGE,
 	FW_FACTORY_UNIT,
@@ -260,20 +260,23 @@ struct epen_pos {
 
 
 struct wacom_i2c {
+	struct wacom_g5_platform_data *pdata;
 	struct i2c_client *client;
 	struct i2c_client *client_boot;
 	struct input_dev *input_dev;
-	struct input_dev *input_dev_pad;
-	struct input_dev *input_dev_pen;
-	struct input_dev *input_dev_virtual;
+	struct sec_cmd_data sec;
 	struct mutex lock;
 	struct mutex update_lock;
 	struct mutex irq_lock;
+	struct mutex mode_lock;
 	struct wake_lock fw_wakelock;
-	struct device *dev;
+	struct delayed_work nb_reg_work;
+	struct notifier_block kbd_nb;
+	struct work_struct kbd_work;
+	u8 kbd_conn_state;
+	u8 kbd_cur_conn_state;
 	struct notifier_block typec_nb;
-	struct delayed_work typec_nb_reg_work;
-	struct delayed_work usb_typec_work;
+	struct work_struct typec_work;
 	u8 dp_connect_state;
 	u8 dp_connect_cmd;
 	int irq;
@@ -286,15 +289,16 @@ struct wacom_i2c {
 	bool localscan_mode;
 	int tsp_noise_mode;
 	int wacom_noise_state;
+	int tsp_block_cnt;
 	int tool;
-	int soft_key_pressed[2];
 	struct delayed_work pen_insert_dwork;
 	bool checksum_result;
-	struct wacom_features *wac_feature;
-	struct wacom_g5_platform_data *pdata;
 	struct delayed_work resume_work;
 	struct delayed_work gxscan_work;
 	struct delayed_work fullscan_work;
+	struct delayed_work work_print_info;
+	u32	print_info_cnt_open;
+	u32	scan_info_fail_cnt;
 	bool connection_check;
 	int  fail_channel;
 	int  min_adc_val;
@@ -303,10 +307,12 @@ struct wacom_i2c {
 	bool battery_saving_mode;
 	volatile bool screen_on;
 	bool power_enable;
+	volatile bool probe_done;
 	struct completion resume_done;
 	struct wake_lock wakelock;
 	bool pm_suspend;
 	u8 survey_mode;
+	u8 check_survey_mode;
 	bool epen_blocked;
 	u8 function_set;
 	u8 function_result;
@@ -317,35 +323,26 @@ struct wacom_i2c {
 	u32 i2c_fail_count;
 	u32 abnormal_reset_count;
 	u32 pen_out_count;
-#ifdef LCD_FREQ_SYNC
-	int lcd_freq;
-	bool lcd_freq_wait;
-	bool use_lcd_freq_sync;
-	struct work_struct lcd_freq_work;
-	struct delayed_work lcd_freq_done_work;
-	struct mutex freq_write_lock;
-#endif
-#ifdef WACOM_USE_SOFTKEY_BLOCK
-	bool block_softkey;
-	struct delayed_work softkey_block_work;
-#endif
+	u32 fw_ver_ic;
+	u32 fw_ver_bin;
+	int update_status;
 	struct work_struct update_work;
 	const struct firmware *firm_data;
 	struct fw_image *fw_img;
 	u8 *fw_data;
-	u32 fw_ver_file;
 	char fw_chksum[5];
 	u8 fw_update_way;
 	bool do_crc_check;
 	bool keyboard_cover_mode;
 	bool keyboard_area;
 	int virtual_tracking;
-	u8 dex_mode;
 	u32 mcount;
-	bool is_open_test;
+	volatile bool is_open_test;
 	bool samplerate_state;
-	u8 ble_mode;
-	bool probing_done;
+	volatile u8 ble_mode;
+	volatile bool is_mode_change;
+	volatile bool ble_block_flag;
+	u32 check_elec;
 #ifdef CONFIG_SEC_FACTORY
 	volatile bool fac_garage_mode;
 	u32 garage_gain0;
@@ -381,16 +378,20 @@ int wacom_checksum(struct wacom_i2c *);
 int wacom_i2c_set_sense_mode(struct wacom_i2c *);
 
 void forced_release(struct wacom_i2c *);
-void forced_release_key(struct wacom_i2c *);
 void forced_release_fullscan(struct wacom_i2c *wac_i2c);
 
 void wacom_select_survey_mode(struct wacom_i2c *, bool enable);
-void wacom_i2c_set_survey_mode(struct wacom_i2c *, int mode);
+int wacom_i2c_set_survey_mode(struct wacom_i2c *, int mode);
 
 int wacom_open_test(struct wacom_i2c *wac_i2c);
 
 int wacom_sec_init(struct wacom_i2c *);
 void wacom_sec_remove(struct wacom_i2c *);
-void wacom_ble_charge_mode(struct wacom_i2c *wac_i2c, char mode);
+
+void wacom_print_info(struct wacom_i2c *wac_i2c);
+
 extern int set_spen_mode(int mode);
+#ifdef CONFIG_SEC_FACTORY
+bool wacom_check_ub(struct wacom_i2c *wac_i2c);
+#endif
 #endif /* _LINUX_WACOM_H_ */

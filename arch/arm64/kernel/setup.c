@@ -345,14 +345,12 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
-#if !(defined CONFIG_RELOCATABLE_KERNEL) && !(defined CONFIG_RANDOMIZE_BASE)
 	if (boot_args[1] || boot_args[2] || boot_args[3]) {
 		pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
 			"\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
 			"This indicates a broken bootloader or old kernel\n",
 			boot_args[1], boot_args[2], boot_args[3]);
 	}
-#endif
 }
 
 static int __init topology_init(void)
@@ -372,7 +370,6 @@ static int __init topology_init(void)
 }
 subsys_initcall(topology_init);
 
-#ifndef CONFIG_RELOCATABLE_KERNEL
 /*
  * Dump out kernel offset information on panic.
  */
@@ -401,4 +398,3 @@ static int __init register_kernel_offset_dumper(void)
 	return 0;
 }
 __initcall(register_kernel_offset_dumper);
-#endif

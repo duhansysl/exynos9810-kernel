@@ -84,12 +84,12 @@ void dpu_cursor_win_update_config(struct decon_device *decon,
 		return;
 	}
 	if (!(regs->win_regs[cur].wincon & WIN_EN_F(cur))) {
-		decon_dbg("%s, window[%d] is not enabled\n", __func__, cur);
+		decon_err("%s, window[%d] is not enabled\n", __func__, cur);
 		return;
 	}
 
 	if (!regs->is_cursor_win[cur]) {
-		decon_dbg("%s, window[%d] is not cursor layer\n",
+		decon_err("%s, window[%d] is not cursor layer\n",
 				__func__, cur);
 		return;
 	}
@@ -177,7 +177,7 @@ int decon_set_cursor_win_config(struct decon_device *decon, int x, int y)
 	}
 
 	if (!regs->is_cursor_win[regs->cursor_win]) {
-		decon_dbg("decon%d: cursor win(%d) disable\n",
+		decon_err("decon%d: cursor win(%d) disable\n",
 			decon->id, regs->cursor_win);
 		ret = -EINVAL;
 		goto end;

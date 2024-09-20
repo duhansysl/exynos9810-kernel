@@ -75,7 +75,7 @@ static inline void dpu_event_log_dsim
 	(dpu_event_t type, struct v4l2_subdev *sd, ktime_t time)
 {
 	struct dsim_device *dsim = container_of(sd, struct dsim_device, sd);
-	struct decon_device *decon = get_decon_drvdata(dsim->id);
+	struct decon_device *decon = get_decon_drvdata(0);
 	int idx = atomic_inc_return(&decon->d.event_log_idx) % DPU_EVENT_LOG_MAX;
 	struct dpu_log *log;
 
@@ -331,8 +331,7 @@ extern void *return_address(int);
 /* Common API to log a event related with DSIM COMMAND */
 void DPU_EVENT_LOG_CMD(struct v4l2_subdev *sd, u32 cmd_id, unsigned long data)
 {
-	struct dsim_device *dsim = container_of(sd, struct dsim_device, sd);
-	struct decon_device *decon = get_decon_drvdata(dsim->id);
+	struct decon_device *decon = get_decon_drvdata(0);
 	int idx, i;
 	struct dpu_log *log;
 

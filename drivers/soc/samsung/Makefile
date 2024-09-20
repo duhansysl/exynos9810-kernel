@@ -1,6 +1,7 @@
 #
 # Exynos SoC Specific drivers
 #
+
 ccflags-y := $(KBUILD_FP_SENSOR_CFLAGS)
 
 obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o
@@ -24,6 +25,8 @@ obj-$(CONFIG_EXYNOS_BCM)	+= exynos-bcm.o
 
 # USI
 obj-$(CONFIG_USI) += usi.o
+
+# reboot
 obj-$(CONFIG_EXYNOS_REBOOT)	+= exynos-reboot.o
 
 #PM

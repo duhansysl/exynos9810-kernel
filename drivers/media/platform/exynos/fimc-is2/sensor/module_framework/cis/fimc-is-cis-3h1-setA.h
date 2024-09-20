@@ -1523,6 +1523,7 @@ const u32 sensor_3h1_setfile_A_1328x748_30fps[] = {
 	0x3052, 0x0104, 0x02,
 	0x6214, 0x7970, 0x02,
 	0x0216, 0x0000, 0x02,
+	0x0100, 0x0100, 0x02,
 };
 
 const struct sensor_pll_info_compact sensor_3h1_pllinfo_A_3264x2448_30fps = {

@@ -288,7 +288,7 @@ static ssize_t show_detect_conn_available_pins(struct device *dev,
 	return sprintf(buf, "%s\n", sec_detect_available_pins_string);
 }
 
-static DEVICE_ATTR(available_pins, 0644, show_detect_conn_available_pins, NULL);
+static DEVICE_ATTR(available_pins, 0444, show_detect_conn_available_pins, NULL);
 
 #ifdef CONFIG_OF
 /**
@@ -373,7 +373,6 @@ static int detect_conn_init_irq(void)
 	return 0;
 
 }
-
 static int sec_detect_conn_item_make(void)
 {
 	struct detect_conn_info *pinfo;
@@ -391,6 +390,7 @@ static int sec_detect_conn_item_make(void)
 
 	return 0;
 }
+
 
 static int sec_detect_conn_probe(struct platform_device *pdev)
 {
@@ -474,7 +474,7 @@ static int sec_detect_conn_probe(struct platform_device *pdev)
 
 	/* detect_conn_init_irq thread create*/
 	ret = detect_conn_init_irq();
-
+	
 	/* make sec_detect_conn item*/
 	ret = sec_detect_conn_item_make();
 

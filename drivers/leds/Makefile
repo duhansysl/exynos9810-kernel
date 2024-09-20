@@ -58,8 +58,6 @@ obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
 obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
 obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
 obj-$(CONFIG_LEDS_MAX77693)		+= leds-max77693.o
-obj-$(CONFIG_LEDS_MAX77865_RGB)		+= leds-max77865-rgb.o
-obj-$(CONFIG_LEDS_MAX77705_RGB)		+= leds-max77705-rgb.o
 obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
 obj-$(CONFIG_LEDS_LM355x)		+= leds-lm355x.o
 obj-$(CONFIG_LEDS_BLINKM)		+= leds-blinkm.o
@@ -74,7 +72,9 @@ obj-$(CONFIG_LEDS_IS31FL32XX)		+= leds-is31fl32xx.o
 obj-$(CONFIG_LEDS_PM8058)		+= leds-pm8058.o
 obj-$(CONFIG_LEDS_MLXCPLD)		+= leds-mlxcpld.o
 obj-$(CONFIG_LEDS_S2MPB02)		+= leds-s2mpb02.o
-obj-$(CONFIG_LEDS_KTD2692)		+= leds-ktd2692.o
+obj-$(CONFIG_LEDS_S2MU107_FLASH)	+= leds-s2mu107.o
+obj-$(CONFIG_LEDS_S2MU106_FLASH)	+= leds-s2mu106.o
+obj-$(CONFIG_LEDS_RT8547)		+= leds-rt8547.o
 
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o

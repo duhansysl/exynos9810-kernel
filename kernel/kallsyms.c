@@ -24,7 +24,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/compiler.h>
-#ifdef CONFIG_SEC_DUMP_SUMMARY
+#if defined(CONFIG_SEC_DEBUG)
 #include <linux/sec_debug.h>
 #endif
 
@@ -59,7 +59,7 @@ extern const u16 kallsyms_token_index[] __weak;
 
 extern const unsigned long kallsyms_markers[] __weak;
 
-#ifdef CONFIG_SEC_DUMP_SUMMARY
+#if defined(CONFIG_SEC_DEBUG)
 void sec_debug_set_kallsyms_info(struct sec_debug_ksyms *ksyms, int magic)
 {
 	if (!IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE)) {

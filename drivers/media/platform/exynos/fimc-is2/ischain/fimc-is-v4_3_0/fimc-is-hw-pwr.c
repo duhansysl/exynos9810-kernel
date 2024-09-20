@@ -33,11 +33,10 @@
 int fimc_is_sensor_runtime_suspend_pre(struct device *dev)
 {
 	int ret = 0;
-	struct platform_device *pdev = to_platform_device(dev);
 	struct fimc_is_device_sensor *device;
 	unsigned int state;
 
-	device = (struct fimc_is_device_sensor *)platform_get_drvdata(pdev);
+	device = (struct fimc_is_device_sensor *)dev_get_drvdata(dev);
 	if (!device) {
 		err("device is NULL");
 		goto p_err;
@@ -70,10 +69,9 @@ p_err:
 int fimc_is_sensor_runtime_resume_pre(struct device *dev)
 {
 	int ret = 0;
-	struct platform_device *pdev = to_platform_device(dev);
 	struct fimc_is_device_sensor *device;
 
-	device = (struct fimc_is_device_sensor *)platform_get_drvdata(pdev);
+	device = (struct fimc_is_device_sensor *)dev_get_drvdata(dev);
 	if (!device) {
 		err("device is NULL");
 		goto p_err;

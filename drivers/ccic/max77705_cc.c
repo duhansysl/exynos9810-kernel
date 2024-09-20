@@ -640,7 +640,7 @@ static void max77705_ccstat_irq_handler(void *data, int irq)
 			if (psy_charger) {
 				val.intval = 1;
 				psy_charger->desc->set_property(psy_charger,
-					POWER_SUPPLY_EXT_PROP_CHGINSEL, &val);
+						(enum power_supply_property) POWER_SUPPLY_EXT_PROP_CHGINSEL, &val);
 			} else {
 				pr_err("%s: Fail to get psy charger\n", __func__);
 			}

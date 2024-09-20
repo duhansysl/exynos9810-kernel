@@ -64,44 +64,31 @@
 #include <uapi/linux/module.h>
 #include "module-internal.h"
 
-#ifdef CONFIG_TIMA_LKMAUTH_CODE_PROT
-#include <asm/tlbflush.h>
-#endif/*CONFIG_TIMA_LKMAUTH_CODE_PROT*/
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
-#ifdef CONFIG_TIMA_LKMAUTH_CODE_PROT
-#define TIMA_SET_PTE_RO 1
-#define TIMA_SET_PTE_NX 2
-#endif/*CONFIG_TIMA_LKMAUTH_CODE_PROT*/
 
 #ifndef ARCH_SHF_SMALL
 #define ARCH_SHF_SMALL 0
 #endif
 
-#ifdef CONFIG_TIMA_LKMAUTH
-/* Return codes for lkmauth function */
-#define	RET_LKMAUTH_SUCCESS				0
-#define	RET_LKMAUTH_FAIL				-1
-#endif
+#ifdef CONFIG_UH_LKM_BLOCK
+/* Return codes for lkm_block */
+#define	RET_UH_LKM_OK					0x00000000
+#define	RET_UH_LKM_BLOCK_FORCE			0x00000002
 
+/* Return codes for lkm_block function */
+#define	RET_LKM_BLOCK_SUCCESS				0
+#define	RET_LKM_BLOCK_FAIL				-1
+#endif
 /*
  * Modules' sections will be aligned on page boundaries
  * to ensure complete separation of code and data, but
  * only when CONFIG_DEBUG_SET_MODULE_RONX=y
  */
- 
-#ifdef CONFIG_TIMA_LKMAUTH_CODE_PROT
-# define debug_align(X) ALIGN(X, PAGE_SIZE)
-#else
-#ifdef TIMA_LKM_SET_PAGE_ATTRIB
-#define debug_align(X) ALIGN(X, PAGE_SIZE)
-#else
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
 # define debug_align(X) ALIGN(X, PAGE_SIZE)
 #else
 # define debug_align(X) (X)
-#endif
-#endif
 #endif
 
 /* If this is set, the section belongs in the init part of the module */
@@ -2713,15 +2700,11 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 }
 #endif /* CONFIG_KALLSYMS */
 
-#ifdef CONFIG_TIMA_LKMAUTH
-#ifdef CONFIG_TIMA_LKM_BLOCK
-static int lkmauth(Elf_Ehdr *hdr, int len)
+#ifdef CONFIG_UH_LKM_BLOCK
+static int lkm_block()
 {
-	int ret = RET_LKMAUTH_FAIL;
-	pr_warn("TIMA: lkmauth--LKM is not allowed by Samsung security policy.\n");
-	return ret;
+	return RET_UH_LKM_BLOCK_FORCE;
 }
-#endif
 #endif
 
 static void dynamic_debug_setup(struct _ddebug *debug, unsigned int num)
@@ -2827,15 +2810,11 @@ static int elf_header_check(struct load_info *info)
 		info->len - info->hdr->e_shoff))
 		return -ENOEXEC;
 
-#ifdef CONFIG_TIMA_LKMAUTH
-#ifdef CONFIG_TIMA_LKM_BLOCK
-	if (lkmauth(info->hdr, info->len) != RET_LKMAUTH_SUCCESS) {
-		pr_err
-		    ("TIMA: lkmauth--unable to load kernel module; module len is %lu.\n",
-		     info->len);
+#ifdef CONFIG_UH_LKM_BLOCK
+	if (lkm_block() != RET_LKM_BLOCK_SUCCESS) {
+		pr_warn("UH: LKM is not allowed by Samsung security policy.\n");
 		return -ENOEXEC;
 	}
-#endif
 #endif
 	return 0;
 }
@@ -3422,166 +3401,6 @@ static void do_mod_ctors(struct module *mod)
 #endif
 }
 
-#ifdef CONFIG_TIMA_LKMAUTH_CODE_PROT
-#ifndef TIMA_KERNEL_L1_MANAGE
-static inline pmd_t *tima_pmd_off_k(unsigned long virt)
-{
-		return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
-}
-
-void tima_set_pte_val(unsigned long virt,int numpages,int flags)
-{
-        unsigned long start = virt;
-        unsigned long end   = virt + (numpages << PAGE_SHIFT);
-        unsigned long pmd_end;
-        pmd_t *pmd;
-        pte_t *pte;
-
-        while (virt < end) 
-        {
-                pmd =tima_pmd_off_k(virt);
-                pmd_end = min(ALIGN(virt + 1, PMD_SIZE), end);
-
-                if ((pmd_val(*pmd) & PMD_TYPE_MASK) != PMD_TYPE_TABLE) {
-                        //printk("Not a pagetable\n");
-                        virt = pmd_end;
-                        continue;
-                }
-
-                while (virt < pmd_end) 
-                {
-                        pte = pte_offset_kernel(pmd, virt);
-                        if(flags == TIMA_SET_PTE_RO)
-                        {
-                                /*Make pages readonly*/
-                                ptep_set_wrprotect(current->mm, virt,pte);
-                        }
-                        if(flags == TIMA_SET_PTE_NX)
-                        { 
-                                /*Make pages Non Executable*/
-                                ptep_set_nxprotect(current->mm, virt,pte);
-                        }
-                        virt += PAGE_SIZE;
-                }
-        }
-
-        flush_tlb_kernel_range(start, end);        
-}
-#endif
-
-/**
- *    tima_mod_page_change_access  - Wrapper function to change access control permissions of pages 
- *
- *     It sends code and data pages to secure side to  make code pages readonly and data pages non executable
- * 
- */
-
-void tima_mod_page_change_access(struct module *mod)
-{
-        unsigned int    *vatext,*vadata;/* base virtual address of text and data regions*/
-        unsigned int    text_count,data_count;/* Number of text and data pages present in core section */
-     
-     /*Lets first pickup core section */
-        vatext      = mod->module_core;
-        vadata      = (int *)((char *)(mod->module_core) + mod->core_ro_size);
-        text_count  = ((char *)vadata - (char *)vatext);
-        data_count  = debug_align(mod->core_size) - text_count;
-        text_count  = text_count / PAGE_SIZE;
-        data_count  = data_count / PAGE_SIZE;
-
-        /*Should be atleast a page */
-        if(!text_count)
-                text_count = 1;
-        if(!data_count)
-                data_count = 1;
- /* Change permissive bits for core section and making Code read only, Data Non Executable*/
-        tima_set_pte_val( (unsigned long)vatext,text_count,TIMA_SET_PTE_RO);
-        tima_set_pte_val( (unsigned long)vadata,data_count,TIMA_SET_PTE_NX); 
-
-     /*Lets pickup init section */
-        vatext      = mod->module_init;
-        vadata      = (int *)((char *)(mod->module_init) + mod->init_ro_size);
-        text_count  = ((char *)vadata - (char *)vatext);
-        data_count  = debug_align(mod->init_size) - text_count;
-        text_count  = text_count / PAGE_SIZE;
-        data_count  = data_count / PAGE_SIZE;
-
-/* Change permissive bits for init section and making Code read only,Data Non Executable*/
-        tima_set_pte_val( (unsigned long)vatext,text_count,TIMA_SET_PTE_RO);
-        tima_set_pte_val( (unsigned long)vadata,data_count,TIMA_SET_PTE_NX);
-}
-#endif /*CONFIG_TIMA_LKMAUTH_CODE_PROT*/
-
-#ifdef TIMA_LKM_SET_PAGE_ATTRIB
-void tima_mod_send_smc_instruction(unsigned int *vatext, unsigned int *vadata,
-				   unsigned int text_count,
-				   unsigned int data_count)
-{
-	unsigned long cmd_id = TIMA_PAC_CMD_ID;
-	/*Call SMC instruction */
-#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
-	__asm__ __volatile__(".arch_extension sec\n");
-#endif
-	__asm__ __volatile__("stmfd  sp!,{r0-r4,r11}\n"
-			     "mov    r11, r0\n"
-			     "mov    r0, %0\n"
-			     "mov    r1, %1\n"
-			     "mov    r2, %2\n"
-			     "mov    r3, %3\n"
-			     "mov    r4, %4\n"
-			     "smc    #11\n"
-			     "mov    r6, #0\n"
-			     "pop    {r0-r4,r11}\n"
-			     "mcr    p15, 0, r6, c8, c3, 0\n"
-			     "dsb\n"
-			     "isb\n"::"r"(cmd_id), "r"(vatext), "r"(text_count),
-			     "r"(vadata), "r"(data_count):"r0", "r1", "r2",
-			     "r3", "r4", "r11", "cc");
-
-}
-
-/**
- *    tima_mod_page_change_access  - Wrapper function to change access control permissions of pages 
- *
- *     It sends code and data pages to secure side to  make code pages readonly and data pages non executable
- * 
- */
-
-void tima_mod_page_change_access(struct module *mod)
-{
-	unsigned int *vatext, *vadata;	/* base virtual address of text and data regions */
-	unsigned int text_count, data_count;	/* Number of text and data pages present in core section */
-
-	/*Lets first pickup core section */
-	vatext = mod->module_core;
-	vadata = (int *)((char *)(mod->module_core) + mod->core_ro_size);
-	text_count = ((char *)vadata - (char *)vatext);
-	data_count = debug_align(mod->core_size) - text_count;
-	text_count = text_count / PAGE_SIZE;
-	data_count = data_count / PAGE_SIZE;
-
-	/*Should be atleast a page */
-	if (!text_count)
-		text_count = 1;
-	if (!data_count)
-		data_count = 1;
-
-	/* Change permissive bits for core section */
-	tima_mod_send_smc_instruction(vatext, vadata, text_count, data_count);
-
-	/*Lets pickup init section */
-	vatext = mod->module_init;
-	vadata = (int *)((char *)(mod->module_init) + mod->init_ro_size);
-	text_count = ((char *)vadata - (char *)vatext);
-	data_count = debug_align(mod->init_size) - text_count;
-	text_count = text_count / PAGE_SIZE;
-	data_count = data_count / PAGE_SIZE;
-
-	/* Change permissive bits for init section */
-	tima_mod_send_smc_instruction(vatext, vadata, text_count, data_count);
-}
-#endif
-
 /* For freeing module_init on success, in case kallsyms traversing */
 struct mod_initfree {
 	struct rcu_head rcu;
@@ -3638,10 +3457,6 @@ static noinline int do_init_module(struct module *mod)
 	mod->state = MODULE_STATE_LIVE;
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_LIVE, mod);
-
-#ifdef TIMA_LKM_SET_PAGE_ATTRIB
-	tima_mod_page_change_access(mod);
-#endif
 
 	/*
 	 * We need to finish all async code before the module init sequence
@@ -3769,9 +3584,6 @@ static int complete_formation(struct module *mod, struct load_info *info)
 	/* This relies on module_mutex for list integrity. */
 	module_bug_finalize(info->hdr, info->sechdrs, mod);
 
-#ifdef CONFIG_TIMA_LKMAUTH_CODE_PROT
-	tima_mod_page_change_access(mod);
-#endif /*CONFIG_TIMA_LKMAUTH_CODE_PROT*/
 	module_enable_ro(mod, false);
 	module_enable_nx(mod);
 

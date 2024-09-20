@@ -1077,8 +1077,8 @@ void exynos_ufs_get_uic_info(struct ufs_hba *hba)
 	if (!(ufs->misc_flags & EXYNOS_UFS_MISC_TOGGLE_LOG))
 		return;
 
-	exynos_ufs_get_attr(hba, ufs->debug.attr);
 	exynos_ufs_get_sfr(hba, ufs->debug.sfr);
+	exynos_ufs_get_attr(hba, ufs->debug.attr);
 	exynos_ufs_get_misc(hba);
 
 	ufs->misc_flags &= ~(EXYNOS_UFS_MISC_TOGGLE_LOG);

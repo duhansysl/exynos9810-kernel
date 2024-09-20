@@ -1205,17 +1205,6 @@ void __pm_runtime_disable(struct device *dev, bool check_resume)
 }
 EXPORT_SYMBOL_GPL(__pm_runtime_disable);
 
-static inline void check_disp_cam_phy(struct device *dev)
-{
-	if (dev_name(dev) &&
-		(!strncmp(dev_name(dev), "phy-phy_m4s4top_dsi0@0x16160000.0", 33) ||
-		 !strncmp(dev_name(dev), "phy-dphy_m0s4s2_csis1@0x16210500.3", 34))) {
-		pr_err("%s: Do not reach here!: %pF\n", __func__,
-				__builtin_return_address(0));
-		BUG();
-	}
-}
-
 /**
  * pm_runtime_enable - Enable runtime PM of a device.
  * @dev: Device to handle.
@@ -1226,14 +1215,10 @@ void pm_runtime_enable(struct device *dev)
 
 	spin_lock_irqsave(&dev->power.lock, flags);
 
-	if (dev->power.disable_depth > 0) {
+	if (dev->power.disable_depth > 0)
 		dev->power.disable_depth--;
-		if (!dev->power.disable_depth)
-			check_disp_cam_phy(dev);
-	} else {
-		dev_warn(dev, "Unbalanced %s!: %pF\n", __func__,
-				__builtin_return_address(0));
-	}
+	else
+		dev_warn(dev, "Unbalanced %s!\n", __func__);
 
 	spin_unlock_irqrestore(&dev->power.lock, flags);
 }

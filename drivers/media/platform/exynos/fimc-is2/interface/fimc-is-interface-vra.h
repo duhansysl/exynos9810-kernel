@@ -85,7 +85,7 @@ struct fimc_is_lib_vra_os_system_funcs {
 	ulong (*spin_lock_irqsave)(void *slock_lib);
 	int  (*spin_unlock_irqrestore)(void *slock_lib, ulong flag);
 	void (*lib_assert)(void);
-	bool (*lib_in_interrupt)(void);
+	bool (*lib_in_irq)(void);
 };
 
 struct fimc_is_lib_vra_interface_funcs {

@@ -37,8 +37,6 @@ typedef unsigned short UINT16;
 typedef signed int INT32;
 typedef unsigned int UINT32;
 typedef int BOOL;
-typedef unsigned int u32;
-typedef int s32;
 
 typedef struct {
 	UINT32 structSize;

@@ -42,6 +42,7 @@ const char *type_check_kinds[] = {
 #endif
 
 #define VALUE_LENGTH 40
+
 static bool was_reported(struct source_location *location)
 {
 	return test_and_set_bit(REPORTED_BIT, &location->reported);
@@ -147,27 +148,10 @@ static bool location_is_valid(struct source_location *loc)
 	return loc->file_name != NULL;
 }
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-struct ubsandebug ubsaninfo;
-static void ubsan_sec_report(int isprologue, struct source_location *loc, int rType)
-{
-	if(isprologue){
-		ubsaninfo.rType = rType;
-		snprintf(ubsaninfo.filename, FILESIZE, "%s\n",loc->file_name);
-	} else {
-		sec_debug_ubsan_handler(&ubsaninfo);	
-	}
-}
-#endif
 static DEFINE_SPINLOCK(report_lock);
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-static void ubsan_prologue(struct source_location *location,
-			unsigned long *flags, int rType)
-#else
 static void ubsan_prologue(struct source_location *location,
 			unsigned long *flags)
-#endif
 {
 	current->in_ubsan++;
 	spin_lock_irqsave(&report_lock, *flags);
@@ -175,9 +159,6 @@ static void ubsan_prologue(struct source_location *location,
 	pr_err("========================================"
 		"========================================\n");
 	print_source_location("UBSAN: Undefined behaviour in", location);
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_sec_report(1, location, rType);
-#endif
 }
 
 static void ubsan_epilogue(unsigned long *flags)
@@ -185,12 +166,8 @@ static void ubsan_epilogue(unsigned long *flags)
 	dump_stack();
 	pr_err("========================================"
 		"========================================\n");
-
 	spin_unlock_irqrestore(&report_lock, *flags);
 	current->in_ubsan--;
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_sec_report(0, NULL, 0);
-#endif
 }
 
 static void handle_overflow(struct overflow_data *data, void *lhs,
@@ -205,11 +182,7 @@ static void handle_overflow(struct overflow_data *data, void *lhs,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_OVERFLOW);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(lhs_val_str, sizeof(lhs_val_str), type, lhs);
 	val_to_string(rhs_val_str, sizeof(rhs_val_str), type, rhs);
@@ -255,11 +228,7 @@ void __ubsan_handle_negate_overflow(struct overflow_data *data,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_NEGATE_OVERFLOW);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(old_val_str, sizeof(old_val_str), data->type, old_val);
 
@@ -280,11 +249,7 @@ void __ubsan_handle_divrem_overflow(struct overflow_data *data,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_DIVREM_OVERFLOW);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(rhs_val_str, sizeof(rhs_val_str), data->type, rhs);
 
@@ -305,11 +270,7 @@ static void handle_null_ptr_deref(struct type_mismatch_data_common *data)
 	if (suppress_report(data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(data->location, &flags, UBSAN_RTYPE_NULL_PTR_DEREF);
-#else
 	ubsan_prologue(data->location, &flags);
-#endif
 
 	pr_err("%s null pointer of type %s\n",
 		type_check_kinds[data->type_check_kind],
@@ -326,11 +287,7 @@ static void handle_misaligned_access(struct type_mismatch_data_common *data,
 	if (suppress_report(data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(data->location, &flags, UBSAN_RTYPE_MISALIGNED_ACCESS);
-#else
 	ubsan_prologue(data->location, &flags);
-#endif
 
 	pr_err("%s misaligned address %p for type %s\n",
 		type_check_kinds[data->type_check_kind],
@@ -348,11 +305,7 @@ static void handle_object_size_mismatch(struct type_mismatch_data_common *data,
 	if (suppress_report(data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(data->location, &flags, UBSAN_RTYPE_OBJECT_SIZE_MISMATCH);
-#else
 	ubsan_prologue(data->location, &flags);
-#endif
 	pr_err("%s address %p with insufficient space\n",
 		type_check_kinds[data->type_check_kind],
 		(void *) ptr);
@@ -408,11 +361,7 @@ void __ubsan_handle_nonnull_return(struct nonnull_return_data *data)
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_NONNULL_RETURN);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	pr_err("null pointer returned from function declared to never return null\n");
 
@@ -433,11 +382,7 @@ void __ubsan_handle_vla_bound_not_positive(struct vla_bound_data *data,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_VLA_BOUND_NOT_POSITIVE);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(bound_str, sizeof(bound_str), data->type, bound);
 	pr_err("variable length array bound value %s <= 0\n", bound_str);
@@ -450,14 +395,11 @@ void __ubsan_handle_out_of_bounds(struct out_of_bounds_data *data, void *index)
 {
 	unsigned long flags;
 	char index_str[VALUE_LENGTH];
+
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_OUT_OF_BOUND);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(index_str, sizeof(index_str), data->index_type, index);
 	pr_err("index %s is out of range for type %s\n", index_str,
@@ -478,11 +420,7 @@ void __ubsan_handle_shift_out_of_bounds(struct shift_out_of_bounds_data *data,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_SHIFT_OUT_OF_BOUND);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(rhs_str, sizeof(rhs_str), rhs_type, rhs);
 	val_to_string(lhs_str, sizeof(lhs_str), lhs_type, lhs);
@@ -514,11 +452,7 @@ void __ubsan_handle_builtin_unreachable(struct unreachable_data *data)
 {
 	unsigned long flags;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, 0);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 	pr_err("calling __builtin_unreachable()\n");
 	ubsan_epilogue(&flags);
 	panic("can't return from __builtin_unreachable()");
@@ -534,11 +468,7 @@ void __ubsan_handle_load_invalid_value(struct invalid_value_data *data,
 	if (suppress_report(&data->location))
 		return;
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-	ubsan_prologue(&data->location, &flags, UBSAN_RTYPE_LOAD_INVALID_VALUE);
-#else
 	ubsan_prologue(&data->location, &flags);
-#endif
 
 	val_to_string(val_str, sizeof(val_str), data->type, val);
 

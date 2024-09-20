@@ -21,9 +21,9 @@
 static unsigned int nr_tm_lut_x_values = NR_TM_LUT_VALUES;
 static unsigned int nr_tm_lut_y_values = NR_TM_LUT_VALUES;
 
-static uint tm_lut_x[NR_TM_LUT_VALUES] = {0,1,2,4,8,16,32,64,96,128,192,256,384,512,768,1024,1280,1536,2048,2560,3072,3328,3584,4096,5120,5632,6144,7168,8192,10240,12288,14336,2048};
-static uint tm_lut_y[NR_TM_LUT_VALUES] = {0,33,45,61,82,109,141,181,211,234,271,302,353,396,466,524,575,621,699,762,802,820,830,848,882,896,915,949,967,995,1010,1018,5};
-static uint tm_override_enable = 0;
+static uint tm_lut_x[NR_TM_LUT_VALUES];
+static uint tm_lut_y[NR_TM_LUT_VALUES];
+static uint tm_override_enable;
 
 int exynos_hdr_get_tm_lut_xy(u32 lut_x[], u32 lut_y[])
 {

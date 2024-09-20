@@ -27,6 +27,9 @@ enum {
 	XT_DOMAINFILTER_NAME_LEN  = 256, // lenght of a domain name
 };
 
+// Below char works as wildcard (*), it can be used as part or whole domain
+const char WILDCARD = '%';
+
 struct xt_domainfilter_match_info {
 	char domain_name[XT_DOMAINFILTER_NAME_LEN];
 	__u8 flags;

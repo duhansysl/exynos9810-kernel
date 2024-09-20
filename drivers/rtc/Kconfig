@@ -1288,16 +1288,6 @@ config RTC_DRV_SEC
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-sec.
 
-config RTC_ALARM_BOOT
-	bool "Android alarm boot function"
-	depends on SEC_PM
-	default y
-	help
-	  This is for alarm booting function.
-	  This feature is based on Chinese models.
-	  However, it would be used on Factory test
-	  instead of Power key booting.
-
 config RTC_DRV_S2MPS17
 	tristate "Samsung PMIC series RTC"
 	depends on MFD_S2MPS17

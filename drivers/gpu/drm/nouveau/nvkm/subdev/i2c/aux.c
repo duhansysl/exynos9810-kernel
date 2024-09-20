@@ -105,15 +105,9 @@ nvkm_i2c_aux_acquire(struct nvkm_i2c_aux *aux)
 {
 	struct nvkm_i2c_pad *pad = aux->pad;
 	int ret;
-
 	AUX_TRACE(aux, "acquire");
 	mutex_lock(&aux->mutex);
-
-	if (aux->enabled)
-		ret = nvkm_i2c_pad_acquire(pad, NVKM_I2C_PAD_AUX);
-	else
-		ret = -EIO;
-
+	ret = nvkm_i2c_pad_acquire(pad, NVKM_I2C_PAD_AUX);
 	if (ret)
 		mutex_unlock(&aux->mutex);
 	return ret;
@@ -145,24 +139,6 @@ nvkm_i2c_aux_del(struct nvkm_i2c_aux **paux)
 		kfree(*paux);
 		*paux = NULL;
 	}
-}
-
-void
-nvkm_i2c_aux_init(struct nvkm_i2c_aux *aux)
-{
-	AUX_TRACE(aux, "init");
-	mutex_lock(&aux->mutex);
-	aux->enabled = true;
-	mutex_unlock(&aux->mutex);
-}
-
-void
-nvkm_i2c_aux_fini(struct nvkm_i2c_aux *aux)
-{
-	AUX_TRACE(aux, "fini");
-	mutex_lock(&aux->mutex);
-	aux->enabled = false;
-	mutex_unlock(&aux->mutex);
 }
 
 int

@@ -23,7 +23,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input/mt.h>
-#include <linux/input/input_booster.h>
 #include <linux/major.h>
 #include <linux/device.h>
 #include <linux/cdev.h>
@@ -1470,9 +1469,6 @@ static struct input_handler evdev_handler = {
 
 static int __init evdev_init(void)
 {
-#ifdef CONFIG_SEC_INPUT_BOOSTER
-	input_booster_init();
-#endif
 	return input_register_handler(&evdev_handler);
 }
 

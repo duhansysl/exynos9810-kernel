@@ -47,6 +47,11 @@ config EXYNOS_ZEBU_EMUL_DISP
 	depends on EXYNOS_DECON_9810
 	default n
 
+config EXYNOS_DUAL_DSI
+	bool "Dual Dsi"
+	depends on EXYNOS_MIPI_DSIM
+	default n
+
 config FB_WINDOW_UPDATE
         bool "DECON window update mode"
         depends on EXYNOS_DECON_9810
@@ -112,11 +117,15 @@ config DPU_2_0_RELEASE_FENCES
         depends on EXYNOS_DECON_9810
         default n
 
-
 config SUPPORT_DSU
 	tristate "Support Dynamic Scale Up (Multi-Resolution)"
 	depends on EXYNOS_DECON_9810
 	default n
+
+config USE_DISPLAYPORT_CCIC_EVENT_QUEUE
+	bool "use queue for CCIC notifications"
+        depends on EXYNOS_DISPLAYPORT
+        default n
 endif
 
 source "drivers/video/fbdev/exynos/dpu_9810/panels/Kconfig"

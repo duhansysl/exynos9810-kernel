@@ -78,7 +78,6 @@ enum fimc_is_subdev_id {
 	ENTRY_M4P,
 	ENTRY_M5P,
 	ENTRY_VRA,
-	ENTRY_SRDZ,
 	ENTRY_END
 };
 

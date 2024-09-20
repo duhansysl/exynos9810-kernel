@@ -1,8 +1,16 @@
+ifeq ($(CONFIG_BATTERY_SAMSUNG_MHS), y)
+obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery_mhs.o sec_battery_sysfs.o sec_battery_dt.o
+else ifeq ($(CONFIG_BATTERY_SAMSUNG_DP), y)
+obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery_dp.o sec_battery_sysfs.o sec_battery_dt.o
+else
 obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery.o sec_battery_sysfs.o sec_battery_dt.o
+endif
 obj-$(CONFIG_OF)		+= sec_adc.o
 obj-$(CONFIG_BATTERY_CISD)	+= sec_cisd.o
 obj-$(CONFIG_MULTI_CHARGING)	+= sec_multi_charger.o
 obj-$(CONFIG_STEP_CHARGING)	+= sec_step_charging.o
+obj-$(CONFIG_WIRELESS_AUTH)	+= sec_battery_misc.o
+obj-$(CONFIG_DIRECT_CHARGING)	+= sec_direct_charger.o
 obj-$(CONFIG_UPDATE_BATTERY_DATA)	+= sec_battery_data.o
 obj-$(CONFIG_BATTERY_NOTIFIER)	+= battery_notifier.o
 
@@ -15,6 +23,8 @@ obj-$(CONFIG_FUELGAUGE_MAX77833)	+= max77833_fuelgauge.o
 obj-$(CONFIG_FUELGAUGE_MAX77854)	+= max77854_fuelgauge.o
 obj-$(CONFIG_FUELGAUGE_MAX77865)	+= max77865_fuelgauge.o
 obj-$(CONFIG_FUELGAUGE_MAX77705)	+= max77705_fuelgauge.o
+obj-$(CONFIG_FUELGAUGE_S2MU106)		+= s2mu106_fuelgauge.o
+obj-$(CONFIG_FUELGAUGE_S2MU107)		+= s2mu107_fuelgauge.o
 
 obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
 obj-$(CONFIG_CHARGER_SMB328)	+= smb328_charger.o
@@ -32,10 +42,19 @@ obj-$(CONFIG_CHARGER_MAX77833)	+= max77833_charger.o
 obj-$(CONFIG_CHARGER_MAX77854)	+= max77854_charger.o
 obj-$(CONFIG_CHARGER_MAX77865)	+= max77865_charger.o
 obj-$(CONFIG_CHARGER_MAX77705)	+= max77705_charger.o
-obj-$(CONFIG_CHARGER_S2MU003)   += s2mu003_charger.o
 obj-$(CONFIG_CHARGER_DA9155)    += da9155_charger.o
+obj-$(CONFIG_PM_S2MU106)  		+= s2mu106_pmeter.o
+obj-$(CONFIG_PM_S2MU107)  		+= s2mu107_pmeter.o
+obj-$(CONFIG_CHARGER_S2MU003)   += s2mu003_charger.o
+obj-$(CONFIG_CHARGER_S2MU106)   += s2mu106_charger.o
+obj-$(CONFIG_CHARGER_S2MU107)   += s2mu107_switching_charger.o
+obj-$(CONFIG_CHARGER_S2MU107_DIRECT)   += s2mu107_direct_charger.o
 
+obj-$(CONFIG_WIRELESS_CHARGER_HAL_MFC)	+= mfc_hal_charger.o
 obj-$(CONFIG_WIRELESS_CHARGER_BQ51221)	+= bq51221_charger.o
 obj-$(CONFIG_WIRELESS_CHARGER_P9220)	+= p9220_charger.o
 obj-$(CONFIG_WIRELESS_CHARGER_MFC)	+= mfc_charger.o
+obj-$(CONFIG_WIRELESS_CHARGER_MFC_S2MIW04)	+= mfc_s2miw04_charger.o
 
+obj-$(CONFIG_CHARGER_PCA9468)	+= pca9468_charger.o
+obj-$(CONFIG_CCIC_NOTIFIER)		+= sec_pd.o

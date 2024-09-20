@@ -1112,7 +1112,7 @@ static void ecd_dump_stacktrace_task(struct pt_regs *regs, struct task_struct *t
 #define THREAD_INFO(sp) ((struct thread_info *) \
 		((unsigned long)(sp) & ~(THREAD_SIZE - 1)))
 #else
-#define THREAD_INFO(tsk) ((struct thread_info *)(tsk))
+#define THREAD_INFO(sp) ((struct thread_info *)(sp))
 #endif
 
 static void ecd_dump_stacktrace(const struct pt_regs *regs, void *ssp)
@@ -1401,9 +1401,9 @@ static int __init add_exception_func(void)
 {
 	if (!initial_no_firmware) {
 		hook_debug_fault_code(DBG_ESR_EVT_HWBP, ecd_do_breakpoint, SIGTRAP,
-		                     TRAP_HWBKPT, "hw-breakpoint handler");
+				      TRAP_HWBKPT, "hw-breakpoint handler");
 		hook_debug_fault_code(DBG_ESR_EVT_HWWP, ecd_do_watchpoint, SIGTRAP,
-		                     TRAP_HWBKPT, "hw-watchpoint handler");
+				      TRAP_HWBKPT, "hw-watchpoint handler");
 	}
 	return 0;
 }

@@ -361,11 +361,11 @@ int arch_check_bp_in_kernelspace(struct perf_event *bp)
  * Hopefully this will disappear when ptrace can bypass the conversion
  * to generic breakpoint descriptions.
  */
-int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl *ctrl,
+int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
 			   int *gen_len, int *gen_type, int *offset)
 {
 	/* Type */
-	switch (ctrl->type) {
+	switch (ctrl.type) {
 	case ARM_BREAKPOINT_EXECUTE:
 		*gen_type = HW_BREAKPOINT_X;
 		break;
@@ -382,12 +382,12 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl *ctrl,
 		return -EINVAL;
 	}
 
-	if (!ctrl->len)
+	if (!ctrl.len)
 		return -EINVAL;
-	*offset = __ffs(ctrl->len);
+	*offset = __ffs(ctrl.len);
 
 	/* Len */
-	switch (ctrl->len >> *offset) {
+	switch (ctrl.len >> *offset) {
 	case ARM_BREAKPOINT_LEN_1:
 		*gen_len = HW_BREAKPOINT_LEN_1;
 		break;

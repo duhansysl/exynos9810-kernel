@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2013-2018 TRUSTONIC LIMITED
  * All Rights Reserved.
@@ -23,15 +24,30 @@
 #include <linux/device.h>
 #include <linux/version.h>
 #include <linux/dma-buf.h>
+#ifdef CONFIG_DMA_SHARED_BUFFER
+#if KERNEL_VERSION(4, 11, 12) < LINUX_VERSION_CODE
+#include "../../drivers/staging/android/ion/ion.h"
+#elif KERNEL_VERSION(3, 14, 0) < LINUX_VERSION_CODE
+#include "../../drivers/staging/android/ion/ion_priv.h"
+#endif
+#endif
+
+#ifdef CONFIG_XEN
+/* To get the MFN */
+#include <linux/pfn.h>
+#include <xen/page.h>
+#endif
 
 #include "public/mc_user.h"
 
 #include "mci/mcimcp.h"
 
-#include "platform.h"	/* CONFIG_TRUSTONIC_TEE_LPAE */
 #include "main.h"
 #include "mcp.h"	/* mcp_buffer_map */
+#include "protocol.h"	/* protocol_fe_uses_pages_and_vas */
 #include "mmu.h"
+
+#define PHYS_48BIT_MASK (BIT(48) - 1)
 
 /* Common */
 #define MMU_BUFFERABLE		BIT(2)		/* AttrIndx[0] */
@@ -47,36 +63,29 @@
 #define MMU_EXT_AF		BIT(10)		/* Access Flag */
 #define MMU_EXT_XN		(((u64)1) << 54) /* XN */
 
-/* Non-LPAE */
-#define MMU_TYPE_EXT		(3 << 0)	/* v5 */
-#define MMU_TYPE_SMALL		(2 << 0)
-#define MMU_EXT_AP0		BIT(4)
-#define MMU_EXT_AP1		(2 << 4)
-#define MMU_EXT_AP2		BIT(9)
-#define MMU_EXT_TEX(x)		((x) << 6)	/* v5 */
-#define MMU_EXT_SHARED_32	BIT(10)		/* ARMv6 and higher */
-
 /* ION */
-#define MMU_ION_BUF     BIT(24) /* Trustonic Specific flag to detect ION mem */
+/* Trustonic Specific flag to detect ION mem */
+#define MMU_ION_BUF		BIT(24)
 
 /*
- * MobiCore specific page tables for world shared memory.
- * Linux uses shadow page tables, see arch/arm/include/asm/pgtable-2level.
- * MobiCore uses the default ARM format.
- *
- * Number of page table entries in one L2 MMU table. This is ARM specific, an
- * MMU table covers 1 MiB by using 256 entries referring to 4KiB pages each.
+ * Specific case for kernel 4.4.168 that does not have the same
+ * get_user_pages() implementation
  */
-#define L2_ENTRIES_MAX	256
+#if KERNEL_VERSION(4, 4, 167) < LINUX_VERSION_CODE && \
+	KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE
+static inline long gup_local(struct mm_struct *mm, uintptr_t start,
+			     unsigned long nr_pages, int write,
+			     struct page **pages)
+{
+	unsigned int gup_flags = 0;
 
-/*
- * Small buffers (below 1MiB) are mapped using the legacy L2 table, but bigger
- * buffers now use a fake L1 table that holds 64-bit pointers to L2 tables. As
- * this must be exactly one page, we can hold up to 512 entries.
- */
-#define L1_ENTRIES_MAX	512
+	if (write)
+		gup_flags |= FOLL_WRITE;
 
-#if KERNEL_VERSION(4, 6, 0) > LINUX_VERSION_CODE
+	return get_user_pages(NULL, mm, start, nr_pages, gup_flags, pages,
+					NULL);
+}
+#elif KERNEL_VERSION(4, 6, 0) > LINUX_VERSION_CODE
 static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 			     unsigned long nr_pages, int write,
 			     struct page **pages)
@@ -88,48 +97,48 @@ static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 			     unsigned long nr_pages, int write,
 			     struct page **pages)
 {
-	unsigned int flags = 0;
+	unsigned int gup_flags = 0;
 
 	if (write)
-		flags |= FOLL_WRITE;
+		gup_flags |= FOLL_WRITE;
+	
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
-	/* ExySp */
-	flags |= FOLL_CMA;
-
-	return get_user_pages_remote(NULL, mm, start, nr_pages, write, 0, pages,
-				     NULL);
+	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
+				    0, pages, NULL);
 }
 #elif KERNEL_VERSION(4, 10, 0) > LINUX_VERSION_CODE
 static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 			     unsigned long nr_pages, int write,
 			     struct page **pages)
 {
-	unsigned int flags = 0;
+	unsigned int gup_flags = 0;
 
 	if (write)
-		flags |= FOLL_WRITE;
+		gup_flags |= FOLL_WRITE;
 
-	/* ExySp */
-	flags |= FOLL_CMA;
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
-	return get_user_pages_remote(NULL, mm, start, nr_pages, flags, pages,
-				     NULL);
+	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
+				    pages, NULL);
 }
 #else
 static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 			     unsigned long nr_pages, int write,
 			     struct page **pages)
 {
-	unsigned int flags = 0;
+	unsigned int gup_flags = 0;
 
 	if (write)
-		flags |= FOLL_WRITE;
+		gup_flags |= FOLL_WRITE;
 
-	/* ExySp */
-	flags |= FOLL_CMA;
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
-	return get_user_pages_remote(NULL, mm, start, nr_pages, flags, pages,
-				     NULL, NULL);
+	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
+				    pages, NULL, NULL);
 }
 #endif
 
@@ -151,21 +160,17 @@ static inline long gup_local_repeat(struct mm_struct *mm, uintptr_t start,
 }
 
 /*
- * Fake L1 MMU table.
+ * A table that could be either a pmd or pte
  */
-union l1_table {
-	u64		*pages_phys;	/* Array of physical page addresses */
-	unsigned long	page;
-};
-
-/*
- * L2 MMU table, which is more a L3 table in the LPAE case.
- */
-union l2_table {
-	union {				/* Array of PTEs */
-		u32	*ptes_32;
-		u64	*ptes_64;
-	};
+union mmu_table {
+	u64		*entries;	/* Array of PTEs */
+	/* Array of pages */
+	struct page	**pages;
+	/* Array of VAs */
+	uintptr_t	*vas;
+	/* Address of table */
+	void		*addr;
+	/* Page for table */
 	unsigned long	page;
 };
 
@@ -177,91 +182,32 @@ union l2_table {
  * the MMU table and a handle for this table is returned to the user.
  */
 struct tee_mmu {
-	union l2_table	l2_tables[L1_ENTRIES_MAX];	/* L2 tables */
-	size_t		l2_tables_nr;	/* Actual number of L2 tables */
-	union l1_table	l1_table;	/* Fake L1 table */
-	union l2_table	l1_l2_table;	/* L2 table for the L1 table */
-	u32		offset;
-	u32		length;
-	bool		user;		/* Pages are from user space */
-	int		pages_created;	/* Leak check */
-	int		pages_locked;	/* Leak check */
+	struct kref			kref;
+	/* Array of pages that hold buffer ptes*/
+	union mmu_table			pte_tables[PMD_ENTRIES_MAX];
+	/* Actual number of ptes tables */
+	size_t				nr_pmd_entries;
+	/* Contains phys @ of ptes tables */
+	union mmu_table			pmd_table;
+	struct tee_deleter		*deleter;	/* Xen map to free */
+	unsigned long			nr_pages;
+	int				pages_created;	/* Leak check */
+	int				pages_locked;	/* Leak check */
+	u32				offset;
+	u32				length;
+	u32				flags;
+	/* Pages are from user space */
+	bool				user;
+	bool				use_pages_and_vas;
 	/* ION case only */
-	struct dma_buf	*dma_buf;
-	struct dma_buf_attachment *attach;
-	struct sg_table *sgt;
+	struct dma_buf			*dma_buf;
+	struct dma_buf_attachment	*attach;
+	struct sg_table			*sgt;
 };
 
-/*
- * Linux uses different mappings for SMP systems(the sharing flag is set for the
- * pte. In order not to confuse things too much in Mobicore make sure the shared
- * buffers have the same flags.  This should also be done in SWD side.
- */
-
-static u64 pte_flags_64 = MMU_BUFFERABLE | MMU_CACHEABLE | MMU_EXT_NG |
-#ifdef CONFIG_SMP
-			  MMU_EXT_SHARED_64 |
-#endif /* CONFIG_SMP */
-			  MMU_EXT_XN | MMU_EXT_AF | MMU_AP_RW_ALL |
-			  MMU_NS | MMU_TYPE_PAGE;
-
-static u64 pte_flags_64_dma = MMU_EXT_NG |
-#ifdef CONFIG_SMP
-			  MMU_EXT_SHARED_64 |
-#endif /* CONFIG_SMP */
-			  MMU_EXT_XN | MMU_EXT_AF | MMU_AP_RW_ALL |
-			  MMU_NS | MMU_TYPE_PAGE;
-
-static u32 pte_flags_32 = MMU_BUFFERABLE | MMU_CACHEABLE | MMU_EXT_NG |
-#ifdef CONFIG_SMP
-			  MMU_EXT_SHARED_32 | MMU_EXT_TEX(1) |
-#endif /* CONFIG_SMP */
-			  MMU_EXT_AP1 | MMU_EXT_AP0 |
-			  MMU_TYPE_SMALL | MMU_TYPE_EXT;
-
-static u32 pte_flags_32_dma = MMU_EXT_NG |
-#ifdef CONFIG_SMP
-			  MMU_EXT_SHARED_32 | MMU_EXT_TEX(1) |
-#endif /* CONFIG_SMP */
-			  MMU_EXT_AP1 | MMU_EXT_AP0 |
-			  MMU_TYPE_SMALL | MMU_TYPE_EXT;
-
-static inline u32 get_pte_flags_32(bool is_writable)
+static void tee_mmu_delete(struct tee_mmu *mmu)
 {
-	return is_writable ? pte_flags_32 : pte_flags_32 | MMU_EXT_AP2;
-}
-
-static inline u32 get_pte_flags_32_dma(bool is_writable)
-{
-	return is_writable ? pte_flags_32_dma : pte_flags_32_dma | MMU_EXT_AP2;
-}
-
-static inline u64 get_pte_flags_64(bool is_writable)
-{
-	return is_writable ? pte_flags_64 : pte_flags_64 | MMU_AP2_RO;
-}
-
-static inline u64 get_pte_flags_64_dma(bool is_writable)
-{
-	return is_writable ? pte_flags_64_dma : pte_flags_64_dma | MMU_AP2_RO;
-}
-
-static uintptr_t mmu_table_pointer(const struct tee_mmu *mmu)
-{
-	if (mmu->l1_table.page) {
-		return g_ctx.f_lpae ?
-			(uintptr_t)mmu->l1_l2_table.ptes_64 :
-			(uintptr_t)mmu->l1_l2_table.ptes_32;
-	} else {
-		return g_ctx.f_lpae ?
-			(uintptr_t)mmu->l2_tables[0].ptes_64 :
-			(uintptr_t)mmu->l2_tables[0].ptes_32;
-	}
-}
-
-static void mmu_release(struct tee_mmu *mmu)
-{
-	size_t t;
+	unsigned long chunk, nr_pages_left = mmu->nr_pages;
 
 #ifdef CONFIG_DMA_SHARED_BUFFER
 	if (mmu->dma_buf) {
@@ -273,71 +219,127 @@ static void mmu_release(struct tee_mmu *mmu)
 #endif
 
 	/* Release all locked user space pages */
-	for (t = 0; t < mmu->l2_tables_nr; t++) {
-		union l2_table *l2_table = &mmu->l2_tables[t];
+	for (chunk = 0; chunk < mmu->nr_pmd_entries; chunk++) {
+		union mmu_table *pte_table = &mmu->pte_tables[chunk];
+		unsigned long nr_pages = nr_pages_left;
 
-		if (!l2_table->page)
+		if (nr_pages > PTE_ENTRIES_MAX)
+			nr_pages = PTE_ENTRIES_MAX;
+
+		nr_pages_left -= nr_pages;
+
+		if (!pte_table->page)
 			break;
 
-		if (mmu->user) {
-			u64 *pte64 = l2_table->ptes_64;
-			u32 *pte32 = l2_table->ptes_32;
+		if (mmu->user && mmu->use_pages_and_vas) {
+			struct page **page = pte_table->pages;
+			int i;
+
+			for (i = 0; i < nr_pages; i++, page++)
+				put_page(*page);
+
+			mmu->pages_locked -= nr_pages;
+		} else if (mmu->user) {
+			u64 *pte64 = pte_table->entries;
 			pte_t pte;
 			int i;
 
-			for (i = 0; i < L2_ENTRIES_MAX; i++) {
+			for (i = 0; i < nr_pages; i++) {
 #if (KERNEL_VERSION(4, 7, 0) > LINUX_VERSION_CODE) || defined(CONFIG_ARM)
 				{
-					if (g_ctx.f_lpae)
-						pte = *pte64++;
-					else
-						pte = *pte32++;
+					pte = *pte64++;
+					/* Unused entries are 0 */
+					if (!pte)
+						break;
 				}
-
-				/* Unused entries are 0 */
-				if (!pte)
-					break;
 #else
 				{
-					if (g_ctx.f_lpae)
-						pte.pte = *pte64++;
-					else
-						pte.pte = *pte32++;
+					pte.pte = *pte64++;
+					/* Unused entries are 0 */
+					if (!pte.pte)
+						break;
 				}
-
-				/* Unused entries are 0 */
-				if (!pte.pte)
-					break;
 #endif
 
 				/* pte_page() cannot return NULL */
 				put_page(pte_page(pte));
-				mmu->pages_locked--;
 			}
+
+			mmu->pages_locked -= nr_pages;
 		}
 
-		free_page(l2_table->page);
+		free_page(pte_table->page);
 		mmu->pages_created--;
 	}
 
-	if (mmu->l1_l2_table.page) {
-		free_page(mmu->l1_l2_table.page);
-		mmu->pages_created--;
-	}
-
-	if (mmu->l1_table.page) {
-		free_page(mmu->l1_table.page);
+	if (mmu->pmd_table.page) {
+		free_page(mmu->pmd_table.page);
 		mmu->pages_created--;
 	}
 
 	if (mmu->pages_created || mmu->pages_locked)
-		mc_dev_err("leak detected: still in use %d, still locked %d",
+		mc_dev_err(-EUCLEAN,
+			   "leak detected: still in use %d, still locked %d",
 			   mmu->pages_created, mmu->pages_locked);
+
+	if (mmu->deleter)
+		mmu->deleter->delete(mmu->deleter->object);
 
 	kfree(mmu);
 
 	/* Decrement debug counter */
 	atomic_dec(&g_ctx.c_mmus);
+}
+
+static struct tee_mmu *tee_mmu_create_common(const struct mcp_buffer_map *b_map)
+{
+	struct tee_mmu *mmu;
+	int ret = -ENOMEM;
+
+	if (b_map->nr_pages > (PMD_ENTRIES_MAX * PTE_ENTRIES_MAX)) {
+		ret = -EINVAL;
+		mc_dev_err(ret, "data mapping exceeds %d pages: %lu",
+			   PMD_ENTRIES_MAX * PTE_ENTRIES_MAX, b_map->nr_pages);
+		return ERR_PTR(ret);
+	}
+
+	/* Allocate the struct */
+	mmu = kzalloc(sizeof(*mmu), GFP_KERNEL);
+	if (!mmu)
+		return ERR_PTR(-ENOMEM);
+
+	/* Increment debug counter */
+	atomic_inc(&g_ctx.c_mmus);
+	kref_init(&mmu->kref);
+
+	/* The Xen front-end does not use PTEs */
+	if (protocol_fe_uses_pages_and_vas())
+		mmu->use_pages_and_vas = true;
+
+	/* Buffer info */
+	mmu->offset = b_map->offset;
+	mmu->length = b_map->length;
+	mmu->flags = b_map->flags;
+
+	/* Pages info */
+	mmu->nr_pages = b_map->nr_pages;
+	mmu->nr_pmd_entries = (mmu->nr_pages + PTE_ENTRIES_MAX - 1) /
+			    PTE_ENTRIES_MAX;
+	mc_dev_devel("mmu->nr_pages %lu num_ptes_pages %zu",
+		     mmu->nr_pages, mmu->nr_pmd_entries);
+
+	/* Allocate a page for the L1 table, always used for DomU */
+	mmu->pmd_table.page = get_zeroed_page(GFP_KERNEL);
+	if (!mmu->pmd_table.page)
+		goto end;
+
+	mmu->pages_created++;
+
+	return mmu;
+
+end:
+	tee_mmu_delete(mmu);
+	return ERR_PTR(ret);
 }
 
 static bool mmu_get_dma_buffer(struct tee_mmu *mmu, int va)
@@ -379,17 +381,20 @@ struct tee_mmu *tee_mmu_create(struct mm_struct *mm,
 	struct tee_mmu	*mmu;
 	const void	*data = (const void *)(uintptr_t)buf->va;
 	const void	*reader = (const void *)((uintptr_t)data & PAGE_MASK);
-	struct page	**pages;	/* Same as above, conveniently typed */
+	struct page	**pages;	/* Same as below, conveniently typed */
 	unsigned long	pages_page = 0;	/* Page to contain the page pointers */
-	size_t		chunk;
-	unsigned long	total_pages_nr;
-	int		l1_entries_max;
+	unsigned long	chunk;
+	struct mcp_buffer_map b_map = {
+		.offset = (u32)(buf->va & ~PAGE_MASK),
+		.length = buf->len,
+		.flags = buf->flags,
+	};
+	bool		writeable = buf->flags & MC_IO_MAP_OUTPUT;
 	int		ret = 0;
-	int		write = (buf->flags & MC_IO_MAP_OUTPUT) != 0;
 
 #ifndef CONFIG_DMA_SHARED_BUFFER
 	if (buf->flags & MMU_ION_BUF) {
-		mc_dev_err("ION buffers not supported by kernel");
+		mc_dev_err(-EINVAL, "ION buffers not supported by kernel");
 		return ERR_PTR(-EINVAL);
 	}
 #endif
@@ -398,51 +403,32 @@ struct tee_mmu *tee_mmu_create(struct mm_struct *mm,
 	if (!(buf->flags & MMU_ION_BUF) && !buf->va)
 		return ERR_PTR(-EINVAL);
 
+	if (buf->flags & MMU_ION_BUF)
+		/* buf->va is not a valid address. ION buffers are aligned */
+		b_map.offset = 0;
+
 	/* Allocate the struct */
-	mmu = kzalloc(sizeof(*mmu), GFP_KERNEL);
-	if (!mmu)
-		return ERR_PTR(-ENOMEM);
+	b_map.nr_pages = PAGE_ALIGN(b_map.offset + b_map.length) / PAGE_SIZE;
+	/* Allow Registered Shared mem with valid pointer and zero size. */
+	if (!b_map.nr_pages)
+		b_map.nr_pages = 1;
 
-	/* Increment debug counter */
-	atomic_inc(&g_ctx.c_mmus);
+	mmu = tee_mmu_create_common(&b_map);
+	if (IS_ERR(mmu))
+		return mmu;
 
-	/* Check that we have enough space to map data */
-	mmu->length = buf->len;
 	if (buf->flags & MMU_ION_BUF) {
+		mc_dev_devel("Buffer is ION");
 		/* Buffer is ION -
 		 * va is the client's dma_buf fd, which should be converted
 		 * to a struct sg_table * directly.
 		 */
 		if (!mmu_get_dma_buffer(mmu, buf->va)) {
-			mc_dev_err("mmu_get_dma_buffer failed");
+			mc_dev_err(ret, "mmu_get_dma_buffer failed");
 			ret = -EINVAL;
 			goto end;
 		}
-
-		mmu->offset = (u32)(mmu->sgt->sgl->offset & ~PAGE_MASK);
-	} else {
-		mmu->offset = (u32)((uintptr_t)data & ~PAGE_MASK);
 	}
-
-	total_pages_nr = PAGE_ALIGN(mmu->offset + mmu->length) / PAGE_SIZE;
-	if (g_ctx.f_mem_ext)
-		l1_entries_max = L1_ENTRIES_MAX;
-	else
-		l1_entries_max = 1;
-
-	if (total_pages_nr > (l1_entries_max * L2_ENTRIES_MAX)) {
-		mc_dev_err("data mapping exceeds %d pages",
-			   l1_entries_max * L2_ENTRIES_MAX);
-		ret = -EINVAL;
-		goto end;
-	}
-
-	/* Get number of L2 tables needed */
-	mmu->l2_tables_nr = (total_pages_nr + L2_ENTRIES_MAX - 1) /
-			    L2_ENTRIES_MAX;
-	mc_dev_devel("total_pages_nr %lu l2_tables_nr %zu",
-		     total_pages_nr, mmu->l2_tables_nr);
-
 	/* Get a page to store page pointers */
 	pages_page = get_zeroed_page(GFP_KERNEL);
 	if (!pages_page) {
@@ -452,73 +438,37 @@ struct tee_mmu *tee_mmu_create(struct mm_struct *mm,
 	mmu->pages_created++;
 
 	pages = (struct page **)pages_page;
-
-	/* Allocate a page for the L1 table */
-	if (mmu->l2_tables_nr > 1) {
-		mmu->l1_table.page = get_zeroed_page(GFP_KERNEL);
-		if (!mmu->l1_table.page) {
-			ret = -ENOMEM;
-			goto end;
-		}
-		mmu->pages_created++;
-
-		mmu->l1_l2_table.page = get_zeroed_page(GFP_KERNEL);
-		if (!mmu->l1_l2_table.page) {
-			ret = -ENOMEM;
-			goto end;
-		}
-		mmu->pages_created++;
-
-		/* Map it */
-		if (g_ctx.f_lpae) {
-			u64 *pte;
-
-			pte = &mmu->l1_l2_table.ptes_64[0];
-			*pte = virt_to_phys(mmu->l1_table.pages_phys);
-			*pte |= get_pte_flags_64(write);
-		} else {
-			u32 *pte;
-
-			pte = &mmu->l1_l2_table.ptes_32[0];
-			*pte = virt_to_phys(mmu->l1_table.pages_phys);
-			*pte |= get_pte_flags_32(write);
-		}
-	}
-
-	for (chunk = 0; chunk < mmu->l2_tables_nr; chunk++) {
-		unsigned long pages_nr, i;
-		struct page **page_ptr;
+	for (chunk = 0; chunk < mmu->nr_pmd_entries; chunk++) {
+		unsigned long nr_pages;
+		int i;
 
 		/* Size to map for this chunk */
-		if (chunk == (mmu->l2_tables_nr - 1))
-			pages_nr = ((total_pages_nr - 1) % L2_ENTRIES_MAX) + 1;
+		if (chunk == (mmu->nr_pmd_entries - 1))
+			nr_pages = ((mmu->nr_pages - 1) % PTE_ENTRIES_MAX) + 1;
 		else
-			pages_nr = L2_ENTRIES_MAX;
+			nr_pages = PTE_ENTRIES_MAX;
 
-		/* Allocate a page for the MMU descriptor */
-		mmu->l2_tables[chunk].page = get_zeroed_page(GFP_KERNEL);
-		if (!mmu->l2_tables[chunk].page) {
+		/* Allocate a page to hold ptes that describe buffer pages */
+		mmu->pte_tables[chunk].page = get_zeroed_page(GFP_KERNEL);
+		if (!mmu->pte_tables[chunk].page) {
 			ret = -ENOMEM;
 			goto end;
 		}
 		mmu->pages_created++;
 
-		/* Add page address to L1 table if needed */
-		if (mmu->l1_table.page) {
-			void *table;
-
-			if (g_ctx.f_lpae)
-				table = mmu->l2_tables[chunk].ptes_64;
-			else
-				table = mmu->l2_tables[chunk].ptes_32;
-
-			mmu->l1_table.pages_phys[chunk] = virt_to_phys(table);
-		}
+		/* Add page address to pmd table if needed */
+		if (mmu->use_pages_and_vas)
+			mmu->pmd_table.vas[chunk] =
+				mmu->pte_tables[chunk].page;
+		else
+			mmu->pmd_table.entries[chunk] =
+			       virt_to_phys(mmu->pte_tables[chunk].addr);
 
 		/* Get pages */
 		if (mmu->dma_buf) {
 			/* Buffer is ION */
 			struct sg_mapping_iter miter;
+			struct page **page_ptr;
 
 			page_ptr = &pages[0];
 			sg_miter_start(&miter, mmu->sgt->sgl,
@@ -533,96 +483,79 @@ struct tee_mmu *tee_mmu_create(struct mm_struct *mm,
 
 			/* Buffer was allocated in user space */
 			down_read(&mm->mmap_sem);
+			/*
+			 * Always try to map read/write from a Linux PoV, so
+			 * Linux creates (page faults) the underlying pages if
+			 * missing.
+			 */
 			gup_ret = gup_local_repeat(mm, (uintptr_t)reader,
-						   pages_nr, 1, pages);
-			if ((gup_ret == -EFAULT) && !write) {
+						   nr_pages, 1, pages);
+			if ((gup_ret == -EFAULT) && !writeable) {
+				/*
+				 * If mapping read/write fails, and the buffer
+				 * is to be shared as input only, try to map
+				 * again read-only.
+				 */
 				gup_ret = gup_local_repeat(mm,
 							   (uintptr_t)reader,
-							   pages_nr, 0, pages);
+							   nr_pages, 0, pages);
 			}
 			up_read(&mm->mmap_sem);
 			if (gup_ret < 0) {
 				ret = gup_ret;
-				mc_dev_err("failed to get user pages @%p: %d",
-					   reader, ret);
+				mc_dev_err(ret, "failed to get user pages @%p",
+					   reader);
 				goto end;
 			}
 
 			/* check if we could lock all pages. */
-			if (gup_ret != pages_nr) {
-				mc_dev_err("failed to get user pages: %ld",
-					   gup_ret);
+			if (gup_ret != nr_pages) {
+				mc_dev_err((int)gup_ret,
+					   "failed to get user pages");
+#if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
 				release_pages(pages, gup_ret, 0);
+#else
+				release_pages(pages, gup_ret);
+#endif
 				ret = -EINVAL;
 				goto end;
 			}
 
-			reader += pages_nr * PAGE_SIZE;
+			reader += nr_pages * PAGE_SIZE;
 			mmu->user = true;
-			mmu->pages_locked += pages_nr;
+			mmu->pages_locked += nr_pages;
 		} else if (is_vmalloc_addr(data)) {
 			/* Buffer vmalloc'ed in kernel space */
-			page_ptr = &pages[0];
-			for (i = 0; i < pages_nr; i++) {
+			for (i = 0; i < nr_pages; i++) {
 				struct page *page = vmalloc_to_page(reader);
 
 				if (!page) {
-					mc_dev_err("failed to map address");
 					ret = -EINVAL;
+					mc_dev_err(ret,
+						   "failed to map address");
 					goto end;
 				}
 
-				*page_ptr++ = page;
+				pages[i] = page;
 				reader += PAGE_SIZE;
 			}
 		} else {
 			/* Buffer kmalloc'ed in kernel space */
 			struct page *page = virt_to_page(reader);
 
-			reader += pages_nr * PAGE_SIZE;
-			page_ptr = &pages[0];
-			for (i = 0; i < pages_nr; i++)
-				*page_ptr++ = page++;
+			reader += nr_pages * PAGE_SIZE;
+			for (i = 0; i < nr_pages; i++)
+				pages[i] = page++;
 		}
 
-		/* Create MMU Table entries */
-		page_ptr = &pages[0];
-
-		/*
-		 * Create MMU table entry, see ARM MMU docu for details about
-		 * flags stored in the lowest 12 bits.  As a side reference, the
-		 * Article "ARM's multiply-mapped memory mess" found in the
-		 * collection at http://lwn.net/Articles/409032/ is also worth
-		 * reading.
-		 */
-		if (g_ctx.f_lpae) {
-			u64 *pte = &mmu->l2_tables[chunk].ptes_64[0];
-
-			for (i = 0; i < pages_nr; i++, page_ptr++, pte++) {
-				*pte = page_to_phys(*page_ptr);
-				if (mmu->dma_buf)
-					*pte |= get_pte_flags_64_dma(write);
-				else
-					*pte |= get_pte_flags_64(write);
-			}
+		/* Create Table of physical addresses*/
+		if (mmu->use_pages_and_vas) {
+			memcpy(mmu->pte_tables[chunk].pages, pages,
+			       nr_pages * sizeof(*pages));
 		} else {
-			u32 *pte = &mmu->l2_tables[chunk].ptes_32[0];
-
-			for (i = 0; i < pages_nr; i++, page_ptr++, pte++) {
-				unsigned long phys = page_to_phys(*page_ptr);
-#if defined CONFIG_ARM64
-				if (phys & 0xffffffff00000000UL) {
-					mc_dev_err("64-bit pointer: 0x%16lx",
-						   phys);
-					ret = -EFAULT;
-					goto end;
-				}
-#endif
-				*pte = (u32)phys;
-				if (mmu->dma_buf)
-					*pte |= get_pte_flags_32_dma(write);
-				else
-					*pte |= get_pte_flags_32(write);
+			for (i = 0; i < nr_pages; i++) {
+				mmu->pte_tables[chunk].entries[i] =
+						page_to_phys(pages[i]);
 			}
 		}
 	}
@@ -634,67 +567,142 @@ end:
 	}
 
 	if (ret) {
-		mmu_release(mmu);
+		tee_mmu_delete(mmu);
 		return ERR_PTR(ret);
 	}
 
-	mc_dev_devel("created mmu %p: %s va %llx len %u off %u L%d table %lx",
-		     mmu, mmu->user ? "user" : "kernel", buf->va, mmu->length,
-		     mmu->offset, mmu->l1_table.page ? 1 : 2,
-		     mmu_table_pointer(mmu));
+	mc_dev_devel(
+		"created mmu %p: %s va %llx len %u off %u flg %x pmd table %lx",
+		mmu, mmu->user ? "user" : "kernel", buf->va, mmu->length,
+		mmu->offset, mmu->flags, mmu->pmd_table.page);
 	return mmu;
 }
 
-void tee_mmu_delete(struct tee_mmu *mmu)
+struct tee_mmu *tee_mmu_wrap(struct tee_deleter *deleter, struct page **pages,
+			     const struct mcp_buffer_map *b_map)
 {
-	if (!mmu)
-		return;
+	int ret = -EINVAL;
+#ifdef CONFIG_XEN
+	struct tee_mmu *mmu;
+	unsigned long chunk, nr_pages_left;
 
-	mc_dev_devel("free mmu %p: %s len %u off %u L%d table %lx",
+	/* Allocate the struct */
+	mmu = tee_mmu_create_common(b_map);
+	if (IS_ERR(mmu))
+		return mmu;
+
+	nr_pages_left = mmu->nr_pages;
+	for (chunk = 0; chunk < mmu->nr_pmd_entries; chunk++) {
+		unsigned long nr_pages = nr_pages_left;
+		u64 *pte;
+		int i;
+
+		if (nr_pages > PTE_ENTRIES_MAX)
+			nr_pages = PTE_ENTRIES_MAX;
+
+		nr_pages_left -= nr_pages;
+
+		/* Allocate a page to hold ptes that describe buffer pages */
+		mmu->pte_tables[chunk].page = get_zeroed_page(GFP_KERNEL);
+		if (!mmu->pte_tables[chunk].page) {
+			ret = -ENOMEM;
+			goto err;
+		}
+		mmu->pages_created++;
+
+		/* Add page address to pmd table if needed */
+		mmu->pmd_table.entries[chunk] =
+			virt_to_phys(mmu->pte_tables[chunk].addr);
+
+		/* Convert to PTEs */
+		pte = &mmu->pte_tables[chunk].entries[0];
+
+		for (i = 0; i < nr_pages; i++, pages++, pte++) {
+			unsigned long phys;
+			unsigned long pfn;
+
+			phys = page_to_phys(*pages);
+#if defined CONFIG_ARM64
+			phys &= PHYS_48BIT_MASK;
+#endif
+			pfn = PFN_DOWN(phys);
+			*pte = __pfn_to_mfn(pfn) << PAGE_SHIFT;
+		}
+	}
+
+	mmu->deleter = deleter;
+	mc_dev_devel("wrapped mmu %p: len %u off %u flg %x pmd table %lx",
+		     mmu, mmu->length, mmu->offset, mmu->flags,
+		     mmu->pmd_table.page);
+	return mmu;
+
+err:
+	tee_mmu_delete(mmu);
+#endif
+	return ERR_PTR(ret);
+}
+
+void tee_mmu_set_deleter(struct tee_mmu *mmu, struct tee_deleter *deleter)
+{
+	mmu->deleter = deleter;
+}
+
+static void tee_mmu_release(struct kref *kref)
+{
+	struct tee_mmu *mmu = container_of(kref, struct tee_mmu, kref);
+
+	mc_dev_devel("free mmu %p: %s len %u off %u pmd table %lx",
 		     mmu, mmu->user ? "user" : "kernel", mmu->length,
-		     mmu->offset, mmu->l1_table.page ? 1 : 2,
-		     mmu_table_pointer(mmu));
-	mmu_release(mmu);
+		     mmu->offset, mmu->pmd_table.page);
+	tee_mmu_delete(mmu);
 }
 
-bool client_mmu_matches(const struct tee_mmu *left,
-			const struct tee_mmu *right)
+void tee_mmu_get(struct tee_mmu *mmu)
 {
-	const void *left_page = left->l2_tables[0].ptes_32;
-	const void *right_page = right->l2_tables[0].ptes_32;
-	bool ret;
-
-	/* L1 not supported */
-	if (left->l1_table.page || right->l1_table.page)
-		return false;
-
-	/* Only need to compare contents of L2 page */
-	ret = !memcmp(left_page, right_page, PAGE_SIZE);
-	mc_dev_devel("MMU tables virt %p and %p %smatch", left, right,
-		     ret ? "" : "do not ");
-	return ret;
+	kref_get(&mmu->kref);
 }
 
-void tee_mmu_buffer(const struct tee_mmu *mmu, struct mcp_buffer_map *map)
+void tee_mmu_put(struct tee_mmu *mmu)
 {
-	uintptr_t table = mmu_table_pointer(mmu);
+	kref_put(&mmu->kref, tee_mmu_release);
+}
 
-	map->phys_addr = virt_to_phys((void *)table);
+void tee_mmu_buffer(struct tee_mmu *mmu, struct mcp_buffer_map *map)
+{
+	if (mmu->use_pages_and_vas)
+		map->addr = mmu->pmd_table.page;
+	else
+		map->addr = virt_to_phys(mmu->pmd_table.addr);
+
 	map->secure_va = 0;
 	map->offset = mmu->offset;
 	map->length = mmu->length;
-	map->flags = MC_IO_MAP_INPUT | MC_IO_MAP_OUTPUT;
-	if (mmu->l1_table.page)
-		map->type = WSM_L1;
-	else
-		map->type = WSM_L2;
+	map->nr_pages = mmu->nr_pages;
+	map->flags = mmu->flags;
+	map->type = WSM_L1;
+#ifdef CONFIG_DMA_SHARED_BUFFER
+	if (mmu->dma_buf) {
+		/* ION */
+#if KERNEL_VERSION(3, 14, 0) < LINUX_VERSION_CODE
+		if (!(((struct ion_buffer *)mmu->dma_buf->priv)->flags
+		   & ION_FLAG_CACHED)) {
+			map->type |= WSM_UNCACHED;
+			mc_dev_devel("ION buffer Non cacheable");
+		} else {
+			mc_dev_devel("ION buffer cacheable");
+		}
+#else
+		map->type |= WSM_UNCACHED;
+#endif
+	}
+#endif
+	map->mmu = mmu;
 }
 
 int tee_mmu_debug_structs(struct kasnprintf_buf *buf, const struct tee_mmu *mmu)
 {
 	return kasnprintf(buf,
-			  "\t\t\tmmu %pK: %s len %u off %u table %pK type L%d\n"
-			  , mmu, mmu->user ? "user" : "kernel", mmu->length,
-			  mmu->offset, (void *)mmu_table_pointer(mmu),
-			  mmu->l1_table.page ? 1 : 2);
+			  "\t\t\tmmu %pK: %s len %u off %u table %pK\n",
+			  mmu, mmu->user ? "user" : "kernel", mmu->length,
+			  mmu->offset, (void *)mmu->pmd_table.page);
 }

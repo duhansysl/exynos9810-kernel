@@ -65,8 +65,6 @@ unsigned long __stack_chk_guard __read_mostly;
 EXPORT_SYMBOL(__stack_chk_guard);
 #endif
 
-int do_not_show_extra;
-
 /*
  * Function pointers to optional machine specific functions
  */
@@ -178,6 +176,10 @@ void machine_restart(char *cmd)
 	while (1);
 }
 
+#ifdef CONFIG_SEC_DEBUG_AVOID_UNNECESSARY_TRAP
+extern unsigned long long incorrect_addr;
+#endif
+
 /*
  * dump a block of kernel memory from around the given address
  */
@@ -185,20 +187,27 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 {
 	int	i, j;
 	int	nlines;
+#ifdef CONFIG_SEC_DEBUG_AVOID_UNNECESSARY_TRAP
+	int	nbytes_offset = nbytes;
+#endif
 	u32	*p;
 
 	/*
 	 * don't attempt to dump non-kernel addresses or
 	 * values that are probably just small negative numbers
 	 */
-	if (addr < PAGE_OFFSET || addr >= -256UL) {
+	if (addr < PAGE_OFFSET || addr > -256UL) {
 		/*
 		 * If kaslr is enabled, Kernel code is able to
 		 * locate in VMALLOC address.
 		 */
-		if (addr < (unsigned long)KERNEL_START ||
-		    addr > (unsigned long)KERNEL_END)
+		if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+			if (addr < (unsigned long)KERNEL_START ||
+			    addr > (unsigned long)KERNEL_END)
+				return;
+		} else {
 			return;
+		}
 	}
 
 	printk("\n%s: %#lx:\n", name, addr);
@@ -220,7 +229,18 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 		printk("%04lx :", (unsigned long)p & 0xffff);
 		for (j = 0; j < 8; j++) {
 			u32	data;
+
+#ifdef CONFIG_SEC_DEBUG_AVOID_UNNECESSARY_TRAP
+			if ((incorrect_addr != 0) && (((unsigned long long)p >= (incorrect_addr - nbytes_offset)) && ((unsigned long long)p <= (incorrect_addr + nbytes_offset)))) {
+				if (j == 7)
+					pr_cont(" ********\n");
+				else
+					pr_cont(" ********");
+			}
+			else if (probe_kernel_address(p, data)) {
+#else
 			if (probe_kernel_address(p, data)) {
+#endif
 				if (j == 7)
 					pr_cont(" ********\n");
 				else
@@ -304,8 +324,8 @@ void __show_regs(struct pt_regs *regs)
 
 		pr_cont("\n");
 	}
-	if (!user_mode(regs) && !do_not_show_extra)
-		show_extra_register_data(regs, 256);
+	if (!user_mode(regs))
+		show_extra_register_data(regs, 128);
 	printk("\n");
 }
 

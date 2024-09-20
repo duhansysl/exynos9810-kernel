@@ -114,10 +114,10 @@ void uh_fault_handler(void)
 	pr_alert("FAR_EL2: %llx\tELR_EL2: %llx\n", uh_handler_data->far_el2,
 		 uh_handler_data->elr_el2);
 
-	do_not_show_extra = 1;
+	//do_not_show_extra = 1;
 	memcpy(&kregs, &uh_handler_data->regs, sizeof(struct uh_registers));
 	__show_regs(&kregs);
-	do_not_show_extra = 0;	
+	//do_not_show_extra = 0;
 	panic("uH Fault handler : %s", exception_class_string[exception_class]);
 }
 

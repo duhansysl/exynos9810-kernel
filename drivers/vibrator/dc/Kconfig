@@ -1,0 +1,10 @@
+#
+#
+#
+config DC_VIBRATOR
+	tristate "SEC DC Vibrator"
+	default n
+	help
+	  If you say yes here you will get support for the
+	  SEC DC Vibrator.
+

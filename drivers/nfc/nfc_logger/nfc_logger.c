@@ -18,6 +18,7 @@
 #include <linux/proc_fs.h>
 #include <linux/time.h>
 #include <linux/uaccess.h>
+//#include <linux/sched/clock.h>
 
 #include "nfc_logger.h"
 
@@ -146,13 +147,13 @@ int nfc_logger_init(void)
 
 	entry = proc_create(PROC_FILE_NAME, 0444, NULL, &nfc_logger_ops);
 	if (!entry) {
-		pr_err("%s: failed to create proc entry\n", __func__);
+		NFC_LOG_ERR("%s: failed to create proc entry\n", __func__);
 		return 0;
 	}
 
 	proc_set_size(entry, BUF_SIZE);
 	is_nfc_logger_init = 1;
-	nfc_logger_print("nfc logger init ok\n");
+	NFC_LOG_INFO("nfc logger init ok\n");
 
 	return 0;
 }

@@ -403,16 +403,6 @@ static ssize_t adc_ctrl1_store(struct device *dev, struct device_attribute *attr
 	return count;
 }
 
-#ifdef CONFIG_SEC_PM
-static ssize_t adc_validity_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	u8 adc_validity;
-
-	s2dos05_read_reg(adc_meter1->i2c, S2DOS05_REG_OCL, &adc_validity);
-	return snprintf(buf, PAGE_SIZE, "%d\n", (adc_validity >> 7));
-}
-#endif /* CONFIG_SEC_PM */
-
 static DEVICE_ATTR(adc_val_all, 0444, adc_val_all_show, NULL);
 static DEVICE_ATTR(adc_en, 0644, adc_en_show, adc_en_store);
 static DEVICE_ATTR(adc_mode, 0644, adc_mode_show, adc_mode_store);
@@ -426,9 +416,6 @@ static DEVICE_ATTR(adc_val_5, 0444, adc_val_5_show, NULL);
 static DEVICE_ATTR(adc_val_6, 0444, adc_val_6_show, NULL);
 static DEVICE_ATTR(adc_val_7, 0444, adc_val_7_show, NULL);
 static DEVICE_ATTR(adc_ctrl1, 0644, adc_ctrl1_show, adc_ctrl1_store);
-#ifdef CONFIG_SEC_PM
-static DEVICE_ATTR(adc_validity, 0444, adc_validity_show, NULL);
-#endif /* CONFIG_SEC_PM */
 
 void s2dos05_powermeter_init(struct s2dos05_dev *s2dos05)
 {
@@ -538,31 +525,10 @@ void s2dos05_powermeter_init(struct s2dos05_dev *s2dos05)
 	ret = device_create_file(s2dos05_adc_dev, &dev_attr_adc_ctrl1);
 	if (ret)
 		goto remove_adc_val_7;
-#ifdef CONFIG_SEC_PM
-	ret = device_create_file(s2dos05_adc_dev, &dev_attr_adc_validity);
-	if (ret)
-		goto remove_adc_ctrl1;
-
-	if (!IS_ERR_OR_NULL(sec_disp_pmic_dev)) {
-		ret = sysfs_create_link(&sec_disp_pmic_dev->kobj,
-				&s2dos05_adc_dev->kobj, "power_meter");
-		if (ret) {
-			pr_err("%s: fail to create link for power_meter\n",
-					__func__);
-			goto remove_adc_validity;
-		}
-	}
-#endif /* CONFIG_SEC_PM */
 
 	pr_info("%s: s2dos05 power meter init end\n", __func__);
 	return;
 
-#ifdef CONFIG_SEC_PM
-remove_adc_validity:
-	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_validity);
-remove_adc_ctrl1:
-	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_ctrl1);
-#endif /* CONFIG_SEC_PM */
 remove_adc_val_7:
 	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_val_7);
 remove_adc_val_6:
@@ -608,9 +574,6 @@ void s2dos05_powermeter_deinit(struct s2dos05_dev *s2dos05)
 	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_val_6);
 	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_val_7);
 	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_ctrl1);
-#ifdef CONFIG_SEC_PM
-	device_remove_file(s2dos05_adc_dev, &dev_attr_adc_validity);
-#endif /* CONFIG_SEC_PM */
 
 	/* ADC turned off */
 	s2dos05_write_reg(s2dos05->i2c, S2DOS05_REG_PWRMT_CTRL2, 0);

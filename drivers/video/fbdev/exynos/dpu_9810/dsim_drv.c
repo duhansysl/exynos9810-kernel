@@ -27,6 +27,8 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/exynos-ss.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 #include <video/mipi_display.h>
 #include <soc/samsung/cal-if.h>
 #include <dt-bindings/clock/exynos9810.h>
@@ -34,8 +36,17 @@
 #include <linux/exynos_iovmm.h>
 #endif
 
+#include <linux/of_reserved_mem.h>
+#include "../../../../../mm/internal.h"
+
 #include "decon.h"
 #include "dsim.h"
+
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+#include "decon_board.h"
+#include "panels/dsim_panel.h"
+#include "panels/dd.h"
+#endif
 
 int dsim_log_level = 6;
 
@@ -58,39 +69,55 @@ static char *dsim_state_names[] = {
 static int dsim_runtime_suspend(struct device *dev);
 static int dsim_runtime_resume(struct device *dev);
 
+#define PREFIX_LEN      40
+#define ROW_LEN         32
+static void dsim_print_hex_dump(void __iomem *regs, const void *buf, size_t len)
+{
+	char prefix_buf[PREFIX_LEN];
+	unsigned long p;
+	int i, row;
+
+	for (i = 0; i < len; i += ROW_LEN) {
+		p = buf - regs + i;
+
+		if (len - i < ROW_LEN)
+			row = len - i;
+		else
+			row = ROW_LEN;
+
+		snprintf(prefix_buf, sizeof(prefix_buf), "[%08lX] ", p);
+		print_hex_dump(KERN_NOTICE, prefix_buf, DUMP_PREFIX_NONE,
+				32, 4, buf + i, row, false);
+	}
+}
+
 static void __dsim_dump(struct dsim_device *dsim)
 {
 	/* change to updated register read mode (meaning: SHADOW in DECON) */
 	dsim_info("=== DSIM %d LINK SFR DUMP ===\n", dsim->id);
 	dsim_reg_enable_shadow_read(dsim->id, 0);
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-			dsim->res.regs, 0xFC, false);
+	dsim_print_hex_dump(dsim->res.regs, dsim->res.regs + 0x0000, 0xFC);
 
 #if defined(CONFIG_SOC_EXYNOS9810)
 	dsim_info("=== DSIM %d DPHY SFR DUMP ===\n", dsim->id);
 	/* DPHY dump */
 	/* PMSK */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x0c00, 0x40, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x0c00, 0x40);
+
 	/* CLOCK lane */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x1080, 0x40, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x1080, 0x40);
 
 	/* Data lane : D0 */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x1480, 0x30, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x1480, 0x30);
 
 	/* Data lane : D1 */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x1880, 0x30, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x1880, 0x30);
 
 	/* Data lane : D2 */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x1C80, 0x30, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x1c80, 0x30);
 
 	/* Data lane : D3 */
-	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
-		dsim->res.phy_regs + 0x2080, 0x30, false);
+	dsim_print_hex_dump(dsim->res.phy_regs, dsim->res.phy_regs + 0x2080, 0x30);
 #endif
 
 	/* restore to avoid size mismatch (possible config error at DECON) */
@@ -99,11 +126,23 @@ static void __dsim_dump(struct dsim_device *dsim)
 
 static void dsim_dump(struct dsim_device *dsim)
 {
-	dsim_info("=== DSIM SFR DUMP ===\n");
-	__dsim_dump(dsim);
+	u32 i = 0, max_dsim = 1;
+	struct decon_device *decon = get_decon_drvdata(0);
+	struct dsim_device *d;
 
-	/* Show panel status */
-	call_panel_ops(dsim, dump, dsim);
+	if (decon)
+		max_dsim = (decon->dt.dsi_mode == DSI_MODE_DUAL_DSI) ? 2 : 1;
+
+	for (i = 0; i < max_dsim; i++) {
+		d = get_dsim_drvdata(i);
+		if (!d)
+			continue;
+
+		dsim_info("=== DSIM%d SFR DUMP ===\n", dsim->id);
+		__dsim_dump(d);
+		/* Show panel status */
+		call_panel_ops(d, dump, d);
+	}
 }
 
 static void dsim_long_data_wr(struct dsim_device *dsim, unsigned long d0, u32 d1)
@@ -232,11 +271,139 @@ static bool dsim_fifo_empty_needed(struct dsim_device *dsim, unsigned int data_i
 	return false;
 }
 
+#if defined(CONFIG_EXYNOS_DUAL_DSI)
+int dsim_write_data_dual(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1)
+{
+	int ret0 = 0;
+	int ret1 = 0;
+	bool must_wait0 = true;
+	bool must_wait1 = true;
+	struct decon_device *decon = get_decon_drvdata(0);
+	struct dsim_device *dsim0 = get_dsim_drvdata(0);
+	struct dsim_device *dsim1 = get_dsim_drvdata(1);
+
+	if (!dsim0 || !dsim1)
+		return 0;
+
+	if (!dsim0->priv.lcdconnected)
+		return 0;
+
+	decon_hiber_block_exit(decon);
+
+	mutex_lock(&dsim0->cmd_lock);
+	mutex_lock(&dsim1->cmd_lock);
+	if (!IS_DSIM_ON_STATE(dsim0) || !IS_DSIM_ON_STATE(dsim1)) {
+		dsim_err("DSIM is not ready. D0.state(%d) D1.state(%d)\n",
+				dsim0->state, dsim1->state);
+		ret0 = -EINVAL;
+		goto err_exit;
+	}
+	DPU_EVENT_LOG_CMD(&dsim0->sd, id, d0);
+	dsim_write_data_dump(dsim0, id, d0, d1);
+	DPU_EVENT_LOG_CMD(&dsim1->sd, id, d0);
+	dsim_write_data_dump(dsim1, id, d0, d1);
+
+	reinit_completion(&dsim0->ph_wr_comp);
+	dsim_reg_clear_int(dsim0->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
+	reinit_completion(&dsim1->ph_wr_comp);
+	dsim_reg_clear_int(dsim1->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
+
+	/* Run write-fail dectector */
+	mod_timer(&dsim0->cmd_timer, jiffies + MIPI_WR_TIMEOUT);
+	mod_timer(&dsim1->cmd_timer, jiffies + MIPI_WR_TIMEOUT);
+
+	switch (id) {
+	/* short packet types of packet types for command. */
+	case MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM:
+	case MIPI_DSI_GENERIC_SHORT_WRITE_1_PARAM:
+	case MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM:
+	case MIPI_DSI_DCS_SHORT_WRITE:
+	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
+	case MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE:
+	case MIPI_DSI_DSC_PRA:
+	case MIPI_DSI_COLOR_MODE_OFF:
+	case MIPI_DSI_COLOR_MODE_ON:
+	case MIPI_DSI_SHUTDOWN_PERIPHERAL:
+	case MIPI_DSI_TURN_ON_PERIPHERAL:
+		dsim_reg_wr_tx_header(dsim0->id, id, d0, d1, false);
+		dsim_reg_wr_tx_header(dsim1->id, id, d0, d1, false);
+		must_wait0 = dsim_fifo_empty_needed(dsim0, id, d0);
+		must_wait1 = dsim_fifo_empty_needed(dsim1, id, d0);
+		break;
+
+	case MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM:
+	case MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM:
+	case MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM:
+	case MIPI_DSI_DCS_READ:
+		dsim_reg_wr_tx_header(dsim0->id, id, d0, d1, true);
+		dsim_reg_wr_tx_header(dsim1->id, id, d0, d1, true);
+		must_wait0 = dsim_fifo_empty_needed(dsim0, id, d0);
+		must_wait1 = dsim_fifo_empty_needed(dsim1, id, d0);
+		break;
+
+	/* long packet types of packet types for command. */
+	case MIPI_DSI_GENERIC_LONG_WRITE:
+	case MIPI_DSI_DCS_LONG_WRITE:
+	case MIPI_DSI_DSC_PPS:
+		dsim_long_data_wr(dsim0, d0, d1);
+		dsim_reg_wr_tx_header(dsim0->id, id, d1 & 0xff,
+				(d1 & 0xff00) >> 8, false);
+		dsim_long_data_wr(dsim1, d0, d1);
+		dsim_reg_wr_tx_header(dsim1->id, id, d1 & 0xff,
+				(d1 & 0xff00) >> 8, false);
+		must_wait0 = dsim_fifo_empty_needed(dsim0, id, *(u8 *)d0);
+		must_wait1 = dsim_fifo_empty_needed(dsim1, id, *(u8 *)d0);
+		break;
+
+	default:
+		dsim_info("data id %x is not supported.\n", id);
+		ret0 = -EINVAL;
+	}
+
+	ret0 = dsim_wait_for_cmd_fifo_empty(dsim0, must_wait0);
+	if (ret0 < 0) {
+		dsim_err("ID(%2X): DSIM cmd wr timeout 0x%2x\n",
+			id, (id == MIPI_DSI_GENERIC_LONG_WRITE || id == MIPI_DSI_DCS_LONG_WRITE) ? *(u8 *)d0 : (unsigned int)d0);
+	}
+	ret1 = dsim_wait_for_cmd_fifo_empty(dsim1, must_wait1);
+	if (ret1 < 0) {
+		dsim_err("ID(%2X): DSIM cmd wr timeout 0x%2x\n",
+			id, (id == MIPI_DSI_GENERIC_LONG_WRITE || id == MIPI_DSI_DCS_LONG_WRITE) ? *(u8 *)d0 : (unsigned int)d0);
+	}
+
+err_exit:
+	mutex_unlock(&dsim0->cmd_lock);
+	mutex_unlock(&dsim1->cmd_lock);
+	decon_hiber_unblock(decon);
+
+	return (ret0 + ret1);
+}
+
+int dsim_reg_start_dual(struct dsim_device *dsim)
+{
+	if (dsim->state == DSIM_STATE_INIT) {
+		dsim_reg_start(dsim->id);
+	} else {
+		if (dsim->id) {
+			dsim_reg_start(0);
+			dsim_reg_start(1);
+		}
+	}
+	return 0;
+}
+
+#endif /* CONFIG_EXYNOS_DUAL_DSI */
+
 int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1)
 {
 	int ret = 0;
 	bool must_wait = true;
 	struct decon_device *decon = get_decon_drvdata(0);
+
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+	if (!dsim->priv.lcdconnected)
+		return 0;
+#endif
 
 	decon_hiber_block_exit(decon);
 
@@ -247,6 +414,7 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1)
 		goto err_exit;
 	}
 	DPU_EVENT_LOG_CMD(&dsim->sd, id, d0);
+	dsim_write_data_dump(dsim, id, d0, d1);
 
 	reinit_completion(&dsim->ph_wr_comp);
 	dsim_reg_clear_int(dsim->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
@@ -296,7 +464,8 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1)
 
 	ret = dsim_wait_for_cmd_fifo_empty(dsim, must_wait);
 	if (ret < 0) {
-		dsim_err("ID(%d): DSIM cmd wr timeout 0x%lx\n", id, d0);
+		dsim_err("ID(%2X): DSIM cmd wr timeout 0x%2x\n",
+			id, (id == MIPI_DSI_GENERIC_LONG_WRITE || id == MIPI_DSI_DCS_LONG_WRITE) ? *(u8 *)d0 : (unsigned int)d0);
 	}
 
 err_exit:
@@ -312,6 +481,11 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 	int i, j, ret = 0;
 	u32 rx_fifo_depth = DSIM_RX_FIFO_MAX_DEPTH;
 	struct decon_device *decon = get_decon_drvdata(0);
+
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+	if (!dsim->priv.lcdconnected)
+		return 0;
+#endif
 
 	decon_hiber_block_exit(decon);
 
@@ -333,7 +507,7 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 	/* Read request */
 	dsim_write_data(dsim, id, addr, 0);
 	if (!wait_for_completion_timeout(&dsim->rd_comp, MIPI_RD_TIMEOUT)) {
-		dsim_err("MIPI DSIM read Timeout!\n");
+		dsim_err("MIPI DSIM read Timeout! %2X, %2X, %d\n", id, addr, cnt);
 		return -ETIMEDOUT;
 	}
 
@@ -370,6 +544,10 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 			rx_size = (rx_fifo & 0x00ffff00) >> 8;
 			dsim_dbg("rx fifo : %8x, response : %x, rx_size : %d\n",
 					rx_fifo, rx_fifo & 0xff, rx_size);
+			if (rx_size > cnt) {
+				dsim_err("rx size is invalid, rx_size: %d, cnt: %d\n", rx_size, cnt);
+				rx_size = cnt;
+			}
 			/* Read data from RX packet payload */
 			for (i = 0; i < rx_size >> 2; i++) {
 				rx_fifo = dsim_reg_get_rx_fifo(dsim->id);
@@ -484,10 +662,10 @@ static irqreturn_t dsim_irq_handler(int irq, void *dev_id)
 	unsigned int int_src;
 	struct dsim_device *dsim = dev_id;
 	struct decon_device *decon = get_decon_drvdata(0);
+
 #ifdef CONFIG_EXYNOS_PD
 	int active;
 #endif
-
 	spin_lock(&dsim->slock);
 
 #ifdef CONFIG_EXYNOS_PD
@@ -523,7 +701,7 @@ static irqreturn_t dsim_irq_handler(int irq, void *dev_id)
 	}
 	if (int_src & DSIM_INTSRC_VT_STATUS) {
 		dsim_dbg("dsim%d vt_status(vsync) irq occurs\n", dsim->id);
-		if (decon) {
+		if (!dsim->id && decon) {
 			decon->vsync.timestamp = ktime_get();
 			wake_up_interruptible_all(&decon->vsync.wait);
 		}
@@ -539,9 +717,19 @@ static irqreturn_t dsim_irq_handler(int irq, void *dev_id)
 /* DPHY RESET is controlled by IP */
 void dpu_sysreg_set_dphy(struct dsim_device *dsim, void __iomem *sysreg)
 {
-	u32 val;
+	u32 old = 0, val = 0, mask = 0;
 
-	val = SEL_RESET_DPHY_MASK(dsim->id);
+	if (!sysreg) {
+		dsim_err("%s: fail\n", __func__);
+		return;
+	}
+
+	mask = val = dsim->res.ss_regs_bits;
+
+	old = readl(sysreg + DISP_DPU_MIPI_PHY_CON);
+
+	val = (old & ~mask) | (val & mask);
+
 	writel(val, sysreg + DISP_DPU_MIPI_PHY_CON);
 }
 
@@ -560,7 +748,6 @@ static int dsim_get_clocks(struct dsim_device *dsim)
 	return 0;
 }
 
-#if !defined(CONFIG_EXYNOS_COMMON_PANEL)
 static int dsim_get_gpios(struct dsim_device *dsim)
 {
 	struct device *dev = dsim->dev;
@@ -598,6 +785,13 @@ static int dsim_reset_panel(struct dsim_device *dsim)
 
 	dsim_dbg("%s +\n", __func__);
 
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+	call_panel_ops(dsim, reset, dsim);
+#endif
+
+	if (res->lcd_reset <= 0)
+		return 0;
+
 	ret = gpio_request_one(res->lcd_reset, GPIOF_OUT_INIT_HIGH, "lcd_reset");
 	if (ret < 0) {
 		dsim_err("failed to get LCD reset GPIO\n");
@@ -624,6 +818,13 @@ static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
 
 	dsim_dbg("%s(%d) +\n", __func__, on);
 
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+	if (on)
+		call_panel_ops(dsim, poweron, dsim);
+	else
+		call_panel_ops(dsim, poweroff, dsim);
+#endif
+
 	if (on) {
 		if (res->lcd_power[0] > 0) {
 			ret = gpio_request_one(res->lcd_power[0],
@@ -647,13 +848,15 @@ static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
 			usleep_range(10000, 11000);
 		}
 	} else {
-		ret = gpio_request_one(res->lcd_reset, GPIOF_OUT_INIT_LOW,
-				"lcd_reset");
-		if (ret < 0) {
-			dsim_err("failed LCD reset off\n");
-			return -EINVAL;
+		if (res->lcd_reset > 0) {
+			ret = gpio_request_one(res->lcd_reset, GPIOF_OUT_INIT_LOW,
+					"lcd_reset");
+			if (ret < 0) {
+				dsim_err("failed LCD reset off\n");
+				return -EINVAL;
+			}
+			gpio_free(res->lcd_reset);
 		}
-		gpio_free(res->lcd_reset);
 
 		if (res->lcd_power[0] > 0) {
 			ret = gpio_request_one(res->lcd_power[0],
@@ -682,85 +885,49 @@ static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
 
 	return 0;
 }
-#else
-int dsim_function_reset(struct dsim_device *dsim)
+
+static void dsim_phy_status(struct dsim_device *dsim)
 {
+	struct phy *phy = NULL;
+	struct regmap *reg = NULL;
+	u32 offset = 0;
+	u32 bits = 0;
+	u32 val = 0;
 	int ret = 0;
-#if 0
-	struct decon_device *decon = get_decon_drvdata(0);
 
-	decon_hiber_block_exit(decon);
+	phy = dsim->phy;
+	reg = dsim->res.phy_iso_reg;
+	offset = dsim->res.phy_iso_offset;
+	bits = dsim->res.phy_iso_bits;
 
-	mutex_lock(&dsim->cmd_lock);
-	if (!IS_DSIM_ON_STATE(dsim)) {
-		dsim_err("DSIM is off. state(%d)\n", dsim->state);
-		ret = -EINVAL;
-		goto err_exit;
-	}
-	dsim_reg_function_reset(dsim->id);
-	dsim_info("dsim-%d sw function reset\n", dsim->id);
-
-err_exit:
-	mutex_unlock(&dsim->cmd_lock);
-	decon_hiber_unblock(decon);
-#endif
-	return ret;
-}
-
-#ifdef CONFIG_OLD_DISP_TIMING
-static int dsim_reset_panel(struct dsim_device *dsim)
-{
-	int ret;
-
-	dsim_dbg("%s +\n", __func__);
-
-	ret = call_panel_ops(dsim, reset, dsim);
-
-	dsim_dbg("%s -\n", __func__);
-	return 0;
-}
-#endif
-static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
-{
-	int ret;
-
-	dsim_dbg("%s(%d) +\n", __func__, on);
-
-	if (on)
-		ret = call_panel_ops(dsim, poweron, dsim);
-	else
-		ret = call_panel_ops(dsim, poweroff, dsim);
-	if (ret < 0) {
-		dsim_err("%s failed to set power\n", __func__);
-		return ret;
-	}
-	dsim_dbg("%s(%d) -\n", __func__, on);
-
-	return 0;
-}
-#endif
-
-static void dsim_phy_status(void)
-{
-	void __iomem *phy_iso_regs;
-	u32 phy_iso = 0;
-	/* 1: Isolation bypassed, 0: Isolation enabled */
-	int val = 0x1;
-
-	phy_iso_regs = ioremap(0x1406070C, 0x10);
-	phy_iso = readl(phy_iso_regs);
-	if ((phy_iso & 0x1) != val) {
-		dsim_err("Isolation bypass should be set\n");
-	} else {
-		iounmap(phy_iso_regs);
+	if (!reg) {
+		dsim_info("%s: phy_iso_reg invalid\n", __func__);
 		return;
 	}
-	iounmap(phy_iso_regs);
+
+	dsim_dbg("%s: PHY count : %d\n", __func__, phy->power_count);
+
+	ret = regmap_read(reg, offset, &val);
+	if (ret < 0) {
+		dsim_info("%s: Can't read 0x%x\n", __func__, offset);
+		return;
+	}
+
+	if ((val & bits) != bits) {
+		dsim_err("PHY Iso bypass doesn't be enabled\n");
+		if (phy->power_count) {
+			regmap_update_bits(reg, offset, bits, bits);
+			dsim_err("PHY Iso bypass should be set again\n");
+		} else {
+			dsim_err("Check PHY framework reference count number\n");
+		}
+	}
 }
 
 static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
 {
 	int ret = 0;
+	bool panel_ctrl;
 
 	if (IS_DSIM_ON_STATE(dsim)) {
 		dsim_warn("%s dsim already on(%s)\n",
@@ -782,7 +949,7 @@ static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
 	/* DPHY power on : iso release */
 	DPU_EVENT_LOG(DPU_EVT_DSIM_PHY_ON, &dsim->sd, ktime_set(0, 0));
 	phy_power_on(dsim->phy);
-	dsim_phy_status();
+	dsim_phy_status(dsim);
 
 	/* check whether the bootloader init has been done */
 	if (dsim->state == DSIM_STATE_INIT) {
@@ -798,9 +965,11 @@ static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
 #endif
 	/* Enable DPHY reset : DPHY reset start */
 	dsim_reg_dphy_resetn(dsim->id, 1);
+	panel_ctrl = (dsim->state == DSIM_STATE_OFF) ? true : false;
 
 	/* Panel power on */
-	dsim_set_panel_power(dsim, 1);
+	if (panel_ctrl)
+		dsim_set_panel_power(dsim, 1);
 
 	dsim_reg_sw_reset(dsim->id);
 
@@ -822,12 +991,17 @@ static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
  #if !defined(CONFIG_EXYNOS_COMMON_PANEL) || defined(CONFIG_OLD_DISP_TIMING)
 		dsim_info("dsim_%d enabled", dsim->id);
 		/* Panel reset should be set after LP-11 */
-		dsim_reset_panel(dsim);
+		if (panel_ctrl)
+			dsim_reset_panel(dsim);
  #endif
 	}
 
 init_end:
+#if defined(CONFIG_EXYNOS_DUAL_DSI)
+	dsim_reg_start_dual(dsim);
+#else
 	dsim_reg_start(dsim->id);
+#endif
 	dsim->state = state;
 	enable_irq(dsim->res.irq);
 
@@ -933,6 +1107,7 @@ static int _dsim_disable(struct dsim_device *dsim, enum dsim_state state)
 #else
 	dsim_runtime_suspend(dsim->dev);
 #endif
+
 	dsim_dbg("%s %s -\n", __func__, dsim_state_names[dsim->state]);
 
 	return 0;
@@ -951,7 +1126,8 @@ static int dsim_disable(struct dsim_device *dsim)
 	}
 
 	dsim_info("dsim-%d %s +\n", dsim->id, __func__);
-	call_panel_ops(dsim, suspend, dsim);
+	if (dsim->lcd_info.mode != DECON_VIDEO_MODE)
+		call_panel_ops(dsim, suspend, dsim);
 	ret = _dsim_disable(dsim, next_state);
 	if (ret < 0) {
 		dsim_err("dsim-%d failed to set %s (ret %d)\n",
@@ -1063,7 +1239,7 @@ static int dsim_exit_ulps(struct dsim_device *dsim)
 	/* DPHY power on : iso release */
 	DPU_EVENT_LOG(DPU_EVT_DSIM_PHY_ON, &dsim->sd, ktime_set(0, 0));
 	phy_power_on(dsim->phy);
-	dsim_phy_status();
+	dsim_phy_status(dsim);
 
 	enable_irq(dsim->res.irq);
 
@@ -1136,9 +1312,60 @@ static int set_dsim_dsu(struct dsim_device *dsim, struct dsu_info *dsu)
 }
 #endif
 
+static int dsim_free_fb_resource(struct dsim_device *dsim)
+{
+	/* unmap */
+	iovmm_unmap_oto(dsim->dev, dsim->fb_handover.phys_addr);
+
+	/* unreserve memory */
+	of_reserved_mem_device_release(dsim->dev);
+
+	/* update state */
+	dsim->fb_handover.reserved = false;
+	dsim->fb_handover.phys_addr = 0xdead;
+	dsim->fb_handover.phys_size = 0;
+
+	return 0;
+}
+
+static int dsim_acquire_fb_resource(struct dsim_device *dsim)
+{
+	int ret = 0;
+
+	/*
+	 * If of_reserved_mem_device_init_by_idx returns error, it means
+	 * framebuffer handover feature is disabled or reserved memory is
+	 * not defined in DT.
+	 *
+	 * And phys_addr and phys_size is not initialized, becuase
+	 * rmem_device_init callback is not called.
+	 */
+	ret = of_reserved_mem_device_init_by_idx(dsim->dev, dsim->dev->of_node, 0);
+	if (ret) {
+		dsim_warn("fb handover memory is not reserved(%d)\n", ret);
+		dsim_warn("check whether fb handover memory is not reserved");
+		dsim_warn("or DT definition is missed\n");
+		dsim->fb_handover.reserved = false;
+		return 0;
+	} else {
+		dsim->fb_handover.reserved = true;
+	}
+
+	/* phys_addr and phys_size must be aligned to page size */
+	ret = iovmm_map_oto(dsim->dev, dsim->fb_handover.phys_addr,
+			dsim->fb_handover.phys_size);
+	if (ret) {
+		dsim_err("failed one to one mapping: %d\n", ret);
+		BUG();
+	}
+
+	return ret;
+}
+
 static long dsim_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct dsim_device *dsim = container_of(sd, struct dsim_device, sd);
+
 	int ret = 0;
 
 	switch (cmd) {
@@ -1196,6 +1423,10 @@ static long dsim_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		call_panel_ops(dsim, set_error_cb, dsim);
 		break;
 #endif
+
+	case DSIM_IOC_FREE_FB_RES:
+		ret = dsim_free_fb_resource(dsim);
+		break;
 
 	default:
 		dsim_err("unsupported ioctl");
@@ -1336,6 +1567,7 @@ void parse_lcd_info(struct device_node *node, struct decon_lcd *lcd_info)
 	u32 hdr_mxl = 0;
 	u32 hdr_mal = 0;
 	u32 hdr_mnl = 0;
+	u32 vt_compensation;
 	int k;
 
 	of_property_read_u32(node, "mode", &lcd_info->mode);
@@ -1397,7 +1629,6 @@ void parse_lcd_info(struct device_node *node, struct decon_lcd *lcd_info)
 			res[8], res[9], res[10], res[11]);
 	dsim_dbg(" fout_mask(%d), rsel(%d)\n", res[12], res[13]);
 #endif
-
 	of_property_read_u32(node, "timing,dsi-escape-clk",
 			&lcd_info->esc_clk);
 	dsim_dbg("requested escape clock(%d)\n", lcd_info->esc_clk);
@@ -1483,8 +1714,8 @@ void parse_lcd_info(struct device_node *node, struct decon_lcd *lcd_info)
 			dsim_info("mres[%d] cmd_underrun_lp_ref(%d)\n", k,
 					lcd_info->cmd_underrun_lp_ref[k]);
 	} else {
-		of_property_read_u32(node, "vt_compensation",
-				&lcd_info->vt_compensation);
+		of_property_read_u32(node, "vt_compensation", &vt_compensation);
+		lcd_info->vt_compensation = vt_compensation;
 		dsim_info("vt_compensation(%d)\n", lcd_info->vt_compensation);
 	}
 
@@ -1534,7 +1765,7 @@ static int dsim_parse_dt(struct dsim_device *dsim, struct device *dev)
 	}
 
 	dsim->id = of_alias_get_id(dev->of_node, "dsim");
-	dsim_info("dsim(%d) probe start..\n", dsim->id);
+	dsim_info("dsim(%d)(%s) probe start..\n", dsim->id, of_node_full_name(dev->of_node));
 
 	dsim->phy = devm_phy_get(dev, "dsim_dphy");
 	if (IS_ERR_OR_NULL(dsim->phy)) {
@@ -1557,6 +1788,8 @@ static void dsim_register_panel(struct dsim_device *dsim)
 {
 #if IS_ENABLED(CONFIG_EXYNOS_COMMON_PANEL)
 	dsim->panel_ops = &common_mipi_lcd_driver;
+#elif defined(CONFIG_EXYNOS_MASS_PANEL)
+	dsim->panel_ops = mipi_lcd_driver;
 #elif IS_ENABLED(CONFIG_EXYNOS_DECON_LCD_S6E3HA2K)
 	dsim->panel_ops = &s6e3ha2k_mipi_lcd_driver;
 #elif IS_ENABLED(CONFIG_EXYNOS_DECON_LCD_S6E3HF4)
@@ -1637,11 +1870,36 @@ static int dsim_init_resources(struct dsim_device *dsim, struct platform_device 
 		dsim_err("failed to install DSIM irq\n");
 		return -EINVAL;
 	}
+
 	disable_irq(dsim->res.irq);
 
 	dsim->res.ss_regs = dpu_get_sysreg_addr();
 	if (IS_ERR_OR_NULL(dsim->res.ss_regs)) {
 		dsim_err("failed to get sysreg addr\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(dsim->phy->dev.of_node, "sysreg_bits", &dsim->res.ss_regs_bits);
+	if (ret < 0) {
+		dsim_err("sysreg_bits of_property_read_u32 fail\n");
+		return -EINVAL;
+	}
+
+	dsim->res.phy_iso_reg = syscon_regmap_lookup_by_phandle(dsim->phy->dev.of_node, "samsung,pmu-syscon");
+	if (IS_ERR_OR_NULL(dsim->res.phy_iso_reg)) {
+		dsim_err("samsung,pmu-syscon syscon_regmap_lookup_by_phandle fail\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(dsim->phy->dev.of_node, "isolation", &dsim->res.phy_iso_offset);
+	if (ret < 0) {
+		dsim_err("isolation of_property_read_u32 fail\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(dsim->phy->dev.of_node, "isolation_bits", &dsim->res.phy_iso_bits);
+	if (ret < 0) {
+		dsim_err("isolation_bits of_property_read_u32 fail\n");
 		return -EINVAL;
 	}
 
@@ -1689,6 +1947,8 @@ static int dsim_probe(struct platform_device *pdev)
 			(unsigned long)dsim);
 
 	pm_runtime_enable(dev);
+	if (dsim->lcd_info.mode == DECON_VIDEO_MODE)
+		dsim_acquire_fb_resource(dsim);
 
 #if defined(CONFIG_ION_EXYNOS)
 	ret = iovmm_activate(dev);
@@ -1730,6 +1990,7 @@ static int dsim_probe(struct platform_device *pdev)
 
 	dsim_info("dsim%d driver(%s mode) has been probed.\n", dsim->id,
 		dsim->lcd_info.mode == DECON_MIPI_COMMAND_MODE ? "cmd" : "video");
+
 	return 0;
 
 err_dt:
@@ -1753,10 +2014,10 @@ static void dsim_shutdown(struct platform_device *pdev)
 {
 	struct dsim_device *dsim = platform_get_drvdata(pdev);
 
+	dsim_info("%s + dsim%d state:%d\n", __func__, dsim->id, dsim->state);
 	DPU_EVENT_LOG(DPU_EVT_DSIM_SHUTDOWN, &dsim->sd, ktime_set(0, 0));
-	dsim_info("%s + state:%d\n", __func__, dsim->state);
 
-	dsim_disable(dsim);
+	/* dsim_disable(dsim); */
 
 	dsim_info("%s -\n", __func__);
 }
@@ -1827,6 +2088,58 @@ static void __exit dsim_exit(void)
 }
 
 module_exit(dsim_exit);
+
+/*
+ * rmem_device_init is called in of_reserved_mem_device_init_by_idx function
+ * when reserved memory is required.
+ */
+static int rmem_device_init(struct reserved_mem *rmem, struct device *dev)
+{
+	struct dsim_device *dsim = dev_get_drvdata(dev);
+
+	dsim_info("%s +\n", __func__);
+	dsim->fb_handover.phys_addr = rmem->base;
+	dsim->fb_handover.phys_size = rmem->size;
+	dsim_info("%s -\n", __func__);
+
+	return 0;
+}
+
+/*
+ * rmem_device_release is called in of_reserved_mem_device_release function
+ * when reserved memory is no longer required.
+ */
+static void rmem_device_release(struct reserved_mem *rmem, struct device *dev)
+{
+	struct page *first = phys_to_page(PAGE_ALIGN(rmem->base));
+	struct page *last = phys_to_page((rmem->base + rmem->size) & PAGE_MASK);
+	struct page *page;
+
+	pr_info("%s: base=%pa, size=%pa, first=%pa, last=%pa\n",
+			__func__, &rmem->base, &rmem->size, first, last);
+
+	for (page = first; page != last; page++) {
+		__ClearPageReserved(page);
+		set_page_count(page, 1);
+		__free_pages(page, 0);
+		adjust_managed_page_count(page, 1);
+	}
+}
+
+static const struct reserved_mem_ops rmem_ops = {
+	.device_init    = rmem_device_init,
+	.device_release = rmem_device_release,
+};
+
+static int __init fb_handover_setup(struct reserved_mem *rmem)
+{
+	pr_info("%s: base=%pa, size=%pa\n", __func__, &rmem->base, &rmem->size);
+
+	rmem->ops = &rmem_ops;
+	return 0;
+}
+RESERVEDMEM_OF_DECLARE(fb_handover, "exynos,fb_handover", fb_handover_setup);
+
 MODULE_AUTHOR("Yeongran Shin <yr613.shin@samsung.com>");
 MODULE_DESCRIPTION("Samusung EXYNOS DSIM driver");
 MODULE_LICENSE("GPL");

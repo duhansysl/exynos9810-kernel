@@ -1978,7 +1978,7 @@ EXPORT_SYMBOL_GPL(clk_is_match);
 
 /***        debugfs support        ***/
 
-#if defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_EXYNOS)
+#ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
 
 static struct dentry *rootdir;

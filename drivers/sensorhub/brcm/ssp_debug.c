@@ -222,9 +222,7 @@ int print_mcu_debug(char *pchRcvDataFrame, int *pDataIdx,
 		int iRcvDataFrameLength)
 {
 	int iLength = 0;
-	#if SSP_DBG
 	int cur = *pDataIdx;
-	#endif
 
 	memcpy(&iLength, pchRcvDataFrame + *pDataIdx, sizeof(u16));
 	*pDataIdx += sizeof(u16);
@@ -368,6 +366,7 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 			get_msdelay(data->adDelayBuf[uSensor]));
 		break;
 	case LIGHT_SENSOR:
+	case UNCAL_LIGHT_SENSOR:
 		ssp_dbg("[SSP] %u : %u, %u, %u, %u, %u, %u (%ums)\n", uSensor,
 			data->buf[uSensor].r, data->buf[uSensor].g,
 			data->buf[uSensor].b, data->buf[uSensor].w,
@@ -467,8 +466,39 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 		break;
 	case WAKE_UP_MOTION:
 		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
-			data->buf[uSensor].wakeup_motion,
+		data->buf[uSensor].wakeup_motion,
+		get_msdelay(data->adDelayBuf[uSensor]));
+		break;
+    case CALL_GESTURE:
+		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
+		data->buf[uSensor].call_gesture,
+		get_msdelay(data->adDelayBuf[uSensor]));
+		break;
+    case MOVE_DETECTOR:
+		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
+		data->buf[uSensor].move_detect,
+		get_msdelay(data->adDelayBuf[uSensor]));
+		break;
+	case LED_COVER_EVENT_SENSOR:
+		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
+		data->buf[uSensor].led_cover_event,
+		get_msdelay(data->adDelayBuf[uSensor]));
+		break;
+	case AUTO_ROTATION_SENSOR:
+		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
+			data->buf[uSensor].auto_rotation_event,
 			get_msdelay(data->adDelayBuf[uSensor]));
+		break;
+	case SAR_BACKOFF_MOTION:
+		ssp_dbg("[SSP] %u : %d (%ums)\n", uSensor,
+			data->buf[uSensor].sar_backoff_motion_event,
+			get_msdelay(data->adDelayBuf[uSensor]));
+	case POCKET_MODE_LITE:
+		ssp_dbg("[SSP] %u : %d %d(%ums)\n", uSensor,
+		data->buf[uSensor].pocket_mode_lite_t.prox,
+		data->buf[uSensor].pocket_mode_lite_t.lux,
+		get_msdelay(data->adDelayBuf[uSensor]));
+		break;
 	case BULK_SENSOR:
 	case GPS_SENSOR:
 		break;
@@ -488,7 +518,7 @@ bool check_wait_event(struct ssp_data *data)
 	int check_sensors[2] = {ACCELEROMETER_SENSOR, LIGHT_SENSOR};
 	int i, sensor;
 	bool res = false;
-	int arrSize = (ANDROID_VERSION < 90000 ? 2 : 1);
+	int arrSize = 1;
 
 	for (i = 0 ; i < arrSize ; i++) { // because light sensor does not check anymore
 		sensor = check_sensors[i];

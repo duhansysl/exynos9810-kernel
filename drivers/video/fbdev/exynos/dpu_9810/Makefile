@@ -5,6 +5,7 @@
 # Licensed under GPLv2
 #
 
+subdir-ccflags-$(CONFIG_EXYNOS_LCD_ENG)	+= -DCONFIG_SMCDSD_LCD_DEBUG
 subdir-ccflags-$(CONFIG_DPU_2_0_FENCE)	+= -DCONFIG_EXYNOS_DPU20
 
 obj-$(CONFIG_EXYNOS_DPP) += dpp.o

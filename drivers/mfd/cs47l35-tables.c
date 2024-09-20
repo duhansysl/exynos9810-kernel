@@ -112,7 +112,6 @@ static const struct reg_default cs47l35_reg_default[] = {
 	{ 0x00000176, 0x0000 }, /* R374 (0x176) - FLL1 Control 6 */
 	{ 0x00000177, 0x0281 }, /* R375 (0x177) - FLL1 Loop Filter Test 1 */
 	{ 0x00000179, 0x0000 }, /* R377 (0x179) - FLL1 Control 7 */
-	{ 0x0000017a, 0x0b06 }, /* R378 (0x17a) - FLL1 EFS2 */
 	{ 0x0000017f, 0x0000 }, /* R383 (0x17f) - FLL1 Synchroniser 1 */
 	{ 0x00000180, 0x0000 }, /* R384 (0x180) - FLL1 Synchroniser 2 */
 	{ 0x00000181, 0x0000 }, /* R385 (0x181) - FLL1 Synchroniser 3 */
@@ -179,7 +178,6 @@ static const struct reg_default cs47l35_reg_default[] = {
 	{ 0x00000448, 0x0a83 }, /* R1096 (0x448) - eDRE Enable */
 	{ 0x0000044a, 0x0000 }, /* R1098 (0x44a) - eDRE Manual */
 	{ 0x00000450, 0x0000 }, /* R1104 (0x450) - DAC AEC Control 1 */
-	{ 0x00000451, 0x0000 }, /* R1105 (0x451) - DAC AEC Control 2 */
 	{ 0x00000458, 0x0000 }, /* R1112 (0x458) - Noise Gate Control */
 	{ 0x00000490, 0x0069 }, /* R1168 (0x490) - PDM SPK1 CTRL 1 */
 	{ 0x00000491, 0x0000 }, /* R1169 (0x491) - PDM SPK1 CTRL 2 */
@@ -892,7 +890,6 @@ static bool cs47l35_16bit_readable_register(struct device *dev,
 	case MADERA_FLL1_CONTROL_5:
 	case MADERA_FLL1_CONTROL_6:
 	case MADERA_FLL1_CONTROL_7:
-	case MADERA_FLL1_EFS_2:
 	case MADERA_FLL1_LOOP_FILTER_TEST_1:
 	case CS47L35_FLL1_SYNCHRONISER_1:
 	case CS47L35_FLL1_SYNCHRONISER_2:
@@ -972,7 +969,6 @@ static bool cs47l35_16bit_readable_register(struct device *dev,
 	case MADERA_EDRE_ENABLE:
 	case MADERA_EDRE_MANUAL:
 	case MADERA_DAC_AEC_CONTROL_1:
-	case MADERA_DAC_AEC_CONTROL_2:
 	case MADERA_NOISE_GATE_CONTROL:
 	case MADERA_PDM_SPK1_CTRL_1:
 	case MADERA_PDM_SPK1_CTRL_2:

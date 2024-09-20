@@ -52,7 +52,6 @@
 #define SOC_SSVC2
 #define SOC_SSVC3
 /* #define SOC_DCP *//* TODO */
-/* #define SOC_SRDZ *//* TODO */
 
 /* Post Processing Configruation */
 /* #define ENABLE_DRC */
@@ -60,6 +59,7 @@
 /* #define ENABLE_DNR_IN_TPU */
 /*#define ENABLE_DNR_IN_MCSC */
 #define ENABLE_TNR
+#define NUM_OF_TNR_BUF	6 /* triple(3) & double buffering(2) */
 #define ENABLE_10BIT_MCSC
 #define ENABLE_DJAG_IN_MCSC
 #define ENABLE_VRA
@@ -141,7 +141,6 @@
 #define USE_I2C_LOCK
 #undef ENABLE_FULL_BYPASS
 #define SENSOR_REQUEST_DELAY		2
-#define ENABLE_SENSOR_VC_FUNCTION
 
 #ifdef ENABLE_IRQ_MULTI_TARGET
 #define FIMC_IS_HW_IRQ_FLAG     IRQF_GIC_MULTI_TARGET
@@ -163,10 +162,20 @@
 
 #define ENABLE_DBG_EVENT_PRINT
 
-//#define SECURE_CAMERA_EMULATE
-#define SECURE_CAMERA_CH	(CSI_ID_D)
-#define SECURE_CAMERA_MEM_ADDR	(0xD0000000)
-#define SECURE_CAMERA_MEM_SIZE	(0x1400000)
+#ifdef CONFIG_SECURE_CAMERA_USE
+#ifdef SECURE_CAMERA_IRIS
+#undef SECURE_CAMERA_IRIS
+#endif
+#define SECURE_CAMERA_FACE     /* For face detection and face authentication */
+#define SECURE_CAMERA_CH		(CSI_ID_B)
+#define SECURE_CAMERA_HEAP_ID		(11)
+#define SECURE_CAMERA_MEM_ADDR		(0xE1900000)	/* secure_camera_heap */
+#define SECURE_CAMERA_MEM_SIZE		(0x2000000)
+#define NON_SECURE_CAMERA_MEM_ADDR	(0x80000000)	/* camera_heap */
+#define NON_SECURE_CAMERA_MEM_SIZE	(0x1B800000)
+
+//#define SECURE_CAMERA_FACE_SEQ_CHK      /* To check sequence before applying secure protection */
+#endif
 
 #define MODULE_2L7_MODE2
 #define MODULE_2L2_MODE2
@@ -183,6 +192,8 @@
 
 #define FAST_FDAE
 #define RESERVED_MEM_IN_DT
-#endif
 
+#define USE_CAMIF_FIX_UP	1
 #define CHAIN_USE_VC_TASKLET	0
+
+#endif

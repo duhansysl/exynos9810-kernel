@@ -11,6 +11,7 @@
  */
 
  #include <linux/module.h>
+#include <linux/videodev2_exynos_media.h>
 
 #include "fimc-is-core.h"
 #include "fimc-is-param.h"
@@ -741,12 +742,9 @@ static int fimc_is_subdev_s_format(struct fimc_is_subdev *subdev,
 		 * YUV422 3P : x16
 		 */
 		case V4L2_PIX_FMT_YUV422P:
-			if (width % 8) {
-				merr("width(%d) of format(%d) is not supported size",
+			if (width % 8)
+				mwarn("width(%d) of format(%d) is not supported size",
 					subdev, width, pixelformat);
-				ret = -EINVAL;
-				goto p_err;
-			}
 			break;
 		/*
 		 * YUV420 2P : x8
@@ -754,24 +752,40 @@ static int fimc_is_subdev_s_format(struct fimc_is_subdev *subdev,
 		 */
 		case V4L2_PIX_FMT_NV12M:
 		case V4L2_PIX_FMT_NV21M:
-			if (width % 8) {
-				merr("width(%d) of format(%d) is not supported size",
+			if (width % 8)
+				mwarn("width(%d) of format(%d) is not supported size",
 					subdev, width, pixelformat);
-				ret = -EINVAL;
-				goto p_err;
-			}
 			break;
 		case V4L2_PIX_FMT_YUV420M:
 		case V4L2_PIX_FMT_YVU420M:
-			if (width % 16) {
-				merr("width(%d) of format(%d) is not supported size",
+			if (width % 16)
+				mwarn("width(%d) of format(%d) is not supported size",
 					subdev, width, pixelformat);
-				ret = -EINVAL;
-				goto p_err;
-			}
 			break;
 		case V4L2_PIX_FMT_NV12:
 		case V4L2_PIX_FMT_NV21:
+			break;
+		case V4L2_PIX_FMT_RGB32:
+			break;
+		case V4L2_PIX_FMT_NV16M_P210: /* 422 2P 10bit unpacked: 2 pixel & 2 byte align */
+			if (width % 2)
+				mwarn("width(%d) of format(%d) is not supported size",
+					subdev, width, pixelformat);
+			break;
+		case V4L2_PIX_FMT_NV12M_P010: /* 420 2P 10bit unpacked: 2 pixel & 2 byte align */
+			if (width % 2)
+				mwarn("width(%d) of format(%d) is not supported size",
+					subdev, width, pixelformat);
+			break;
+		case V4L2_PIX_FMT_NV16M_S10B: /* 422 2P 8+2bit: 2 pixel & 16 byte align */
+			if (width % 16)
+				mwarn("width(%d) of format(%d) is not supported size",
+					subdev, width, pixelformat);
+			break;
+		case V4L2_PIX_FMT_NV12M_S10B: /* 420 2P 8+2bit: 2 pixel & 16 byte align */
+			if (width % 16)
+				mwarn("width(%d) of format(%d) is not supported size",
+					subdev, width, pixelformat);
 			break;
 		default:
 			merr("format(%d) is not supported", subdev, pixelformat);
@@ -1288,7 +1302,7 @@ static int fimc_is_subdev_internal_alloc_buffer(struct fimc_is_subdev *subdev,
 	}
 
 	for (i = 0; i < subdev->buffer_num; i++) {
-		subdev->pb_subdev[i] = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, buffer_size, 16);
+		subdev->pb_subdev[i] = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, buffer_size, 0, 0);
 		if (IS_ERR_OR_NULL(subdev->pb_subdev[i])) {
 			err("failed to allocate buffer for internal subdev");
 			return -ENOMEM;

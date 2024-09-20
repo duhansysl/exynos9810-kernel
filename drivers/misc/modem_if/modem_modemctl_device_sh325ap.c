@@ -27,7 +27,7 @@
 #include <soc/samsung/exynos-pmu.h>
 #include <soc/samsung/pmu-cp.h>
 #include <soc/samsung/ect_parser.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 #include <linux/clk.h>
 
 #ifdef CONFIG_MUIC_NOTIFIER

@@ -88,7 +88,7 @@ struct {
 	int				ldsum_enabled;
 	int				change_ms;
 	int				cl_busy_ratio;
-	
+
 	unsigned long			pol_max;
 	unsigned long			qos_max;
 
@@ -160,7 +160,7 @@ void exynos_hpgov_validate_hpin(unsigned int cpu)
 	next_mode = cpumask_weight(&mask) + 1;
 	max_freq = exynos_hpgov.maxfreq_table[next_mode];
 	cur_freq = (unsigned int)cal_dfs_get_rate(exynos_hpgov.cal_id);
-	pr_debug("%s: max_freq %d, cur_freq %d, next_mode %d \n",
+	pr_info("%s: max_freq %d, cur_freq %d, next_mode %d \n",
 			__func__, max_freq, cur_freq, next_mode);
 
 	BUG_ON(max_freq < cur_freq);

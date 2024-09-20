@@ -224,6 +224,12 @@ enum dma_input_error {
 	DMA_INPUT_ERROR_NO	= 0 /*  DMA input setting is done */
 };
 
+enum dma_input_orientation {
+	DMA_INPUT_ORIENTATION_NORMAL = 0,
+	DMA_INPUT_ORIENTATION_CCW    = 1,
+	DMA_INPUT_ORIENTATION_CW     = 2
+};
+
 /* ----------------------  Output  ----------------------------------- */
 enum otf_output_crop {
 	OTF_OUTPUT_CROP_DISABLE		= 0,
@@ -777,7 +783,8 @@ struct param_dma_input {
 	u32	msb; /* last bit of data in memory size */
 	u32	v_otf_enable;
 	u32	v_otf_token_line;
-	u32	reserved[PARAMETER_MAX_MEMBER-19];
+	u32     orientation; /* 0: normal, 1: ccw: 2: cw */
+	u32     reserved[PARAMETER_MAX_MEMBER-20];
 	u32	err;
 };
 
@@ -1479,9 +1486,6 @@ static inline enum dma_input_order change_to_input_order(enum dma_output_order o
 	enum dma_input_order input_order;
 
 	switch (output_order) {
-	case DMA_OUTPUT_ORDER_NO:
-		input_order = DMA_INPUT_ORDER_NO;
-		break;
 	case DMA_OUTPUT_ORDER_CrCb:
 		input_order = DMA_INPUT_ORDER_CrCb;
 		break;
@@ -1506,8 +1510,9 @@ static inline enum dma_input_order change_to_input_order(enum dma_output_order o
 	case DMA_OUTPUT_ORDER_YCbCr:
 		input_order = DMA_INPUT_ORDER_YCbCr;
 		break;
+	case DMA_OUTPUT_ORDER_NO:
 	default:
-		input_order = output_order;
+		input_order = DMA_INPUT_ORDER_NO;
 		break;
 	}
 

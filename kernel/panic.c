@@ -31,7 +31,7 @@
 #include <asm/core_regs.h>
 #include <soc/samsung/exynos-condbg.h>
 
-#ifdef CONFIG_SEC_DUMP_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
 #include <linux/sec_debug.h>
 #endif
 
@@ -150,6 +150,7 @@ void panic(const char *fmt, ...)
 	regs.regs[30] = _RET_IP_;
 	regs.pc = regs.regs[30] - sizeof(unsigned int);
 #endif
+
 	exynos_trace_stop();
 	if (ecd_get_enable() &&
 		ecd_get_debug_panic() &&
@@ -194,7 +195,7 @@ void panic(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 	if (buf[strlen(buf) - 1] == '\n')
 		buf[strlen(buf) - 1] = '\0';
 #endif
@@ -203,17 +204,7 @@ void panic(const char *fmt, ...)
 		sec_debug_set_extra_info_fault(PANIC_FAULT, (unsigned long)regs.pc, &regs);
 #endif
 	ecd_printf("Kernel Panic - not syncing: %s\n", buf);
-	pr_auto(ASL5, "Kernel panic - not syncing: %s\n", buf);
-
-#if !defined(SEC_PRODUCT_SHIP) && defined(CONFIG_RELOCATABLE_KERNEL)
-	{
-		u64 const kernel_offset = kimage_vaddr - KIMAGE_VADDR;
-		u64 kernel_addr = SZ_2G + SZ_512K + kernel_offset;
-
-		pr_emerg("Kernel loaded at: 0x%llx, offset from compile-time address %llx\n",
-		 kernel_addr, kernel_offset);
-	}
-#endif
+	pr_emerg("Kernel panic - not syncing: %s\n", buf);
 
 	exynos_ss_prepare_panic();
 	exynos_ss_dump_panic(buf, (size_t)strnlen(buf, sizeof(buf)));
@@ -223,10 +214,6 @@ void panic(const char *fmt, ...)
 	 */
 	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
 		dump_stack();
-#endif
-#ifdef CONFIG_SEC_DUMP_SUMMARY
-		sec_debug_save_panic_info(buf,
-			(unsigned long)__builtin_return_address(0));
 #endif
 	//sysrq_sched_debug_show();
 

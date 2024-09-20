@@ -17,9 +17,6 @@
 #include <linux/irqdomain.h>
 #include <linux/sysfs.h>
 #include <linux/exynos-ss.h>
-#ifdef CONFIG_SEC_DUMP_SUMMARY
-#include <linux/sec_debug.h>
-#endif
 
 #include "internals.h"
 
@@ -612,16 +609,6 @@ int generic_handle_irq(unsigned int irq)
 
 	if (!desc)
 		return -EINVAL;
-
-#ifdef CONFIG_SEC_DUMP_SUMMARY
-		if (desc->action)
-			sec_debug_irq_sched_log(irq, (void *)desc->action->handler,
-				irqs_disabled());
-		else
-			sec_debug_irq_sched_log(irq, (void *)desc->handle_irq,
-				irqs_disabled());
-#endif
-
 	generic_handle_irq_desc(desc);
 	return 0;
 }

@@ -1,0 +1,48 @@
+
+config WIRELESS_AUTH
+	 bool "support for samsung wireless authentication massage"
+	 help
+	 Say Y to include support for swam
+	 samsung wireless authentication massage 
+
+config WIRELESS_CHARGER_HIGH_VOLTAGE
+	tristate "high voltage wireless charger"
+	depends on BATTERY_SAMSUNG && I2C
+	help
+	  Say Y here to enable support for the wireless charger charger
+	  driver.
+
+config WIRELESS_NO_HV
+	tristate "wireless no hv"
+	depends on BATTERY_SAMSUNG && I2C
+	help
+	  Say Y here to disable HV wireless charging
+	  driver.
+
+config WIRELESS_CHARGER_MFC
+	tristate "MFC IC charger support"
+	depends on BATTERY_SAMSUNG && I2C
+	help
+	  Say Y here to enable support for the MFC IC
+	  MFC wireless charger driver.
+
+config WIRELESS_FIRMWARE_UPDATE
+	tristate "p9220 battery charger support"
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y here to enable support for the wireless charger firmware update
+	  wireless charger IC firmware update.
+
+config WIRELESS_TX_MODE
+	bool "wireless power sharing support in sec battery driver"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y to include support for sec afc charging support
+
+config WIRELESS_FIRMWARE_65
+	tristate "p9220 battery charger support"
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y here to enable support for the wireless charger firmware update
+	  wireless charger IC firmware update.

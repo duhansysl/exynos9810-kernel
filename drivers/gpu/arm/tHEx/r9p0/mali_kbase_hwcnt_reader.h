@@ -39,11 +39,6 @@
 #define KBASE_HWCNT_READER_ENABLE_EVENT    _IOW(KBASE_HWCNT_READER, 0x40, u32)
 #define KBASE_HWCNT_READER_DISABLE_EVENT   _IOW(KBASE_HWCNT_READER, 0x41, u32)
 #define KBASE_HWCNT_READER_GET_API_VERSION _IOW(KBASE_HWCNT_READER, 0xFF, u32)
-//SRUK-START
-#define KBASE_HWCNT_READER_GET_CPU_GPU_TIME  _IOR(KBASE_HWCNT_READER, 0x1F, \
-		struct kbase_hwcnt_reader_cpu_gpu_time)
-//SRUK-END
-
 
 /**
  * struct kbase_hwcnt_reader_metadata - hwcnt reader sample buffer metadata
@@ -56,21 +51,6 @@ struct kbase_hwcnt_reader_metadata {
 	u32 event_id;
 	u32 buffer_idx;
 };
-
-//SRUK-START
-
-/**
- * struct kbase_hwcnt_reader_cpu_gpu_time - cpu/gpu timestamp buffer metadata
- * @gpu_time:  Time in ticks. To get monotonic timestamp multiply it with the system clock speed.
-				i.e.gpu monotonic timestamp =  gpu_time * 1000/26  (if system clock speed is 26Mhz)
- * @cpu_timestamp: position in sampling area where sample buffer was stored
- */
-
-struct kbase_hwcnt_reader_cpu_gpu_time {
-	u64 gpu_time_tick;
-	u64 cpu_timestamp;
-};
-//SRUK-END
 
 /**
  * enum base_hwcnt_reader_event - hwcnt dumping events

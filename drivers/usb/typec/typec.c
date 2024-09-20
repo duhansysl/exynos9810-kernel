@@ -443,7 +443,7 @@ static ssize_t supports_usb_power_delivery_show(struct device *dev,
 						char *buf)
 {
 	struct typec_partner *p = to_typec_partner(dev);
-
+	pr_info("%s usb_pd=%d\n", __func__, p->usb_pd);
 	return sprintf(buf, "%s\n", p->usb_pd ? "yes" : "no");
 }
 static DEVICE_ATTR_RO(supports_usb_power_delivery);
@@ -878,7 +878,7 @@ static ssize_t data_role_store(struct device *dev,
 	}
 
 	mutex_lock(&port->port_type_lock);
-	if (port->cap->type != TYPEC_PORT_DRP) {
+	if (port->port_type != TYPEC_PORT_DRP) {
 		dev_dbg(dev, "port type fixed at \"%s\"",
 			     typec_port_types[port->port_type]);
 		ret = -EOPNOTSUPP;
@@ -939,7 +939,7 @@ static ssize_t power_role_store(struct device *dev,
 	}
 
 	mutex_lock(&port->port_type_lock);
-	if (port->cap->type != TYPEC_PORT_DRP) {
+	if (port->port_type != TYPEC_PORT_DRP) {
 		dev_dbg(dev, "port type fixed at \"%s\"",
 			     typec_port_types[port->port_type]);
 		ret = -EOPNOTSUPP;
@@ -1182,6 +1182,7 @@ void typec_set_data_role(struct typec_port *port, enum typec_data_role role)
 		return;
 
 	port->data_role = role;
+	pr_info("%s data_role=%d\n", __func__, port->data_role);
 	sysfs_notify(&port->dev.kobj, NULL, "data_role");
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
 }
@@ -1201,6 +1202,7 @@ void typec_set_pwr_role(struct typec_port *port, enum typec_role role)
 		return;
 
 	port->pwr_role = role;
+	pr_info("%s pwr_role=%d\n", __func__, port->pwr_role);
 	sysfs_notify(&port->dev.kobj, NULL, "power_role");
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
 }
@@ -1252,7 +1254,9 @@ void typec_set_pwr_opmode(struct typec_port *port,
 
 	port->pwr_opmode = opmode;
 	sysfs_notify(&port->dev.kobj, NULL, "power_operation_mode");
+#ifndef CONFIG_USB_HOST_SAMSUNG_FEATURE
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
+#endif
 
 	partner_dev = device_find_child(&port->dev, NULL, partner_match);
 	if (partner_dev) {
@@ -1265,6 +1269,9 @@ void typec_set_pwr_opmode(struct typec_port *port,
 		}
 		put_device(partner_dev);
 	}
+#ifdef CONFIG_USB_HOST_SAMSUNG_FEATURE
+	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
+#endif
 }
 EXPORT_SYMBOL_GPL(typec_set_pwr_opmode);
 

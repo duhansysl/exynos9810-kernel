@@ -32,8 +32,11 @@ obj-$(CONFIG_CAMERA_CIS_IMX219_OBJ) += fimc-is-device-module-imx219.o
 obj-$(CONFIG_CAMERA_CIS_IMX258_OBJ) += fimc-is-device-module-imx258.o
 obj-$(CONFIG_CAMERA_CIS_SR259_OBJ) += fimc-is-device-module-sr259.o
 obj-$(CONFIG_CAMERA_CIS_IMX241_OBJ) += fimc-is-device-module-imx241.o
+obj-$(CONFIG_CAMERA_CIS_IMX616_OBJ) += fimc-is-device-module-imx616.o
 obj-$(CONFIG_CAMERA_CIS_VIRTUAL_OBJ) += fimc-is-device-module-virtual.o
 obj-$(CONFIG_CAMERA_CIS_3M3_OBJ) += fimc-is-device-module-3m3.o
+obj-$(CONFIG_CAMERA_CIS_3L6_OBJ) += fimc-is-device-module-3l6.o
+obj-$(CONFIG_CAMERA_CIS_GC5035_OBJ) += fimc-is-device-module-gc5035.o
 
 EXTRA_CFLAGS += -Idrivers/media/platform/exynos/fimc-is2
 EXTRA_CFLAGS += -Idrivers/media/platform/exynos/fimc-is2/include

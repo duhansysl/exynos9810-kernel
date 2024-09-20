@@ -24,12 +24,13 @@
 #if defined(CONFIG_SEC_SIPC_MODEM_IF)
 #include <soc/samsung/exynos-modem-ctrl.h>
 #endif
-#ifdef CONFIG_SEC_DEBUG
-#include <linux/sec_debug.h>
-#endif
 #ifdef CONFIG_EXYNOS_ACPM_S2D
 #include <soc/samsung/acpm_ipc_ctrl.h>
 #endif
+#ifdef CONFIG_SEC_DEBUG
+#include <linux/sec_debug.h>
+#endif
+
 
 //#define MULTI_IRQ_SUPPORT_ITMON
 
@@ -666,7 +667,7 @@ MODULE_DEVICE_TABLE(of, itmon_dt_match);
 #ifdef CONFIG_S3C2410_WATCHDOG
 extern int s3c2410wdt_set_emergency_reset(unsigned int timeout, int index);
 #else
-#define s3c2410wdt_set_emergency_reset(a, b)	do { } while (0)
+#define s3c2410wdt_set_emergency_reset(a, b)	do { } while(0)
 #endif
 static void itmon_switch_scandump(struct itmon_dev *itmon)
 {
@@ -997,6 +998,7 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 	struct itmon_platdata *pdata = itmon->pdata;
 	struct itmon_traceinfo *traceinfo = &pdata->traceinfo[trans_type];
 	struct itmon_nodegroup *group = NULL;
+
 #ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
 	char temp_buf[SZ_128];
 #endif
@@ -1004,8 +1006,7 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 	if (!traceinfo->dirty)
 		return;
 
-	pr_auto(ASL3,
-		"--------------------------------------------------------------------------\n"
+	pr_info("--------------------------------------------------------------------------\n"
 		"      Transaction Information\n\n"
 		"      > Master         : %s %s\n"
 		"      > Target         : %s\n"
@@ -1020,22 +1021,21 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 		trans_type == TRANS_TYPE_READ ? "READ" : "WRITE",
 		itmon_errcode[traceinfo->errcode]);
 #ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-	snprintf(temp_buf, SZ_128, "%s %s/ %s/ 0x%zx %s/ %s/ %s",
-		traceinfo->port, traceinfo->master ? traceinfo->master : "",
-		traceinfo->dest ? traceinfo->dest : "Unknown",
-		traceinfo->target_addr,
-		traceinfo->target_addr == INVALID_REMAPPING ?
-		"(by CP maybe)" : "",
-		trans_type == TRANS_TYPE_READ ? "READ" : "WRITE",
-		itmon_errcode[traceinfo->errcode]);
-	sec_debug_set_extra_info_busmon(temp_buf);
+		snprintf(temp_buf, SZ_128, "%s %s/ %s/ 0x%zx %s/ %s/ %s",
+			traceinfo->port, traceinfo->master ? traceinfo->master : "",
+			traceinfo->dest ? traceinfo->dest : "Unknown",
+			traceinfo->target_addr,
+			traceinfo->target_addr == INVALID_REMAPPING ?
+			"(by CP maybe)" : "",
+			trans_type == TRANS_TYPE_READ ? "READ" : "WRITE",
+			itmon_errcode[traceinfo->errcode]);
+		sec_debug_set_extra_info_busmon(temp_buf);
 #endif
 
 	if (node) {
 		struct itmon_tracedata *tracedata = &node->tracedata;
 
-		pr_auto(ASL3,
-			"      > Size           : %u bytes x %u burst => %u bytes\n"
+		pr_info("      > Size           : %u bytes x %u burst => %u bytes\n"
 			"      > Burst Type     : %u (0:FIXED, 1:INCR, 2:WRAP)\n"
 			"      > Level          : %s\n"
 			"      > Protection     : %s\n",
@@ -1046,13 +1046,12 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 			(BIT_AXPROT(tracedata->ext_info_2) & 0x2) ? "Non-secure access" : "Secure access");
 
 		group = node->group;
-		pr_auto(ASL3,
-			"      > Path Type      : %s\n"
+		pr_info("      > Path Type      : %s\n"
 			"--------------------------------------------------------------------------\n",
 			itmon_pathtype[traceinfo->path_type == -1 ? group->bus_type : traceinfo->path_type]);
 
 	} else {
-		pr_auto(ASL3, "--------------------------------------------------------------------------\n");
+		pr_info("--------------------------------------------------------------------------\n");
 	}
 }
 
@@ -1065,8 +1064,7 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	struct itmon_traceinfo *traceinfo = &pdata->traceinfo[trans_type];
 
 	if (!traceinfo->path_dirty) {
-		pr_auto(ASL3,
-			"--------------------------------------------------------------------------\n"
+		pr_info("--------------------------------------------------------------------------\n"
 			"      ITMON Report (%s)\n"
 			"--------------------------------------------------------------------------\n"
 			"      PATH Information\n",
@@ -1075,19 +1073,19 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	}
 	switch (node->type) {
 	case M_NODE:
-		pr_auto(ASL3, " > %14s, %8s(0x%08X)\n",
+		pr_info("      > %14s, %8s(0x%08X)\n",
 			node->name, "M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_S_NODE:
-		pr_auto(ASL3, " > %14s, %8s(0x%08X)\n",
+		pr_info("      > %14s, %8s(0x%08X)\n",
 			node->name, "T_S_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_M_NODE:
-		pr_auto(ASL3, " > %14s, %8s(0x%08X)\n",
+		pr_info("      > %14s, %8s(0x%08X)\n",
 			node->name, "T_M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case S_NODE:
-		pr_auto(ASL3, " > %14s, %8s(0x%08X)\n",
+		pr_info("      > %14s, %8s(0x%08X)\n",
 			node->name, "S_NODE", node->phy_regs + tracedata->offset);
 		break;
 	}
@@ -1297,7 +1295,7 @@ static void itmon_route_tracedata(struct itmon_dev *itmon)
 
 	if (pdata->traceinfo[TRANS_TYPE_READ].dirty ||
 		pdata->traceinfo[TRANS_TYPE_WRITE].dirty)
-		pr_auto(ASL3, " Raw Register Information(ITMON Internal Information)\n\n");
+		pr_info("      Raw Register Information(ITMON Internal Information)\n\n");
 
 	for (trans_type = 0; trans_type < TRANS_TYPE_NUM; trans_type++) {
 		for (i = M_NODE; i < NODE_TYPE; i++) {
@@ -1314,7 +1312,7 @@ static void itmon_route_tracedata(struct itmon_dev *itmon)
 
 	if (pdata->traceinfo[TRANS_TYPE_READ].dirty ||
 		pdata->traceinfo[TRANS_TYPE_WRITE].dirty)
-		pr_auto(ASL3, "--------------------------------------------------------------------------\n");
+		pr_info("--------------------------------------------------------------------------\n");
 
 	for (trans_type = 0; trans_type < TRANS_TYPE_NUM; trans_type++) {
 		if (!pdata->crash_in_progress) {
@@ -1362,7 +1360,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 		/* Only NOT S-Node is able to make log to registers */
 		break;
 	default:
-		pr_auto(ASL3, "Unknown Error - node:%s offset:%u\n", node->name, offset);
+		pr_info("Unknown Error - node:%s offset:%u\n", node->name, offset);
 		break;
 	}
 
@@ -1389,7 +1387,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 
 		list_add(&new_node->list, &pdata->tracelist[read]);
 	} else {
-		pr_auto(ASL3, "failed to kmalloc for %s node %x offset\n",
+		pr_info("failed to kmalloc for %s node %x offset\n",
 			node->name, offset);
 	}
 }
@@ -1650,7 +1648,7 @@ static ssize_t itmon_scandump_store(struct kobject *kobj,
 
 #ifdef CONFIG_EXYNOS_ACPM_S2D
 static ssize_t itmon_s2d_show(struct kobject *kobj,
-				struct kobj_attribute *attr, char *buf)
+			         struct kobj_attribute *attr, char *buf)
 {
 	ssize_t n = 0;
 	struct itmon_platdata *pdata = g_itmon->pdata;
@@ -1969,15 +1967,8 @@ static int itmon_probe(struct platform_device *pdev)
 	itmon->pdata->masterinfo = masterinfo;
 	itmon->pdata->rpathinfo = rpathinfo;
 	itmon->pdata->nodegroup = nodegroup;
-
-#ifdef CONFIG_SEC_DEBUG
-	if (sec_debug_check_sj()) {
-		printk("%s: LOCKED, no s2d\n", __func__);
-		itmon->pdata->sysfs_s2d = 0;
-	} else {
-		printk("%s: UNLOCKED, s2d\n", __func__);
-		itmon->pdata->sysfs_s2d = 1;
-	}
+#ifdef CONFIG_EXYNOS_SCAN2DRAM_SYSFS
+	itmon->pdata->sysfs_s2d = 1;
 #endif
 
 

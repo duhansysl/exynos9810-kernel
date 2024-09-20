@@ -45,3 +45,8 @@ config S3C2412_COMMON_CLK
 config S3C2443_COMMON_CLK
 	bool "Samsung S3C2443 clock controller support" if COMPILE_TEST
 	select COMMON_CLK_SAMSUNG
+
+config EXYNOS_USICMGP01_OSCCLK
+	bool "Use OSCCLK for USI CMGP01 SPI"
+	help
+		Support OSCCLK for USI CMGP01 SPI for making spiclk Under 6.5MHz

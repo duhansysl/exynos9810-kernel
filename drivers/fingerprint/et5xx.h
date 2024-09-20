@@ -32,6 +32,7 @@
 #include <linux/of_dma.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/pl330.h>
+/*
 #if defined(CONFIG_SECURE_OS_BOOSTER_API)
 #if defined(CONFIG_SOC_EXYNOS8890) || defined(CONFIG_SOC_EXYNOS7870) \
 	|| defined(CONFIG_SOC_EXYNOS7880) || defined(CONFIG_SOC_EXYNOS7570) \
@@ -40,6 +41,10 @@
 #else
 #include <mach/secos_booster.h>
 #endif
+#elif defined(CONFIG_TZDEV_BOOST)
+*/
+#if defined(CONFIG_TZDEV_BOOST)
+#include <../drivers/misc/tzdev/tz_boost.h>
 #endif
 
 struct sec_spi_info {
@@ -125,7 +130,7 @@ struct sec_spi_info {
 #define FP_SET_LOCKSCREEN				0x16
 #define FP_SET_WAKE_UP_SIGNAL				0x17
 #endif
-#define FP_POWER_CONTROL_ET5XX				0x18
+#define FP_POWER_CONTROL_ET5XX			0x18
 #define FP_SENSOR_ORIENT				0x19
 #define FP_SPI_VALUE					0x1a
 #define FP_IOCTL_RESERVED_01				0x1b
@@ -241,13 +246,14 @@ struct etspi_data {
 	struct wake_lock fp_spi_lock;
 #endif
 #endif
-	unsigned int orient;
 	struct wake_lock fp_signal_lock;
 	bool tz_mode;
 	int detect_period;
 	int detect_threshold;
 	bool finger_on;
 	const char *chipid;
+	bool ldo_enabled;
+	unsigned int orient;
 	int reset_count;
 	int interrupt_count;
 };

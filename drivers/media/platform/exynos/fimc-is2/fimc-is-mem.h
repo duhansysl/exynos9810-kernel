@@ -20,11 +20,11 @@
 #include <media/videobuf2-ion.h>
 #endif
 #include "fimc-is-framemgr.h"
+#include "exynos-fimc-is-sensor.h"
 
 struct fimc_is_vb2_buf;
 struct fimc_is_vb2_buf_ops {
 	ulong (*plane_kvaddr)(struct fimc_is_vb2_buf *vbuf, u32 plane);
-	ulong (*plane_cookie)(struct fimc_is_vb2_buf *vbuf, u32 plane);
 	dma_addr_t (*plane_dvaddr)(struct fimc_is_vb2_buf *vbuf, u32 plane);
 	void (*plane_prepare)(struct fimc_is_vb2_buf *vbuf, u32 plane,
 						bool exact);
@@ -32,6 +32,8 @@ struct fimc_is_vb2_buf_ops {
 						bool exact);
 	void (*buf_prepare)(struct fimc_is_vb2_buf *vbuf, bool exact);
 	void (*buf_finish)(struct fimc_is_vb2_buf *vbuf, bool exact);
+	long (*remap_attr)(struct fimc_is_vb2_buf *vbuf, int attr);
+	void (*unremap_attr)(struct fimc_is_vb2_buf *vbuf, int attr);
 	dma_addr_t (*bufcon_map)(struct fimc_is_vb2_buf *vbuf, struct device *dev, int idx, struct dma_buf *dmabuf);
 	void (*bufcon_unmap)(struct fimc_is_vb2_buf *vbuf, int idx);
 };
@@ -112,7 +114,7 @@ struct fimc_is_mem_ops {
 	void (*suspend)(void *ctx);
 	void (*set_cached)(void *ctx, bool cacheable);
 	int (*set_alignment)(void *ctx, size_t alignment);
-	struct fimc_is_priv_buf *(*alloc)(void *ctx, size_t size, size_t align);
+	struct fimc_is_priv_buf *(*alloc)(void *ctx, size_t size, unsigned int heap_id_mask, unsigned int flags);
 };
 
 struct fimc_is_ion_ctx {
@@ -153,8 +155,7 @@ struct fimc_is_mem {
 struct fimc_is_minfo {
 	struct fimc_is_priv_buf *pb_fw;
 	struct fimc_is_priv_buf *pb_setfile;
-	struct fimc_is_priv_buf *pb_rear_cal;
-	struct fimc_is_priv_buf *pb_front_cal;
+	struct fimc_is_priv_buf *pb_cal[SENSOR_POSITION_MAX];
 	struct fimc_is_priv_buf *pb_debug;
 	struct fimc_is_priv_buf *pb_event;
 	struct fimc_is_priv_buf *pb_fshared;
@@ -163,6 +164,10 @@ struct fimc_is_minfo {
 	struct fimc_is_priv_buf *pb_heap_rta; /* RTA HEAP */
 	struct fimc_is_priv_buf *pb_heap_ddk; /* DDK HEAP */
 	struct fimc_is_priv_buf *pb_taaisp;
+	struct fimc_is_priv_buf *pb_medrc;
+	struct fimc_is_priv_buf *pb_taaisp_s;	/* secure */
+	struct fimc_is_priv_buf *pb_medrc_s;	/* secure */
+	struct fimc_is_priv_buf *pb_tnr;
 	struct fimc_is_priv_buf *pb_lhfd;
 	struct fimc_is_priv_buf *pb_vra;
 	struct fimc_is_priv_buf *pb_tpu;
@@ -187,8 +192,6 @@ struct fimc_is_minfo {
 	dma_addr_t	dvaddr_region;
 	ulong		kvaddr_region;
 
-	dma_addr_t	dvaddr_taaisp;
-	ulong		kvaddr_taaisp;
 	dma_addr_t	dvaddr_tpu;
 	ulong		kvaddr_tpu;
 	dma_addr_t	dvaddr_lhfd;	/* FD map buffer region */
@@ -199,8 +202,7 @@ struct fimc_is_minfo {
 	ulong		kvaddr_mcsc_dnr;
 
 	ulong		kvaddr_setfile;
-	ulong		kvaddr_rear_cal;
-	ulong		kvaddr_front_cal;
+	ulong           kvaddr_cal[SENSOR_POSITION_MAX];
 };
 
 int fimc_is_mem_init(struct fimc_is_mem *mem, struct platform_device *pdev);

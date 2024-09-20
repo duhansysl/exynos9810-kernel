@@ -10,12 +10,6 @@
  * published by the Free Software Foundation.
  */
 
-struct fimc_is_eeprom_gpio {
-	char *sda;
-	char *scl;
-	char *pinname;
-};
-
 struct fimc_is_device_eeprom {
 	struct v4l2_device			v4l2_dev;
 	struct platform_device			*pdev;

@@ -41,7 +41,7 @@ ENTRY(uh_call)
 	ldp	x2, x3, [sp, #32]
 	ldp	x4, x5, [sp, #48]
 	ldp	x29, x30, [sp], #64
-#endif	
+#endif
 	ret
 ENDPROC(uh_call)
 

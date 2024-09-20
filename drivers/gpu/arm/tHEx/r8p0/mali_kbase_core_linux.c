@@ -1660,12 +1660,14 @@ static int kbase_api_tlstream_stats(struct kbase_context *kctx,
 #endif /* MALI_UNIT_TEST */
 
 #define KBASE_HANDLE_IOCTL(cmd, function)                          \
+	case cmd:                                                  \
 	do {                                                       \
 		BUILD_BUG_ON(_IOC_DIR(cmd) != _IOC_NONE);          \
 		return function(kctx);                             \
 	} while (0)
 
 #define KBASE_HANDLE_IOCTL_IN(cmd, function, type)                 \
+	case cmd:                                                  \
 	do {                                                       \
 		type param;                                        \
 		int err;                                           \
@@ -1678,6 +1680,7 @@ static int kbase_api_tlstream_stats(struct kbase_context *kctx,
 	} while (0)
 
 #define KBASE_HANDLE_IOCTL_OUT(cmd, function, type)                \
+	case cmd:                                                  \
 	do {                                                       \
 		type param;                                        \
 		int ret, err;                                      \
@@ -1691,6 +1694,7 @@ static int kbase_api_tlstream_stats(struct kbase_context *kctx,
 	} while (0)
 
 #define KBASE_HANDLE_IOCTL_INOUT(cmd, function, type)                  \
+	case cmd:                                                      \
 	do {                                                           \
 		type param;                                            \
 		int ret, err;                                          \
@@ -1728,17 +1732,12 @@ static long kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	/* Only these ioctls are available until setup is complete */
 	switch (cmd) {
-	case KBASE_IOCTL_VERSION_CHECK:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_VERSION_CHECK,
 				kbase_api_handshake,
 				struct kbase_ioctl_version_check);
-		break;
-
-	case KBASE_IOCTL_SET_FLAGS:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_SET_FLAGS,
 				kbase_api_set_flags,
 				struct kbase_ioctl_set_flags);
-		break;
 	}
 
 	/* Block call until version handshake and setup is complete */
@@ -1747,154 +1746,95 @@ static long kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	/* Normal ioctls */
 	switch (cmd) {
-	case KBASE_IOCTL_JOB_SUBMIT:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_JOB_SUBMIT,
 				kbase_api_job_submit,
 				struct kbase_ioctl_job_submit);
-		break;
-	case KBASE_IOCTL_GET_GPUPROPS:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_GET_GPUPROPS,
 				kbase_api_get_gpuprops,
 				struct kbase_ioctl_get_gpuprops);
-		break;
-	case KBASE_IOCTL_POST_TERM:
 		KBASE_HANDLE_IOCTL(KBASE_IOCTL_POST_TERM,
 				kbase_api_post_term);
-		break;
-	case KBASE_IOCTL_MEM_ALLOC:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_MEM_ALLOC,
 				kbase_api_mem_alloc,
 				union kbase_ioctl_mem_alloc);
-		break;
-	case KBASE_IOCTL_MEM_QUERY:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_MEM_QUERY,
 				kbase_api_mem_query,
 				union kbase_ioctl_mem_query);
-		break;
-	case KBASE_IOCTL_MEM_FREE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_FREE,
 				kbase_api_mem_free,
 				struct kbase_ioctl_mem_free);
-		break;
-	case KBASE_IOCTL_HWCNT_READER_SETUP:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_HWCNT_READER_SETUP,
 				kbase_api_hwcnt_reader_setup,
 				struct kbase_ioctl_hwcnt_reader_setup);
-		break;
-	case KBASE_IOCTL_HWCNT_ENABLE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_HWCNT_ENABLE,
 				kbase_api_hwcnt_enable,
 				struct kbase_ioctl_hwcnt_enable);
-		break;
-	case KBASE_IOCTL_HWCNT_DUMP:
 		KBASE_HANDLE_IOCTL(KBASE_IOCTL_HWCNT_DUMP,
 				kbase_api_hwcnt_dump);
-		break;
-	case KBASE_IOCTL_HWCNT_CLEAR:
 		KBASE_HANDLE_IOCTL(KBASE_IOCTL_HWCNT_CLEAR,
 				kbase_api_hwcnt_clear);
-		break;
-	case KBASE_IOCTL_DISJOINT_QUERY:
 		KBASE_HANDLE_IOCTL_OUT(KBASE_IOCTL_DISJOINT_QUERY,
 				kbase_api_disjoint_query,
 				struct kbase_ioctl_disjoint_query);
-		break;
-	case KBASE_IOCTL_GET_DDK_VERSION:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_GET_DDK_VERSION,
 				kbase_api_get_ddk_version,
 				struct kbase_ioctl_get_ddk_version);
-		break;
-	case KBASE_IOCTL_MEM_JIT_INIT:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_JIT_INIT,
 				kbase_api_mem_jit_init,
 				struct kbase_ioctl_mem_jit_init);
-		break;
-	case KBASE_IOCTL_MEM_SYNC:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_SYNC,
 				kbase_api_mem_sync,
 				struct kbase_ioctl_mem_sync);
-		break;
-	case KBASE_IOCTL_MEM_FIND_CPU_OFFSET:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_MEM_FIND_CPU_OFFSET,
 				kbase_api_mem_find_cpu_offset,
 				union kbase_ioctl_mem_find_cpu_offset);
-		break;
-	case KBASE_IOCTL_GET_CONTEXT_ID:
 		KBASE_HANDLE_IOCTL_OUT(KBASE_IOCTL_GET_CONTEXT_ID,
 				kbase_api_get_context_id,
 				struct kbase_ioctl_get_context_id);
-		break;
-	case KBASE_IOCTL_TLSTREAM_ACQUIRE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_TLSTREAM_ACQUIRE,
 				kbase_api_tlstream_acquire,
 				struct kbase_ioctl_tlstream_acquire);
-		break;
-	case KBASE_IOCTL_TLSTREAM_FLUSH:
 		KBASE_HANDLE_IOCTL(KBASE_IOCTL_TLSTREAM_FLUSH,
 				kbase_api_tlstream_flush);
-		break;
-	case KBASE_IOCTL_MEM_COMMIT:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_COMMIT,
 				kbase_api_mem_commit,
 				struct kbase_ioctl_mem_commit);
-		break;
-	case KBASE_IOCTL_MEM_ALIAS:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_MEM_ALIAS,
 				kbase_api_mem_alias,
 				union kbase_ioctl_mem_alias);
-		break;
-	case KBASE_IOCTL_MEM_IMPORT:
 		KBASE_HANDLE_IOCTL_INOUT(KBASE_IOCTL_MEM_IMPORT,
 				kbase_api_mem_import,
 				union kbase_ioctl_mem_import);
-		break;
-	case KBASE_IOCTL_MEM_FLAGS_CHANGE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_FLAGS_CHANGE,
 				kbase_api_mem_flags_change,
 				struct kbase_ioctl_mem_flags_change);
-		break;
-	case KBASE_IOCTL_STREAM_CREATE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_STREAM_CREATE,
 				kbase_api_stream_create,
 				struct kbase_ioctl_stream_create);
-		break;
-	case KBASE_IOCTL_FENCE_VALIDATE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_FENCE_VALIDATE,
 				kbase_api_fence_validate,
 				struct kbase_ioctl_fence_validate);
-		break;
-	case KBASE_IOCTL_GET_PROFILING_CONTROLS:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_GET_PROFILING_CONTROLS,
 				kbase_api_get_profiling_controls,
 				struct kbase_ioctl_get_profiling_controls);
-		break;
-	case KBASE_IOCTL_MEM_PROFILE_ADD:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_MEM_PROFILE_ADD,
 				kbase_api_mem_profile_add,
 				struct kbase_ioctl_mem_profile_add);
-		break;
-	case KBASE_IOCTL_SOFT_EVENT_UPDATE:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_SOFT_EVENT_UPDATE,
 				kbase_api_soft_event_update,
 				struct kbase_ioctl_soft_event_update);
-		break;
-	case KBASE_IOCTL_SLSI_COMBINATION_BOOST_FLAGS:
-		/* MALI_SEC_INTEGRATION */
-		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_SLSI_COMBINATION_BOOST_FLAGS,
-				kbase_api_combination_boost,
-				struct kbase_ioctl_slsi_combination_boost_flags);
-		break;
+/* MALI_SEC_INTEGRATION */
+       KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_SLSI_COMBINATION_BOOST_FLAGS,
+               kbase_api_combination_boost,
+               struct kbase_ioctl_slsi_combination_boost_flags);
+
 #if MALI_UNIT_TEST
-	case KBASE_IOCTL_TLSTREAM_TEST:
 		KBASE_HANDLE_IOCTL_IN(KBASE_IOCTL_TLSTREAM_TEST,
 				kbase_api_tlstream_test,
 				struct kbase_ioctl_tlstream_test);
-		break;
-	case KBASE_IOCTL_TLSTREAM_STATS:
 		KBASE_HANDLE_IOCTL_OUT(KBASE_IOCTL_TLSTREAM_STATS,
 				kbase_api_tlstream_stats,
 				struct kbase_ioctl_tlstream_stats);
-		break;
 #endif
 	}
 

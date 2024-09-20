@@ -2,6 +2,7 @@
 #define _RKP_H
 
 #ifndef __ASSEMBLY__
+#include <linux/uh.h>
 
 /* uH_RKP Command ID */
 enum __RKP_CMD_ID {
@@ -109,54 +110,6 @@ struct rkp_init { //copy from uh (app/rkp/rkp.h)
          u64 tramp_valias;
 };
 
-#ifdef CONFIG_RKP_KDP
-typedef struct kdp_init_struct {
-	u32 credSize;
-	u32 sp_size;
-	u32 pgd_mm;
-	u32 uid_cred;
-	u32 euid_cred;
-	u32 gid_cred;
-	u32 egid_cred;
-	u32 bp_pgd_cred;
-	u32 bp_task_cred;
-	u32 type_cred;
-	u32 security_cred;
-	u32 usage_cred;
-	u32 cred_task;
-	u32 mm_task;
-	u32 pid_task;
-	u32 rp_task;
-	u32 comm_task;
-	u32 bp_cred_secptr;
-	u64 verifiedbootstate;
-} kdp_init_t;
-#endif  /* CONFIG_RKP_KDP */
-
-
-
-
-#ifdef CONFIG_RKP_NS_PROT
-typedef struct ns_param {
-	u32 ns_buff_size;
-	u32 ns_size;
-	u32 bp_offset;
-	u32 sb_offset;
-	u32 flag_offset;
-	u32 data_offset;
-}ns_param_t;
-
-#define rkp_ns_fill_params(nsparam,buff_size,size,bp,sb,flag,data)	\
-do {						\
-	nsparam.ns_buff_size = (u64)buff_size;		\
-	nsparam.ns_size  = (u64)size;		\
-	nsparam.bp_offset = (u64)bp;		\
-	nsparam.sb_offset = (u64)sb;		\
-	nsparam.flag_offset = (u64)flag;		\
-	nsparam.data_offset = (u64)data;		\
-} while(0)
-#endif
-
 #define rkp_is_pg_protected(va)	rkp_is_protected(va, __pa(va), (u64 *)rkp_pgt_bitmap, 1)
 #define rkp_is_pg_dbl_mapped(pa) rkp_is_protected((u64)__va(pa), pa, (u64 *)rkp_map_bitmap, 0)
 
@@ -180,7 +133,7 @@ do {						\
 #define FIMC_LIB_START_VA		(FIMC_LIB_OFFSET_VA + 0x04000000)
 #define FIMC_VRA_LIB_SIZE		(0x80000)
 #define FIMC_DDK_LIB_SIZE		(0x400000)
-#define FIMC_RTA_LIB_SIZE		(0x300000)
+#define FIMC_RTA_LIB_SIZE		(0x400000)
 
 #define FIMC_LIB_SIZE			(FIMC_VRA_LIB_SIZE + FIMC_DDK_LIB_SIZE + FIMC_RTA_LIB_SIZE)
 

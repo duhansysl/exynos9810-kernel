@@ -222,7 +222,8 @@ enum fimc_is_video_state {
 enum fimc_is_queue_state {
 	FIMC_IS_QUEUE_BUFFER_PREPARED,
 	FIMC_IS_QUEUE_BUFFER_READY,
-	FIMC_IS_QUEUE_STREAM_ON
+	FIMC_IS_QUEUE_STREAM_ON,
+	IS_QUEUE_NEED_TO_REMAP,
 };
 
 struct fimc_is_frame_cfg {
@@ -267,9 +268,8 @@ struct fimc_is_queue {
 	u32				buf_maxcount;
 	u32				buf_rdycount;
 	u32				buf_refcount;
-	ulong				buf_dva[FIMC_IS_MAX_BUFS][FIMC_IS_MAX_PLANES];
+	dma_addr_t			buf_dva[FIMC_IS_MAX_BUFS][FIMC_IS_MAX_PLANES];
 	ulong				buf_kva[FIMC_IS_MAX_BUFS][FIMC_IS_MAX_PLANES];
-	ulong				buf_box[FIMC_IS_MAX_BUFS][FIMC_IS_MAX_PLANES];
 
 	/* for debugging */
 	u32				buf_req;
@@ -342,8 +342,8 @@ int fimc_is_queue_setup(struct fimc_is_queue *queue,
 	struct device *alloc_devs[]);
 int fimc_is_queue_buffer_queue(struct fimc_is_queue *queue,
 	struct vb2_buffer *vb);
-int fimc_is_buffer_init(struct vb2_buffer *vb);
-int fimc_is_queue_prepare(struct vb2_buffer *vb);
+int fimc_is_queue_buffer_init(struct vb2_buffer *vb);
+int fimc_is_queue_buffer_prepare(struct vb2_buffer *vb);
 void fimc_is_queue_wait_prepare(struct vb2_queue *vbq);
 void fimc_is_queue_wait_finish(struct vb2_queue *vbq);
 int fimc_is_queue_start_streaming(struct fimc_is_queue *queue,

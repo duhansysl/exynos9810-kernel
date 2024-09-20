@@ -31,6 +31,7 @@
 #include <linux/compiler.h>
 #include <linux/moduleparam.h>
 #include <linux/wakeup_reason.h>
+#include <linux/cpumask.h>
 
 #include "power.h"
 
@@ -46,6 +47,18 @@ static DECLARE_WAIT_QUEUE_HEAD(suspend_freeze_wait_head);
 
 enum freeze_state __read_mostly suspend_freeze_state;
 static DEFINE_SPINLOCK(suspend_freeze_lock);
+
+static struct cpumask fast_cpu_mask;
+static struct cpumask backup_cpu_mask;
+
+static void init_pm_cpumask(void)
+{
+	int i;
+	cpumask_clear(&fast_cpu_mask);
+	for (i = 4; i < nr_cpu_ids; i++) {
+		cpumask_set_cpu(i, &fast_cpu_mask);
+	}
+}
 
 void freeze_set_ops(const struct platform_freeze_ops *ops)
 {
@@ -127,6 +140,7 @@ void __init pm_states_init(void)
 	 * initialize pm_states accordingly here
 	 */
 	pm_states[PM_SUSPEND_FREEZE] = pm_labels[relative_states ? 0 : 2];
+	init_pm_cpumask();
 }
 
 static int __init sleep_states_setup(char *str)
@@ -285,7 +299,6 @@ static int suspend_prepare(suspend_state_t state)
 
 	error = __pm_notifier_call_chain(PM_SUSPEND_PREPARE, -1, &nr_calls);
 	if (error) {
-		log_suspend_abort_reason("Suspend_prepare failed(%d)", nr_calls);
 		nr_calls--;
 		goto Finish;
 	}
@@ -420,6 +433,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 
  Enable_cpus:
 	enable_nonboot_cpus();
+	cpumask_copy(&backup_cpu_mask, &current->cpus_allowed);
+	set_cpus_allowed_ptr(current, &fast_cpu_mask);
 
  Platform_wake:
 	platform_resume_noirq(state);
@@ -478,6 +493,11 @@ int suspend_devices_and_enter(suspend_state_t state)
 
  Close:
 	platform_resume_end(state);
+	if (!cpumask_empty(&backup_cpu_mask)) {
+		cpumask_copy(&current->cpus_allowed, &backup_cpu_mask);
+		cpumask_clear(&backup_cpu_mask);
+	}
+
 	return error;
 
  Recover_platform:

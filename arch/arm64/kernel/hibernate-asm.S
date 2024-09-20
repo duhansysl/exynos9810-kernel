@@ -102,7 +102,7 @@ ENTRY(swsusp_arch_suspend_exit)
 #ifndef	CONFIG_SOC_EXYNOS9810
 2:	dc	cvau, x4	/* clean D line / unified line */
 #else
-2:	dc	cvac, x4	/* clean D line / unified line */
+2:	dc	civac, x4	/* clean D line / unified line */
 #endif
 	add	x4, x4, x2
 	cmp	x4, x1

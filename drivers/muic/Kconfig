@@ -28,6 +28,41 @@ config MUIC_NOTIFIER
 	  If you say yes here you will get support for
 	  the MUIC attached device status change notification.
 
+config MUIC_MANAGER
+	bool "MUIC Manager supports CCIC chip interface"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support manager for the CCIC chip.
+
+config MUIC_CORE
+	bool "Supports MUIC Core"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MUIC Core functionalities
+
+config MUIC_HV
+	bool "MUIC_HV"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config MUIC_HV_12V
+	bool "MUIC_HV_12V"
+	depends on MUIC_HV
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config MUIC_SUPPORT_CCIC
+	bool "MUIC supports CCIC chip interface"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the CCIC chip.
+
 config MUIC_MAX77705
         bool "Using MAX77705 MUIC"
         depends on USE_MUIC
@@ -48,61 +83,6 @@ config HV_MUIC_MAX77705_AFC
 	  To enable this driver,
 	  MUIC_MAX77705 should be enabled.
 
-config MUIC_UNIVERSAL
-	bool "UNIVERSAL MUIC"
-	depends on USE_MUIC
-	default n
-	help
-	  If you say yes here you will get support for various MUIC chips.
-
-config MUIC_UNIVERSAL_MAX77854
-	bool "MAX77854 MUIC"
-	depends on MUIC_UNIVERSAL
-	default n
-	help
-	  If you say yes here you will get support for the MAX77854 MUIC chip.
-
-config MUIC_UNIVERSAL_MAX77865
-	bool "MAX77865 MUIC"
-	depends on MUIC_UNIVERSAL
-	default n
-	help
-	  If you say yes here you will get support for the MAX77865 MUIC chip.
-
-config MUIC_HV
-	bool "MUIC_HV"
-	depends on MUIC_UNIVERSAL
-	default n
-	help
-	  If you say yes here you will get support for the AFC.
-
-config MUIC_HV_12V
-	bool "MUIC_HV_12V"
-	depends on MUIC_HV
-	default n
-	help
-	  If you say yes here you will get support for the AFC.
-
-config MUIC_HV_MAX77854
-	bool "MUIC_HV_MAX77854"
-	depends on MUIC_UNIVERSAL_MAX77854
-	default n
-	help
-	  If you say yes here you will get support for the AFC.
-
-config MUIC_HV_MAX77865
-	bool "MUIC_HV_MAX77865"
-	depends on MUIC_UNIVERSAL_MAX77865
-	default n
-	help
-	  If you say yes here you will get support for the AFC.
-
-config MUIC_SUPPORT_CCIC
-	bool "MUIC supports CCIC chip interface"
-	default n
-	help
-	  If you say yes here you will get support for the CCIC chip.
-
 config MUIC_MAX77705_CCIC
         bool "Using MAX77705 MUIC supports CCIC chip interface"
         depends on MUIC_MAX77705 && MUIC_SUPPORT_CCIC
@@ -113,6 +93,266 @@ config MUIC_MAX77705_CCIC
 	  To enable this driver,
 	  MUIC_MAX77705 and MUIC_SUPPORT_CCIC should be enabled.
 
+config MUIC_SUPPORT_POWERMETER
+	bool "MUIC supports PM chip interface"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the Power Meter.
+
+config MUIC_S2MU004
+	bool "Using S2MU004 MUIC"
+	depends on USE_MUIC && MFD_S2MU004
+	default n
+	help
+	  If you say yes here you will get support for the S2MU004 MUIC chip.
+
+config MUIC_SUPPORT_CCIC_OTG_CTRL
+	bool "MUIC Allows CCIC to Disable MUIC VBUS DET"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for this.
+
+config MUIC_SUPPORT_TYPEB
+	bool "Using Type-B Features"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the TypeB Features.
+
+config MUIC_SYSFS
+	bool "Using muic sysfs Features"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the muic sysfs.
+
+config MUIC_SUPPORT_VBUS_BOOST
+	bool "Using muic Features for vbus boost"
+	depends on USE_MUIC && BATTERY_SAMSUNG_V2
+	default n
+	help
+	  If you say yes here you will get support for the muic vbus boosting.
+
+config MUIC_SKIP_INCOMPLETE_INSERT
+	bool "Not Using muic Features for incomplete insert"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the muic incomplete insert.
+
+config HV_MUIC_S2MU004_AFC
+	bool "Using S2MU004 MUIC AFC"
+	depends on MUIC_S2MU004
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config HV_MUIC_VOLTAGE_CTRL
+	bool "Using AFC Voltage control functionality"
+	depends on MUIC_HV_S2MU004_AFC || MUIC_HV
+	default n
+	help
+	  If you say yes here you will get support for
+	  the AFC voltage control functionality.
+
+config MUIC_S2MU004_AFC_DISABLE
+	bool "Using AFC disable functionality"
+	depends on MUIC_S2MU004
+	default n
+	help
+	  If you say yes here you will get support for
+	  the AFC disable control functionality.
+
+config MUIC_S2MU005
+	bool "Using S2MU005 MUIC"
+	depends on USE_MUIC && MFD_S2MU005
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the S2MU005 MUIC chip.
+
+config MUIC_S2MU005_ENABLE_AUTOSW
+	bool "Using S2MU005 MUIC ENABLE AUTOSW"
+	depends on MUIC_S2MU005
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the S2MU005 MUIC chip ENABLE AUTOSW feature.
+
+config MUIC_S2MU005_DISCHARGING_WA
+	bool "Using S2MU005 MUIC DISCHARGING WORKAROUND"
+	depends on MUIC_S2MU005
+	default n
+	help
+		If you say yes here you will get support for
+		for the S2MU005 MUIC chip DISCHARGING WA feature.
+
+config MUIC_S2MU106
+	bool "Using S2MU106 MUIC"
+	depends on USE_MUIC && MFD_S2MU106
+	default n
+	help
+	  If you say yes here you will get support for the S2MU106 MUIC chip.
+
+config HV_MUIC_S2MU106_AFC
+	bool "Using S2MU106 MUIC AFC"
+	depends on MUIC_HV && MUIC_S2MU106
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config MUIC_S2MU106_RID
+	bool "Using S2MU106 MUIC RID"
+	depends on MUIC_S2MU106
+	default n
+	help
+	  If you say yes here you will get support for the S2MU106 MUIC RID functions.
+
+config S2MU106_TYPEC_WATER
+	bool "Using S2MU106 Type-C Water Detection"
+	depends on MUIC_S2MU106_RID
+	default n
+	help
+	  If you say yes here you will get support for
+	  the S2MU106 Type-C Water functions.
+
+config MUIC_S2MU205
+	bool "Using S2MU205 MUIC"
+	depends on USE_MUIC && MFD_S2MU205
+	default n
+	help
+	  If you say yes here you will get support for the S2MU205 MUIC chip.
+
+config MUIC_S2MU205_RID
+	bool "Using S2MU205 MUIC RID"
+	depends on MUIC_S2MU205
+	default n
+	help
+	  If you say yes here you will get support for the S2MU205 MUIC RID functions.
+
+config S2MU205_TYPEC_WATER
+	bool "Using S2MU205 Type-C Water Detection"
+	depends on MUIC_S2MU205_RID
+	default n
+	help
+	  If you say yes here you will get support for
+	  the S2MU205 Type-C Water functions.
+
+config MUIC_S2MU107
+	bool "Using S2MU107 MUIC"
+	depends on USE_MUIC && MFD_S2MU107
+	default n
+	help
+	  If you say yes here you will get support for the S2MU107 MUIC chip.
+
+config HV_MUIC_S2MU107_AFC
+	bool "Using S2MU107 MUIC AFC"
+	depends on MUIC_HV && MUIC_S2MU107
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config MUIC_S2MU107_RID
+	bool "Using S2MU107 MUIC RID"
+	depends on MUIC_S2MU107
+	default n
+	help
+	  If you say yes here you will get support for the S2MU106 MUIC RID functions.
+
+config S2MU107_TYPEC_WATER
+	bool "Using S2MU107 Type-C Water Detection"
+	depends on MUIC_S2MU107_RID
+	default n
+	help
+	  If you say yes here you will get support for
+	  the S2MU106 Type-C Water functions.
+
+config MUIC_S2MU107_ENABLE_AUTOSW
+	bool "Using S2MU107 MUIC ENABLE AUTOSW"
+	depends on MUIC_S2MU107
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the S2MU107 MUIC chip ENABLE AUTOSW feature.
+
+config HICCUP_CHARGER
+	bool "Using HICCUP charger"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the hiccup charger feature.
+config CP_UART_SWITCH
+	bool "Using CP UART PATH"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the cp uart path feature.
+
+config NEW_FACTORY_JIGONB
+	bool "Using JIGONB control"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the jigonb control.
+
+config NEW_FACTORY_UART
+	bool "Using factory uart control"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the factory uart control.
+
+config MUIC_INCOMPATIBLE_VZW
+	bool "Using Verizon incomatible type"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the Verizon incomatible type cable.
+
+config MUIC_S2MU005_SUPPORT_HMT
+	bool "Using HMT"
+	depends on USE_MUIC
+	default n
+	help
+		If you say yes here you will get support for
+		for the HMT accessory.
+
+config MUIC_UNIVERSAL
+	bool "UNIVERSAL MUIC"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for various MUIC chips.
+
+config MUIC_UNIVERSAL_MAX77865
+	bool "MAX77865 MUIC"
+	depends on MUIC_UNIVERSAL
+	default n
+	help
+	  If you say yes here you will get support for the MAX77865 MUIC chip.
+
+config MUIC_HV_MAX77865
+	bool "MUIC_HV_MAX77865"
+	depends on MUIC_UNIVERSAL_MAX77865
+	default n
+	help
+	  If you say yes here you will get support for the AFC.
+
+config MUIC_S2MU004_NON_USB_C_TYPE
+	bool "Using S2MU005 MUIC with non usb-c type"
+	depends on MUIC_S2MU004
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the S2MU004 MUIC non usb-c type chip.
+
 config MUIC_TEST_FUNC
 	bool "MUIC supports several function's in TEST"
 	depends on SEC_DEBUG && !SAMSUNG_PRODUCT_SHIP
@@ -120,25 +360,26 @@ config MUIC_TEST_FUNC
 	help
 	  If you say yes here you will get support for the TEST function's.
 
-config HICCUP_CHARGER
-	bool "Using HICCUP charger"
-	depends on USE_MUIC && !SEC_FACTORY
+config TYPEB_WATERPROOF_MODEL
+	bool "Using TYPEB WATERPROOF MODEL"
+	depends on USE_MUIC
 	default n
 	help
 		If you say yes here you will get support for
-		for the hiccup charger feature.
+		for the  TYPEB WATERPROOF MODEL feature.
 
-config MUIC_HV_SUPPORT_POGO_DOCK
-	bool "MUIC_HV_SUPPORT_POGO_DOCK"
+config MUIC_SUPPORT_PRSWAP
+	bool "MUIC supports power role swap"
 	depends on USE_MUIC
 	default n
 	help
-	  If you say yes here you will get support for the AFC pogo dock.
+	  If you say yes here you will get support for the power role swap.
 
-config MUIC_SM5508
-	bool "SM5508 MUIC"
+config MUIC_SM5504_POGO
+	bool "Using SM5504 MUIC for pogo"
 	depends on USE_MUIC
 	default n
 	help
-	  If you say yes here you will get support for the SM5508 MUIC chip.
-	  
+	  If you say yes here you will get support for sm5504 muic pogo.
+
+

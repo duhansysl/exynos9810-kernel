@@ -796,8 +796,8 @@ Retry_Sense:
 #ifdef CONFIG_USB_DEBUG_DETAILED_LOG
 			pr_err("usb storage -- auto-sense failure\n");
 #endif
-
-			/* we skip the reset if this happens to be a
+			/*
+			 * we skip the reset if this happens to be a
 			 * multi-target device, since failure of an
 			 * auto-sense is perfectly valid
 			 */

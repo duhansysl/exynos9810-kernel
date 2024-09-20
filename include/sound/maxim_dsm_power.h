@@ -16,19 +16,6 @@
 
 #define MAXDSM_POWER_START_DELAY 1000
 
-enum maxdsm_ppr_channel {
-	MAXDSM_LEFT = 0,
-	MAXDSM_RIGHT = 1,
-	MAXDSM_CHANNEL = 2,
-};
-
-enum maxdsm_ppr_state {
-	PPR_OFF = 0,
-	PPR_ON,
-	PPR_NORMAL,
-	PPR_RUN,
-};
-
 struct maxim_dsm_power_info {
 	int interval;
 	int duration;
@@ -39,29 +26,8 @@ struct maxim_dsm_power_info {
 struct maxim_dsm_power_values {
 	uint32_t status;
 	int power;
-	int power_r;
 	uint64_t avg;
-	uint64_t avg_r;
 	int count;
-};
-
-struct maxim_dsm_power_ppr_info {
-	int interval;
-	int duration;
-	int target_min_time_ms;
-	int global_enable;
-	unsigned long previous_jiffies;
-	unsigned long amp_uptime_jiffies;
-};
-
-struct maxim_dsm_ppr_values {
-	int status;
-	int target_temp;
-	int exit_temp;
-	int cutoff_frequency;
-	int threshold_level;
-	int env_temp;
-	int spk_t;
 };
 
 struct maxim_dsm_power {
@@ -70,21 +36,9 @@ struct maxim_dsm_power {
 	struct mutex mutex;
 	struct workqueue_struct *wq;
 	struct delayed_work work;
-	struct delayed_work work_ppr;
 	struct maxim_dsm_power_values values;
 	struct maxim_dsm_power_info info;
-	struct maxim_dsm_ppr_values values_ppr[MAXDSM_CHANNEL];
-	struct maxim_dsm_power_ppr_info info_ppr;
 	uint32_t platform_type;
 };
-
-struct maxim_dsm_ppr_init_values {
-	int target_temp[MAXDSM_CHANNEL];
-	int exit_temp[MAXDSM_CHANNEL];
-};
-
-void maxdsm_power_ppr_control(int state);
-void maxdsm_power_control(int state);
-int maxdsm_update_ppr_info(uint32_t *ppr_info);
 
 #endif /* __SOUND_MAXIM_DSM_POWER_H__ */

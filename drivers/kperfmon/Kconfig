@@ -1,0 +1,17 @@
+#
+# Samsung Performance Logging system
+#
+
+menu "samsung Performace manager"
+
+config KPERFMON
+	bool "Enable performance log"
+	default y
+	help
+		Samsung performance log(OLOG).
+		Say Y here if enable performance olog driver to do logging system resources.
+		When some delay occurs in the kernel, native or user space,
+		the logging information should be restored into the system.
+
+endmenu
+

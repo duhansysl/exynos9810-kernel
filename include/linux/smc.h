@@ -65,13 +65,26 @@
 #define SMC_DRM_PPMP_MFCFW_UNPROT	(0x82002113)
 #define MC_FC_SET_CFW_PROT		(0x82002040)
 #define SMC_DRM_SEC_SMMU_INFO		(0x820020D0)
-
-/* PPMPU */
-#define SMC_PPMPU_PR_VIOLATION		(0x820020DE)
-#define SMC_PPMPU_GET_PROT		(0x820020DF)
-
 #define MC_FC_DRM_SET_CFW_PROT		(0x10000000)
 #define SMC_SRPMB_WSM			(0x82003811)
+
+/* Command ID for seccam */
+#define SMC_SECCAM_SETENV               (0x82002130)
+#define SMC_SECCAM_INIT                 (0x82002131)
+#define SMC_SECCAM_SYSREG_PROT          (0x82002132)
+#define SMC_SECCAM_PREPARE              (0x82002135)
+#define SMC_SECCAM_UNPREPARE            (0x82002136)
+#define SMC_SECCAM_GETSTATUS            (0x82002137)
+
+/* Command ID for seccam */
+#define SMC_SECCAM_SETENV               (0x82002130)
+#define SMC_SECCAM_INIT                 (0x82002131)
+#define SMC_SECCAM_INIT_NSBUF           (0x82002134)
+#define SMC_SECCAM_SYSREG_PROT          (0x82002132)
+#define SMC_SECCAM_PREPARE              (0x82002135)
+#define SMC_SECCAM_UNPREPARE            (0x82002136)
+#define SMC_SECCAM_GETSTATUS            (0x82002137)
+#define SMC_SECCAM_SET_PDP_REG		(0x8200213A)
 
 /* Deprecated */
 #define SMC_DRM_MAKE_PGTABLE		(0x81000003)
@@ -223,6 +236,11 @@ enum drmdrv_result_t {
 	E_DRMDRV_MFC_FW_IS_NOT_PROTECTED	= 0x8001,
 	E_DRMDRV_MFC_FW_ARG_IS_NULL		= 0x8002,
 	E_DRMDRV_MFC_FW_INVALID_SIZE		= 0x8003,
+};
+
+enum pdp_en_in_t {
+	PDP_IN_EN_READ = 1,
+	PDP_IN_EN_WRITE,
 };
 
 extern int __exynos_smc(unsigned long cmd, unsigned long arg1, unsigned long arg2, unsigned long arg3);

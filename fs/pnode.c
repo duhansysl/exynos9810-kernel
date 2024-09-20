@@ -14,9 +14,10 @@
 #include "pnode.h"
 
 #ifdef CONFIG_RKP_NS_PROT
-void rkp_set_mnt_flags(struct vfsmount *mnt,int flags);
-void rkp_reset_mnt_flags(struct vfsmount *mnt,int flags);
+void rkp_set_mnt_flags(struct vfsmount *mnt, int flags);
+void rkp_reset_mnt_flags(struct vfsmount *mnt, int flags);
 #endif
+
 /* return the next shared peer mount of @p */
 static inline struct mount *next_peer(struct mount *p)
 {
@@ -149,8 +150,7 @@ void change_mnt_propagation(struct mount *mnt, int type)
 #else
 			mnt->mnt.mnt_flags |= MNT_UNBINDABLE;
 #endif
-		}
-		else {
+		} else {
 #ifdef CONFIG_RKP_NS_PROT
 			rkp_reset_mnt_flags(mnt->mnt,MNT_UNBINDABLE);
 #else

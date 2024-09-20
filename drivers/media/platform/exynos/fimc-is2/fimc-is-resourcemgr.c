@@ -35,6 +35,9 @@
 #ifdef CONFIG_CMU_EWF
 #include <soc/samsung/cmu_ewf.h>
 #endif
+#if defined(CONFIG_SECURE_CAMERA_USE)
+#include <linux/smc.h>
+#endif
 
 #include <linux/of_fdt.h>
 #include <linux/of_reserved_mem.h>
@@ -128,14 +131,14 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	minfo->total_size += SIZE_LHFD_SHOT_BUF * MAX_LHFD_SHOT_BUF;
 #endif
 
-	minfo->pb_fw = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, minfo->total_size, 16);
+	minfo->pb_fw = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, minfo->total_size, 0, 0);
 	if (IS_ERR(minfo->pb_fw)) {
 		err("failed to allocate buffer for FW");
 		return -ENOMEM;
 	}
 
 #if defined (ENABLE_FD_SW)
-	minfo->pb_lhfd = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, LHFD_MAP_SIZE, 16);
+	minfo->pb_lhfd = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, LHFD_MAP_SIZE, 0, 0);
 	if (IS_ERR(minfo->pb_lhfd)) {
 		err("failed to allocate buffer for LHFD_MAP");
 		return -ENOMEM;
@@ -234,38 +237,35 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	struct fimc_is_mem *mem = &resourcemgr->mem;
 	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
 	size_t tpu_size = 0;
-	size_t tnr_size;
+#if !defined(ENABLE_DYNAMIC_MEM) && defined(ENABLE_TNR)
+	size_t tnr_size = ((SIZE_TNR_IMAGE_BUF + SIZE_TNR_WEIGHT_BUF) * NUM_OF_TNR_BUF);
+#endif
+	int i;
 
 	minfo->total_size = 0;
 	/* setfile */
-	minfo->pb_setfile = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, SETFILE_SIZE, 16);
+	minfo->pb_setfile = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, SETFILE_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_setfile)) {
 		err("failed to allocate buffer for SETFILE");
 		return -ENOMEM;
 	}
 	minfo->total_size += minfo->pb_setfile->size;
 
-	/* calibration data for rear lens */
-	minfo->pb_rear_cal = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, REAR_CALDATA_SIZE, 16);
-	if (IS_ERR_OR_NULL(minfo->pb_rear_cal)) {
-		err("failed to allocate buffer for REAR_CALDATA");
-		return -ENOMEM;
+	/* calibration data for each sensor postion */
+	for (i = 0; i < SENSOR_POSITION_MAX; i++) {
+		minfo->pb_cal[i] = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, CALDATA_SIZE, 0, 0);
+		if (IS_ERR_OR_NULL(minfo->pb_cal[i])) {
+			err("failed to allocate buffer for REAR_CALDATA");
+			return -ENOMEM;
+		}
+		minfo->total_size += minfo->pb_cal[i]->size;
 	}
-	minfo->total_size += minfo->pb_rear_cal->size;
-
-	/* calibration data for front lens */
-	minfo->pb_front_cal = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, FRONT_CALDATA_SIZE, 16);
-	if (IS_ERR_OR_NULL(minfo->pb_front_cal)) {
-		err("failed to allocate buffer for FRONT_CALDATA");
-		return -ENOMEM;
-	}
-	minfo->total_size += minfo->pb_front_cal->size;
 
 	/* library logging */
 	minfo->pb_debug = mem->kmalloc(DEBUG_REGION_SIZE + 0x10, 16);
 	if (IS_ERR_OR_NULL(minfo->pb_debug)) {
 		/* retry by ION */
-		minfo->pb_debug = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, DEBUG_REGION_SIZE + 0x10, 16);
+		minfo->pb_debug = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, DEBUG_REGION_SIZE + 0x10, 0, 0);
 		if (IS_ERR_OR_NULL(minfo->pb_debug)) {
 			err("failed to allocate buffer for DEBUG_REGION");
 			return -ENOMEM;
@@ -277,7 +277,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	minfo->pb_event = mem->kmalloc(EVENT_REGION_SIZE + 0x10, 16);
 	if (IS_ERR_OR_NULL(minfo->pb_event)) {
 		/* retry by ION */
-		minfo->pb_event = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, EVENT_REGION_SIZE + 0x10, 16);
+		minfo->pb_event = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, EVENT_REGION_SIZE + 0x10, 0, 0);
 		if (IS_ERR_OR_NULL(minfo->pb_event)) {
 			err("failed to allocate buffer for EVENT_REGION");
 			return -ENOMEM;
@@ -286,7 +286,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	minfo->total_size += minfo->pb_event->size;
 
 	/* data region */
-	minfo->pb_dregion = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, DATA_REGION_SIZE, 16);
+	minfo->pb_dregion = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, DATA_REGION_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_dregion)) {
 		err("failed to allocate buffer for DATA_REGION");
 		return -ENOMEM;
@@ -295,7 +295,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 
 	/* parameter region */
 	minfo->pb_pregion = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
-						(FIMC_IS_SENSOR_COUNT*PARAM_REGION_SIZE), 16);
+						(FIMC_IS_STREAM_COUNT * PARAM_REGION_SIZE), 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_pregion)) {
 		err("failed to allocate buffer for PARAM_REGION");
 		return -ENOMEM;
@@ -303,7 +303,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	minfo->total_size += minfo->pb_pregion->size;
 
 	/* fshared data region */
-	minfo->pb_fshared = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, FSHARED_REGION_SIZE, 16);
+	minfo->pb_fshared = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, FSHARED_REGION_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_fshared)) {
 		err("failed to allocate buffer for FSHARED_REGION");
 		return -ENOMEM;
@@ -311,31 +311,54 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	minfo->total_size += minfo->pb_fshared->size;
 
 	/* reserved memory for library */
-	minfo->pb_heap_rta = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, RESERVE_LIB_SIZE, 16);
+	minfo->pb_heap_rta = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, RESERVE_LIB_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_heap_rta)) {
 		err("failed to allocate buffer for library");
 		return -ENOMEM;
 	}
 	minfo->total_size += minfo->pb_heap_rta->size;
 
-	tnr_size = 0;
 #if !defined(ENABLE_DYNAMIC_MEM)
-#if defined(ENABLE_TNR)
-	/* 4 is double buffering & 2 instance for dual camera */
-	tnr_size += ((SIZE_TNR_IMAGE_BUF + SIZE_TNR_WEIGHT_BUF) * 4);
-#endif
-
 	/* 3aa/isp internal DMA buffer */
-	minfo->pb_taaisp = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, TAAISP_DMA_SIZE + tnr_size, 16);
+	minfo->pb_taaisp = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+						STAT_DMA_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_taaisp)) {
-		err("failed to allocate buffer for TAAISP_DMAE");
+		err("failed to allocate buffer for STAT_DMA");
 		return -ENOMEM;
 	}
 	minfo->total_size += minfo->pb_taaisp->size;
+
+	info("[RSC] STAT_DMA memory size (aligned) : %08x\n", STAT_DMA_SIZE);
+
+	/* ME/DRC buffer */
+#if (MEDRC_DMA_SIZE > 0)
+	minfo->pb_medrc = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+				MEDRC_DMA_SIZE, 0, 0);
+	if (IS_ERR_OR_NULL(minfo->pb_medrc)) {
+		err("failed to allocate buffer for ME_DRC");
+		return -ENOMEM;
+	}
+
+	info("[RSC] ME_DRC memory size (aligned) : %08x\n", MEDRC_DMA_SIZE);
+
+	minfo->total_size += minfo->pb_medrc->size;
+#endif
+
+#if defined(ENABLE_TNR)
+	/* TNR internal DMA buffer */
+	minfo->pb_tnr = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, tnr_size, 0, 0);
+	if (IS_ERR_OR_NULL(minfo->pb_tnr)) {
+		err("failed to allocate buffer for TNR DMA");
+		return -ENOMEM;
+	}
+	minfo->total_size += minfo->pb_tnr->size;
+
+	info("[RSC] TNR_DMA memory size: %08lx\n", tnr_size);
+#endif
 #endif
 
 #if defined (ENABLE_FD_SW)
-	minfo->pb_lhfd = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, LHFD_MAP_SIZE, 16);
+	minfo->pb_lhfd = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, LHFD_MAP_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_lhfd)) {
 		err("failed to allocate buffer for LHFD_MAP");
 		return -ENOMEM;
@@ -344,7 +367,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 #endif
 
 #if defined (ENABLE_VRA)
-	minfo->pb_vra = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, VRA_DMA_SIZE, 16);
+	minfo->pb_vra = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, VRA_DMA_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_vra)) {
 		err("failed to allocate buffer for VRA");
 		return -ENOMEM;
@@ -353,7 +376,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 #endif
 
 #if defined (ENABLE_DNR_IN_MCSC)
-	minfo->pb_mcsc_dnr = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, MCSC_DNR_DMA_SIZE, 16);
+	minfo->pb_mcsc_dnr = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, MCSC_DNR_DMA_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_mcsc_dnr)) {
 		err("failed to allocate buffer for MCSC DNR");
 		return -ENOMEM;
@@ -371,7 +394,7 @@ static int fimc_is_resourcemgr_allocmem(struct fimc_is_resourcemgr *resourcemgr)
 	tpu_size += (SIZE_DNR_INTERNAL_BUF * NUM_DNR_INTERNAL_BUF);
 #endif
 	if (tpu_size > 0) {
-		minfo->pb_tpu = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, tpu_size, 16);
+		minfo->pb_tpu = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, tpu_size, 0, 0);
 		if (IS_ERR_OR_NULL(minfo->pb_tpu)) {
 			err("failed to allocate buffer for TPU");
 			return -ENOMEM;
@@ -388,6 +411,7 @@ static int fimc_is_resourcemgr_initmem(struct fimc_is_resourcemgr *resourcemgr)
 {
 	struct fimc_is_minfo *minfo = NULL;
 	int ret = 0;
+	int i;
 
 	probe_info("fimc_is_init_mem - ION\n");
 
@@ -420,10 +444,6 @@ static int fimc_is_resourcemgr_initmem(struct fimc_is_resourcemgr *resourcemgr)
 	resourcemgr->minfo.dvaddr_region = CALL_BUFOP(minfo->pb_pregion, dvaddr, minfo->pb_pregion);
 	resourcemgr->minfo.kvaddr_region = CALL_BUFOP(minfo->pb_pregion, kvaddr, minfo->pb_pregion);
 
-#if !defined(ENABLE_DYNAMIC_MEM)
-	resourcemgr->minfo.dvaddr_taaisp = CALL_BUFOP(minfo->pb_taaisp, dvaddr, minfo->pb_taaisp);
-	resourcemgr->minfo.kvaddr_taaisp = CALL_BUFOP(minfo->pb_taaisp, kvaddr, minfo->pb_taaisp);
-#endif
 #if defined(ENABLE_FD_SW)
 	resourcemgr->minfo.dvaddr_lhfd = CALL_BUFOP(minfo->pb_lhfd, dvaddr, minfo->pb_lhfd);
 	resourcemgr->minfo.kvaddr_lhfd = CALL_BUFOP(minfo->pb_lhfd, kvaddr, minfo->pb_lhfd);
@@ -460,8 +480,10 @@ static int fimc_is_resourcemgr_initmem(struct fimc_is_resourcemgr *resourcemgr)
 	resourcemgr->minfo.kvaddr_event_cnt =  resourcemgr->minfo.kvaddr_event
 						+ EVENT_REGION_SIZE;
 	resourcemgr->minfo.kvaddr_setfile = CALL_BUFOP(minfo->pb_setfile, kvaddr, minfo->pb_setfile);
-	resourcemgr->minfo.kvaddr_rear_cal = CALL_BUFOP(minfo->pb_rear_cal, kvaddr, minfo->pb_rear_cal);
-	resourcemgr->minfo.kvaddr_front_cal = CALL_BUFOP(minfo->pb_front_cal, kvaddr, minfo->pb_front_cal);
+
+	for (i = 0; i < SENSOR_POSITION_MAX; i++)
+		resourcemgr->minfo.kvaddr_cal[i] =
+			CALL_BUFOP(minfo->pb_cal[i], kvaddr, minfo->pb_cal[i]);
 
 	probe_info("[RSC] Kernel virtual for library: %08lx\n", resourcemgr->minfo.kvaddr);
 	probe_info("[RSC] Kernel virtual for debug: %08lx\n", resourcemgr->minfo.kvaddr_debug);
@@ -475,30 +497,57 @@ static int fimc_is_resourcemgr_alloc_dynamic_mem(struct fimc_is_resourcemgr *res
 {
 	struct fimc_is_mem *mem = &resourcemgr->mem;
 	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
-	size_t tnr_size;
-
-	tnr_size = 0;
 #if defined (ENABLE_TNR)
-	/* 4 is double buffering & 2 instance for dual camera */
-	tnr_size += ((SIZE_TNR_IMAGE_BUF + SIZE_TNR_WEIGHT_BUF) * 4);
+	size_t tnr_size = ((SIZE_TNR_IMAGE_BUF + SIZE_TNR_WEIGHT_BUF) * NUM_OF_TNR_BUF);
 #endif
 
 	/* 3aa/isp internal DMA buffer */
-	minfo->pb_taaisp = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, TAAISP_DMA_SIZE + tnr_size, 16);
+	minfo->pb_taaisp = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+						STAT_DMA_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_taaisp)) {
-		err("failed to allocate buffer for TAAISP_DMA memory");
+		err("failed to allocate buffer for STAT_DMA memory");
 		return -ENOMEM;
 	}
 
-	info("[RSC] TAAISP_DMA memory size (aligned) : %08lx\n", TAAISP_DMA_SIZE + tnr_size);
+	info("[RSC] STAT_DMA memory size (aligned) : %08x\n", STAT_DMA_SIZE);
+
+	/* ME/DRC buffer */
+	#if (MEDRC_DMA_SIZE > 0)
+	minfo->pb_medrc = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+				MEDRC_DMA_SIZE, 0, 0);
+	if (IS_ERR_OR_NULL(minfo->pb_medrc)) {
+		CALL_VOID_BUFOP(minfo->pb_taaisp, free, minfo->pb_taaisp);
+		err("failed to allocate buffer for ME_DRC");
+		return -ENOMEM;
+	}
+
+	info("[RSC] ME_DRC memory size (aligned) : %08x\n", MEDRC_DMA_SIZE);
+#endif
+
+#if defined(ENABLE_TNR)
+	/* TNR internal DMA buffer */
+	minfo->pb_tnr = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, tnr_size, 0, 0);
+	if (IS_ERR_OR_NULL(minfo->pb_tnr)) {
+		CALL_VOID_BUFOP(minfo->pb_taaisp, free, minfo->pb_taaisp);
+#if (MEDRC_DMA_SIZE > 0)
+			CALL_VOID_BUFOP(minfo->pb_medrc, free, minfo->pb_medrc);
+#endif
+		err("failed to allocate buffer for TNR DMA");
+		return -ENOMEM;
+	}
+
+	info("[RSC] TNR_DMA memory size: %08lx\n", tnr_size);
+#endif
 
 	return 0;
 }
 
 static int fimc_is_resourcemgr_init_dynamic_mem(struct fimc_is_resourcemgr *resourcemgr)
 {
-	struct fimc_is_minfo *minfo = NULL;
+	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
 	int ret = 0;
+	unsigned long kva;
+	dma_addr_t dva;
 
 	probe_info("fimc_is_init_mem - ION\n");
 
@@ -509,12 +558,24 @@ static int fimc_is_resourcemgr_init_dynamic_mem(struct fimc_is_resourcemgr *reso
 		goto p_err;
 	}
 
-	minfo = &resourcemgr->minfo;
+	kva = CALL_BUFOP(minfo->pb_taaisp, kvaddr, minfo->pb_taaisp);
+	dva = CALL_BUFOP(minfo->pb_taaisp, dvaddr, minfo->pb_taaisp);
+	info("[RSC] STAT_DMA memory kva:0x%1x, dva: %pad\n", kva, &dva);
 
-	resourcemgr->minfo.dvaddr_taaisp = CALL_BUFOP(minfo->pb_taaisp, dvaddr, minfo->pb_taaisp);
-	resourcemgr->minfo.kvaddr_taaisp = CALL_BUFOP(minfo->pb_taaisp, kvaddr, minfo->pb_taaisp);
+#if (MEDRC_DMA_SIZE > 0)
+	kva = CALL_BUFOP(minfo->pb_medrc, kvaddr, minfo->pb_medrc);
+	dva = CALL_BUFOP(minfo->pb_medrc, dvaddr, minfo->pb_medrc);
+	info("[RSC] ME_DRC memory kva:0x%1x, dva: %pad\n", kva, &dva);
+#endif
+
+#if defined(ENABLE_TNR)
+	kva = CALL_BUFOP(minfo->pb_tnr, kvaddr, minfo->pb_tnr);
+	dva = CALL_BUFOP(minfo->pb_tnr, dvaddr, minfo->pb_tnr);
+	info("[RSC] TNR_DMA memory kva:0x%1x, dva: %pad\n", kva, &dva);
+#endif
 
 	info("[RSC] %s done\n", __func__);
+
 p_err:
 	return ret;
 }
@@ -522,13 +583,101 @@ p_err:
 static int fimc_is_resourcemgr_deinit_dynamic_mem(struct fimc_is_resourcemgr *resourcemgr)
 {
 	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
+
+#if defined(ENABLE_TNR)
+	CALL_VOID_BUFOP(minfo->pb_tnr, free, minfo->pb_tnr);
+#endif
+#if (MEDRC_DMA_SIZE > 0)
+		CALL_VOID_BUFOP(minfo->pb_medrc, free, minfo->pb_medrc);
+#endif
+	CALL_VOID_BUFOP(minfo->pb_taaisp, free, minfo->pb_taaisp);
+
+	return 0;
+}
+#endif /* #ifdef ENABLE_DYNAMIC_MEM */
+
+#if defined(SECURE_CAMERA_FACE)
+static int fimc_is_resourcemgr_alloc_secure_mem(struct fimc_is_resourcemgr *resourcemgr)
+{
+	struct fimc_is_mem *mem = &resourcemgr->mem;
+	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
+
+	/* 3aa/isp internal DMA buffer */
+	minfo->pb_taaisp_s = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+				TAAISP_STAT_SIZE * 3, EXYNOS_ION_HEAP_CAMERA,
+				ION_FLAG_CACHED | ION_FLAG_PROTECTED);
+	if (IS_ERR_OR_NULL(minfo->pb_taaisp_s)) {
+		err("failed to allocate buffer for STAT_DMA_S");
+		return -ENOMEM;
+	}
+
+	info("[RSC] STAT_DMA_S memory size (aligned) : %08x\n",
+				TAAISP_STAT_SIZE * 3);
+
+	/* ME/DRC buffer */
+#if (MEDRC_DMA_SIZE > 0)
+	minfo->pb_medrc_s = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx,
+				MEDRC_DMA_SIZE, EXYNOS_ION_HEAP_SECURE_CAMERA,
+				ION_FLAG_CACHED | ION_FLAG_PROTECTED);
+	if (IS_ERR_OR_NULL(minfo->pb_medrc_s)) {
+		CALL_VOID_BUFOP(minfo->pb_taaisp_s, free, minfo->pb_taaisp_s);
+		err("failed to allocate buffer for ME_DRC_S");
+		return -ENOMEM;
+	}
+
+	info("[RSC] ME_DRC_S memory size (aligned) : %08x\n", MEDRC_DMA_SIZE);
+#endif
+
+	return 0;
+}
+
+static int fimc_is_resourcemgr_init_secure_mem(struct fimc_is_resourcemgr *resourcemgr)
+{
+	struct fimc_is_core *core;
 	int ret = 0;
 
-	CALL_VOID_BUFOP(minfo->pb_taaisp, free, minfo->pb_taaisp);
+	core = container_of(resourcemgr, struct fimc_is_core, resourcemgr);
+	FIMC_BUG(!core);
+
+	if (core->scenario != FIMC_IS_SCENARIO_SECURE)
+		return ret;
+
+	info("fimc_is_init_secure_mem - ION\n");
+
+	ret = fimc_is_resourcemgr_alloc_secure_mem(resourcemgr);
+	if (ret) {
+		err("Couldn't alloc for FIMC-IS\n");
+		ret = -ENOMEM;
+		goto p_err;
+	}
+
+	info("[RSC] %s done\n", __func__);
+p_err:
+	return ret;
+}
+
+static int fimc_is_resourcemgr_deinit_secure_mem(struct fimc_is_resourcemgr *resourcemgr)
+{
+	struct fimc_is_minfo *minfo = &resourcemgr->minfo;
+	struct fimc_is_core *core;
+	int ret = 0;
+
+	core = container_of(resourcemgr, struct fimc_is_core, resourcemgr);
+	FIMC_BUG(!core);
+
+	if (minfo->pb_taaisp_s)
+		CALL_VOID_BUFOP(minfo->pb_taaisp_s, free, minfo->pb_taaisp_s);
+	if (minfo->pb_medrc_s)
+		CALL_VOID_BUFOP(minfo->pb_medrc_s, free, minfo->pb_medrc_s);
+
+	minfo->pb_taaisp_s = NULL;
+	minfo->pb_medrc_s = NULL;
+
+	info("[RSC] %s done\n", __func__);
 
 	return ret;
 }
-#endif /* #ifdef ENABLE_DYNAMIC_MEM */
+#endif
 
 static struct vm_struct fimc_is_lib_vm;
 static struct vm_struct fimc_is_heap_vm;
@@ -671,7 +820,7 @@ static int __init fimc_is_heap_mem_map(struct fimc_is_resourcemgr *resourcemgr)
 	struct page **pages = vmalloc(sizeof(struct page *) * npages);
 	struct page **tmp = pages;
 
-	minfo->pb_heap_ddk = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, HEAP_SIZE, 16);
+	minfo->pb_heap_ddk = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, HEAP_SIZE, 0, 0);
 	if (IS_ERR_OR_NULL(minfo->pb_heap_ddk)) {
 		err("failed to allocate buffer for DDK HEAP");
 		vfree(pages);
@@ -867,7 +1016,7 @@ int fimc_is_kernel_log_dump(bool overwrite)
 		return -ENOSPC;
 	}
 
-	log_kernel = (void *)exynos_ss_get_item_vaddr("log_kernel");
+ 	log_kernel = (void *)exynos_ss_get_item_vaddr("log_kernel");
 	if (!log_kernel)
 		return -EINVAL;
 
@@ -1194,10 +1343,12 @@ int fimc_is_resource_open(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type,
 		result = &core->sensor[RESOURCE_TYPE_SENSOR4];
 		resource->pdev = core->sensor[RESOURCE_TYPE_SENSOR4].pdev;
 		break;
+#if (FIMC_IS_SENSOR_COUNT > 5)
 	case RESOURCE_TYPE_SENSOR5:
 		result = &core->sensor[RESOURCE_TYPE_SENSOR5];
 		resource->pdev = core->sensor[RESOURCE_TYPE_SENSOR5].pdev;
 		break;
+#endif
 #endif
 	case RESOURCE_TYPE_ISCHAIN:
 		for (stream = 0; stream < FIMC_IS_STREAM_COUNT; ++stream) {
@@ -1249,7 +1400,8 @@ int fimc_is_resource_get(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 		goto p_err;
 	}
 
-	if (rsccount >= (FIMC_IS_STREAM_COUNT + FIMC_IS_VIDEO_SS5_NUM)) {
+	/* remove "equal to" because a preprocessor resource could be used */
+	if (rsccount > (FIMC_IS_STREAM_COUNT + FIMC_IS_SENSOR_COUNT)) {
 		err("[RSC] Invalid rsccount(%d)", rsccount);
 		ret = -EMFILE;
 		goto p_err;
@@ -1288,16 +1440,17 @@ int fimc_is_resource_get(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 #endif
 		/* CSIS common DMA rcount set */
 		atomic_set(&core->csi_dma.rcount, 0);
-#if defined(CONFIG_SECURE_CAMERA_USE) && defined(NOT_SEPERATED_SYSREG)
+#if defined(SECURE_CAMERA_FACE)
 		mutex_init(&core->secure_state_lock);
 		core->secure_state = FIMC_IS_STATE_UNSECURE;
+		core->scenario = 0;
 
-		dbgd_resource("%s: fimc-is secure state has reset\n", __func__);
+		info("%s: fimc-is secure state has reset\n", __func__);
 #endif
 		core->dual_info.mode = FIMC_IS_DUAL_MODE_NOTHING;
 		core->dual_info.pre_mode = FIMC_IS_DUAL_MODE_NOTHING;
 		core->dual_info.tick_count = 0;
-#ifdef CONFIG_VENDER_MCD
+#if defined(CONFIG_VENDER_MCD)
 		core->vender.opening_hint = IS_OPENING_HINT_NONE;
 #endif
 
@@ -1397,6 +1550,14 @@ int fimc_is_resource_get(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 				goto p_err;
 			}
 
+#if defined(SECURE_CAMERA_FACE)
+			ret = fimc_is_resourcemgr_init_secure_mem(resourcemgr);
+			if (ret) {
+				err("fimc_is_resourcemgr_init_secure_mem is fail(%d)\n", ret);
+				goto p_err;
+			}
+#endif
+
 			ret = fimc_is_ischain_power(&core->ischain[0], 1);
 			if (ret) {
 				err("fimc_is_ischain_power is fail(%d)", ret);
@@ -1455,11 +1616,15 @@ int fimc_is_resource_get(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 //		fimc_is_vender_resource_get(&core->vender);
 	}
 
+	if (rsccount == 0) {
 #ifdef ENABLE_HWACG_CONTROL
-	/* for CSIS HWACG */
-	if (rsccount == 0)
+		/* for CSIS HWACG */
 		fimc_is_hw_csi_qchannel_enable_all(true);
 #endif
+		/* when the first sensor device be opened */
+		if (rsc_type < RESOURCE_TYPE_ISCHAIN)
+			fimc_is_hw_camif_init();
+	}
 
 	atomic_inc(&resource->rsccount);
 	atomic_inc(&core->rsccount);
@@ -1575,6 +1740,10 @@ int fimc_is_resource_put(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 			clear_bit(FIMC_IS_RM_SS5_POWER_ON, &resourcemgr->state);
 			break;
 		case RESOURCE_TYPE_ISCHAIN:
+#if defined(SECURE_CAMERA_FACE)
+			ret = fimc_is_secure_func(core, NULL, FIMC_IS_SECURE_CAMERA_FACE,
+				core->scenario, SMC_SECCAM_UNPREPARE);
+#endif
 			ret = fimc_is_itf_power_down(&core->interface);
 			if (ret)
 				err("power down cmd is fail(%d)", ret);
@@ -1586,6 +1755,12 @@ int fimc_is_resource_put(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 			ret = fimc_is_interface_close(&core->interface);
 			if (ret)
 				err("fimc_is_interface_close is fail(%d)", ret);
+
+#if defined(SECURE_CAMERA_FACE)
+			ret = fimc_is_resourcemgr_deinit_secure_mem(resourcemgr);
+			if (ret)
+				err("fimc_is_resourcemgr_deinit_secure_mem is fail(%d)", ret);
+#endif
 
 			ret = fimc_is_debug_close();
 			if (ret)
@@ -1604,10 +1779,6 @@ int fimc_is_resource_put(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 			bts_update_scen(BS_CAMERA_DEFAULT, 0);
 #endif
 			break;
-		default:
-			err("[RSC] resource type(%d) is invalid", rsc_type);
-			BUG();
-			break;
 		}
 
 //		fimc_is_vender_resource_put(&core->vender);
@@ -1622,7 +1793,6 @@ int fimc_is_resource_put(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 		if (ret)
 			err("fimc_is_resourcemgr_deinit_dynamic_mem is fail(%d)", ret);
 #endif
-
 
 		current_min = (resourcemgr->cluster0 & CLUSTER_MIN_MASK) >> CLUSTER_MIN_SHIFT;
 		current_max = (resourcemgr->cluster0 & CLUSTER_MAX_MASK) >> CLUSTER_MAX_SHIFT;
@@ -1653,7 +1823,7 @@ int fimc_is_resource_put(struct fimc_is_resourcemgr *resourcemgr, u32 rsc_type)
 #ifdef CONFIG_CMU_EWF
 		set_cmuewf(idx_ewf, 0);
 #endif
-#ifdef CONFIG_VENDER_MCD
+#if defined(CONFIG_VENDER_MCD)
 		core->vender.closing_hint = IS_CLOSING_HINT_NONE;
 #endif
 

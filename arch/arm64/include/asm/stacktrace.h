@@ -25,13 +25,12 @@ struct stackframe {
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	int graph;
 #endif
-#ifdef CONFIG_SEC_DEBUG_BRANCH_VERIFIER
-	unsigned int pc_from_irq;
-#endif
 };
 
 extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
 extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
 			    int (*fn)(struct stackframe *, void *), void *data);
+
+DECLARE_PER_CPU(unsigned long *, irq_stack_ptr);
 
 #endif	/* __ASM_STACKTRACE_H */

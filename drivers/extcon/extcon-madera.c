@@ -1041,7 +1041,7 @@ static void madera_extcon_set_mode(struct madera_extcon *info, int mode)
 		 info->micd_modes[mode].bias, info->micd_modes[mode].gpio,
 		 info->micd_modes[mode].hp_gnd);
 
-	if (info->micd_pol_gpio)
+	if (info->micd_pol_gpio > 0)
 		gpiod_set_value_cansleep(info->micd_pol_gpio,
 					 info->micd_modes[mode].gpio);
 
@@ -1428,7 +1428,6 @@ static void madera_hs_mic_control(struct madera_extcon *info, int state)
 				   addr,
 				   MADERA_IN1L_MUTE_MASK,
 				   MADERA_MIC_MUTE << MADERA_IN1L_MUTE_SHIFT);
-		madera->hs_mic_muted = true;
 		snd_soc_dapm_mutex_unlock(madera->dapm);
 		break;
 	case MADERA_MIC_UNMUTE:
@@ -1442,8 +1441,6 @@ static void madera_hs_mic_control(struct madera_extcon *info, int state)
 		if (ret)
 			dev_err(info->dev,
 				"Failed to read input status: %d\n", ret);
-
-		madera->hs_mic_muted = false;
 
 		if (!ret && (in_bit & val))
 			regmap_update_bits(madera->regmap,
@@ -1895,9 +1892,6 @@ err:
 static void madera_hpdet_moisture_stop(struct madera_extcon *info)
 {
 	struct madera *madera = info->madera;
-
-	/* Wait for any running detect to finish */
-	madera_hpdet_wait(info);
 
 	switch (madera->type) {
 	case CS47L35:
@@ -2403,12 +2397,9 @@ static void madera_micd_handler(struct work_struct *work)
 		goto out;
 	}
 
-	if (ret >= 0) {
-		dev_dbg(info->dev, "Mic impedance %d ohms\n", ret);
-		ret = madera_ohm_to_hohm((unsigned int)ret);
-	}
+	dev_dbg(info->dev, "Mic impedance %d ohms\n", ret);
 
-	madera_jds_reading(info, ret);
+	madera_jds_reading(info, madera_ohm_to_hohm((unsigned int)ret));
 
 out:
 	madera_jds_start_timeout(info);
@@ -2550,10 +2541,6 @@ static irqreturn_t madera_jackdet(int irq, void *data)
 
 	if (present) {
 		dev_dbg(info->dev, "Detected jack\n");
-
-		if (info->pdata->jd_wake_time)
-			__pm_wakeup_event(&info->detection_wake_lock,
-					info->pdata->jd_wake_time);
 
 		/*
 		 * if we're doing moisture detect delay reporting an insert
@@ -2852,14 +2839,14 @@ static void madera_extcon_process_accdet_node(struct madera_extcon *info,
 	madera_extcon_get_micd_configs(info, node, pdata);
 	madera_extcon_of_get_micd_ranges(info, node, pdata);
 
-	info->micd_pol_gpio = devm_get_gpiod_from_child(info->dev,
+	info->micd_pol_gpio = devm_get_gpiod_from_child(madera->dev,
 							"cirrus,micd-pol",
 							node);
 	if (IS_ERR(info->micd_pol_gpio)) {
 		dev_warn(info->dev,
 			 "Malformed cirrus,micd-pol-gpios ignored: %ld\n",
 			 PTR_ERR(info->micd_pol_gpio));
-		info->micd_pol_gpio = NULL;
+		info->micd_pol_gpio = 0;
 	}
 
 
@@ -2953,11 +2940,11 @@ static void madera_extcon_dump_config(struct madera_extcon *info)
 		MADERA_EXTCON_PDATA_DUMP(micd_open_circuit_declare, "%u");
 		MADERA_EXTCON_PDATA_DUMP(micd_software_compare, "%u");
 
-		if (info->micd_pol_gpio)
+		if (info->micd_pol_gpio > 0)
 			dev_dbg(info->dev, "micd_pol_gpio: %d\n",
 				desc_to_gpio(info->micd_pol_gpio));
 		else
-			dev_dbg(info->dev, "micd_pol_gpio: unused\n");
+			dev_dbg(info->dev, "micd_pol_gpio: 0\n");
 
 		dev_dbg(info->dev, "\tmicd_ranges {\n");
 		for (j = 0; j < info->num_micd_ranges; ++j)
@@ -3253,7 +3240,6 @@ static int madera_extcon_probe(struct platform_device *pdev)
 	info->dev = &pdev->dev;
 	mutex_init(&info->lock);
 	init_completion(&info->manual_mic_completion);
-	wakeup_source_init(&info->detection_wake_lock, "madera-jack-detection");
 	INIT_DELAYED_WORK(&info->micd_detect_work, madera_micd_handler);
 	INIT_DELAYED_WORK(&info->state_timeout_work, madera_jds_timeout_work);
 	platform_set_drvdata(pdev, info);
@@ -3308,21 +3294,18 @@ static int madera_extcon_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(info->dev, "Failed to request GPIO%d: %d\n",
 				pdata->micd_pol_gpio, ret);
-			goto err_wakelock;
+			return ret;
 		}
 
 		info->micd_pol_gpio = gpio_to_desc(pdata->micd_pol_gpio);
 	} else {
 		ret = madera_extcon_get_device_pdata(info);
-		if (ret < 0) {
-			goto err_wakelock;
-		}
+		if (ret < 0)
+			return ret;
 	}
 
-	if (!pdata->enabled || pdata->output == 0) {
-		ret = -ENODEV; /* no accdet output configured */
-		goto err_wakelock;
-	}
+	if (!pdata->enabled || pdata->output == 0)
+		return -ENODEV; /* no accdet output configured */
 
 	info->hpdet_short_x100 =
 		madera_ohm_to_hohm(pdata->hpdet_short_circuit_imp);
@@ -3350,7 +3333,7 @@ static int madera_extcon_probe(struct platform_device *pdev)
 	if (IS_ERR(info->micvdd)) {
 		ret = PTR_ERR(info->micvdd);
 		dev_err(info->dev, "Failed to get MICVDD: %d\n", ret);
-		goto err_wakelock;
+		return ret;
 	}
 
 	if (pdata->jd_invert)
@@ -3363,14 +3346,13 @@ static int madera_extcon_probe(struct platform_device *pdev)
 	info->edev = devm_extcon_dev_allocate(&pdev->dev, madera_cable);
 	if (IS_ERR(info->edev)) {
 		dev_err(&pdev->dev, "failed to allocate extcon device\n");
-		ret = -ENOMEM;
-		goto err_wakelock;
+		return -ENOMEM;
 	}
 
 	ret = devm_extcon_dev_register(&pdev->dev, info->edev);
 	if (ret < 0) {
 		dev_err(info->dev, "extcon_dev_register() failed: %d\n", ret);
-		goto err_wakelock;
+		return ret;
 	}
 
 	info->input = devm_input_allocate_device(&pdev->dev);
@@ -3604,8 +3586,6 @@ err_micdet:
 err_input:
 err_register:
 	pm_runtime_disable(&pdev->dev);
-err_wakelock:
-	wakeup_source_trash(&info->detection_wake_lock);
 
 	return ret;
 }
@@ -3642,7 +3622,6 @@ static int madera_extcon_remove(struct platform_device *pdev)
 
 	device_remove_file(&pdev->dev, &dev_attr_hp1_impedance);
 	device_remove_file(&pdev->dev, &dev_attr_mic_impedance);
-	wakeup_source_trash(&info->detection_wake_lock);
 	kfree(info->hpdet_trims);
 
 	return 0;
@@ -3651,7 +3630,6 @@ static int madera_extcon_remove(struct platform_device *pdev)
 static struct platform_driver madera_extcon_driver = {
 	.driver		= {
 		.name	= "madera-extcon",
-		.suppress_bind_attrs = true,
 	},
 	.probe		= madera_extcon_probe,
 	.remove		= madera_extcon_remove,

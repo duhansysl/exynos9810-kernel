@@ -1,0 +1,296 @@
+BCM4375 DHD 101.16.48.1 for Android R OS - Palette(O1,T2)/Canvas/Hubble/Davinci/Beyond Project
+
+DHD 101.16.48.1 - 2020.12.15
+Kernel Panic
+ - CS00011597954(By LEE EONJI) Fixed a kernel panic after pcie link down via avoiding ep access
+
+Others
+ - CS00011589604(By Kim MinSoo) Fixed build error from __init macro (removed)
+ - CS00011596980(By LEE EONJI) Fixed to permanent scan block after scan timeout
+ - CS00011611318(By SungBin Min) Fixed iovar buffer corruption for the 6G band control command
+
+
+DHD 101.16.48 - 2020.12.07
+Kernel Panic
+ - CS00011575801(By Kim Tae-Yong) Avoided a deadlock condition between connect path and pno scan event handling path
+
+Others
+ - CS00011576210(By Jung Kuk Seo) Fixed to not update the non-PSC channel information when SoftAP requested 6GHz ACS channel
+
+
+DHD 101.16.47 - 2020.12.03
+Others
+ - CS00011546898 (By Hwang MinSik) Fixed to disable LPC for RF test mode
+ - CS00011553554(By Min Cheol Jeong) Fixed to scan timeout caused by PNO stop
+ - Added to sync states when reports link down in IDLE state
+
+
+DHD 101.16.46 - 2020.11.30
+Others
+ - CS00011543983(By Min SungBin) Fixed kernel panic when scheduled scan triggered
+ - CS00011544702:(By Jung-Young Myung) Fixed "pkt_filter_enable" IOVar failure when set APF
+
+
+DHD 101.16.45 - 2020.11.27
+Security Patch
+ - CS00011488886(By Jeong Min Cheol) SI-19286: Fixed stack buffer overflow issue in wbrc driver
+
+Others
+ - CS00011195375(By Lee sanguk) Added throughput debug ability
+   (It should be sync up with HAL 1.60.18 or higher)
+ - CS00011403538(By Yoon YeJi) Added logging information for set roam_off in DHD
+ - CS00011421633(By Park Jun-young) Added to Disable/Enable MAX dtim in suspend via wl_cfg80211_set_power_mgmt
+ - CS00011438978(By Kim MinSoo) Enabled LB_HOST_CTRL by default for BCM4375
+ - CS00011446274(By Kim Tae-Yong) Added interrupt status trace for ROT debug by interrupt missing
+ - CS00011447658(By Lee Sunghee) Changed Channel util unit to legacy value
+ - CS00011497824(By Jung Junyeop) Fixed to initialize listen timer properly
+ - CS00011519784(By Min SungBin) Added the RTC timestamp in suspend/resume function
+ - Fixed to allocate the packet(skb) for Rx buffer when pktget fails
+ - Fixed to disable roam_off properly with ACCELBOOT
+ - Printed a necessary fw log for debugging
+
+
+DHD 101.16.37.5 - 2020.11.26
+Kernel Panic
+ - CS00011525674(By Kim Tae-Yong) Fixed ITMON Kernel Panic by added code to avoid register access during PCIe linkdown recovery
+
+
+DHD 101.16.37.4 - 2020.11.20
+Others
+ - CS00011509950(By Min SungBin) Fixed to permanent scan failure caused by wrong return value after legacy scan failure
+
+
+DHD 101.16.37.3 - 2020.11.19
+Kernel Panic
+ - CS00011482402(By Jeong Min Cheol) Fixed kernel panic due to accessing a common ring before the ring is initialized
+
+Others
+ - CS00011377081(By Choi Hyeonu) Fixed prevent issue (CID:29123, 31696, 31931, 32137, 32685, 49502, 49573)
+ - CS00011476796(By Min SungBin) Fixed to prevent scan busy hang caused by successive p2p scan
+ - CS00011492056(By Kim Tae-Yong) Fixed time unit mismatch and assert enable for DUMP_MEMFILE_BUGON mode only
+
+Vendor HAL Library
+ - HAL_REL_1_60_18
+  - CS00011195375(By Lee sanguk) Support throughput debug ability- HAL part
+    (It should be sync up with DHD 101.16.45 or higher, DHD 101.10.438 or higher)
+  - Fixed wrong RTT result length calculation in event handler
+  - Updated established NDP channel information on DP confirm event
+
+
+DHD 101.16.37.1 - 2020.11.13
+Security Patch
+ - CS00011440377(By Kim Tae-Yong) SI-19447: Fixed stack buffer overflow
+
+Others
+ - CS00011167124(By Kim Tae-Yong) Fixed to send hang event for scantimeout and invalid pktid cases
+ - CS00011231388(By Manh Nguyen) Bring up for 4361 R-OS
+ - CS00011335914(By Choi Jongmin) Enabled 11ax softap for GS21
+ - CS00011346988(By Kim Tae-Yong) Handled the return value of exynos_pcie_pm_resume for pcie link up failure case
+ - CS00011349176(By Min Hyunkee) Added wakelock backport for Exynos9820 project
+ - CS00011364717(By Manh Nguyen) Fixed to use proper softap interface name on BCM4361
+ - CS00011377081(By Choi Hyeonu) Fixed prevent issue (CID:36624, 49466, 49586, 49648, 49653, 49716, 83818, 83943)
+ - CS00011399402(By Kim Tae-Yong) Removed SETDFSSCANMODE private command
+ - CS00011427384(By Park Jun-young) Fixed prevent issue (CID:83955, 105205, 105206, 105208, 105214)
+ - CS00011461983(By Kim Beom Jip) Modified to allow zero ranging enable value on NAN enabling
+ - Added "WLAN_SOFTAP_HE_ENABLE" in DHD Kconfig file
+ - Added health check to catch scheduling issues during suspend
+ - Fixed P2P connection failure due to mac randomization after Android framework reset
+ - Fixed to force reset reason code to prevent autoreconnect in bcnloss case
+
+
+DHD 101.16.35 - 2020.10.30
+Kernel Panic
+ - CS00011275251(By Kim Tae-Yong) Fixed kernel panic from snprintf during handling wifiver info
+ - Fixed to handle malformed chanspec during auto channel selection for Softap
+
+Others
+ - CS00011134595(By LEE EONJI) Fixed missing nvram/blob information in wifiver info
+ - CS00011142206(By Choi Jongmin) Added android private command to control Runtime PM
+ - CS00011155837(By Park Jun-young) Fixed Android AUTO and ADPS compatibility issue
+ - CS00011174028(By Jeong Min Cheol) Added a retry logic for the failing case of interface creation
+ - CS00011197216(By Choi Hyeonu) Fixed rtnl deadlock issue when stopping scheduled scan
+ - CS00011264707(By Lee SoonHo) Changed log to print channel info instead of chanspec
+ - CS00011268243(By Yoon YeJi) Fixed missing SSID on RCL event update
+ - CS00011272762(By Jeong Min Cheol) Added more debug code for D3 ack timeout issue debugging
+ - CS00011314551(By Lim Junhak) Fixed for SAE password min length issue
+ - CS00011314912(By Choi Junsu) Fixed GKI build error
+ - Added to cleanup virtual interface explicitly when framework crash occurs
+ - Fixed missing scan status bit clear when scan abort by PNO stop
+ - Fixed NAN geo-fence abnormal suspend/reschedule issue if target count is greater than max session
+ - Fixed NAN ranging due to after canceling subscribe
+ - Fixed to sync up wake stat HAL command variable type
+   (This patch should be sync up with HAL 1.60.14 or higher version)
+ - Refactoring tx functionality from dhd_linux.c to dhd_linux_tx.c
+
+Vendor HAL Library
+ - HAL_REL_1_60_14
+  - CS00011338727 CS00011334384(by Park Sinwoo) Fixed for RTT result parsing failure in HAL with kernel 5.x
+  - Fixed to sync up wake stat HAL command variable type
+   (This patch should be sync up with DHD 101.16.35 or higher version)
+
+
+DHD 101.16.25.2 - 2020.10.16
+Others
+ - CS00011149055(By Kim MinSoo) Enabled LB_TXP by default
+ - CS00011202737(By Choi Hyeonu) Fixed build error at the dhd_mem_dump
+ - CS00011234441(By Kim Tae-Yong) Canceled a timeout handler to prevent false ap link failure timeout
+ - CS00011240471(By Choi Hyeonu) Fixed Prevent issue (CID 30726, 31501, 32810, 36244, 49769, 68624, 69773, 83955)
+ - CS00011265668(By Choi Hyeonu) Fixed Legacy scan fail due to P2P wildcard SSID
+ - Changed to update the PMKID cache when it is already full
+
+Vendor HAL Library
+ - HAL_REL_1_60_11
+  - CS00011240471(By Choi Hyeonu) Fixed Prevent issue (CID 28844)
+  - CS00011276917(By Jeong Min Cheol) Fixed to sync filesystem by force after dump file writing
+
+
+DHD 101.16.25 - 2020.09.25
+Others
+ - CS00010924102(By Lim Junhak) Enabled AUTH/ASSOC Status Code Extension in Makefile
+ - CS00011095953(By Kim Tae-Yong) Enabled async suspend feature on Exynos Platform
+ - CS00011113715(By Bang Haejung) Fixed 4-Way H/S failure caused by mismatch counting
+ - CS00011115066(By Choi Hyeonu) Triggered regon deasserted in the case of wifi off with force_regon
+ - CS00011126323(By Choi Junsu) Fixed additional attribute size for linux kernel 5.4  NL policy check
+   (This patch should be sync up with HAL 1.60.10 or higher version)
+ - CS00011134595(By LEE EONJI) Fixed missing nvram/blob information in wifiver info
+ - CS00011154605(By Jeong Min Cheol) Fixed to replace Linux random APIs due to GKI policy
+ - CS00011166366(By Lee Sunghee) Fixed connection failure due to set Legacy roam_trigger failure
+ - CS00011173622(By Min SungBin) Fixed memory overflow issue(KASAN issue)
+ - Added PCIe IRQ affinity configuration for module type driver
+ - Added support to access logstrs and map files using standard linux FW APIs
+ - Added to collect DAR and CFG registers when we read invalid rd index
+ - Enabled the feature for reduced rtnl lock/unlock time during Wi-Fi turn on
+
+Vendor HAL Library
+ - HAL_REL_1_60_10
+  - CS00011126323(By Choi Junsu) Fixed additional attribute size for linux kernel 5.4 NL policy check
+   (This patch should be sync up with DHD 101.16.25 or higher version)
+
+
+DHD 101.16.18 - 2020.09.14
+Others
+ - Fixed nla attribute size of ACS properly
+ - Fixed to handle GAS action frame MAC address properly when random mac disabled
+ - Fixed to sync up publish id type between DHD/HAL
+   (This patch should be sync up with HAL 1.60.9 or higher version)
+ - CS00010932925(By Jeong Min Cheol) Fixed VFS load failure issue
+
+Vendor HAL Library
+- HAL_REL_1_60_9
+ - Fixed to sync up publish id type between DHD/HAL
+   (This patch should be sync up with DHD 101.16.18 or higher version)
+
+
+DHD 101.16.16 - 2020.09.11
+New Feature
+ - CS00010924102(By Lim Junhak) Support AUTH/ASSOC Status Code Extension (Disabled in Makefile)
+ - Support to use standard linux firmware APIs to read Fw, Nvram and Clm files to avoid using VFS calls
+
+Others
+ - CS00010792626(By Choi Hyeonu) Updated radio_on_time and cca_busy_time from an iovar
+ - CS00010801126(By Choi Hyeonu) Added dump done sysfs to notify the dump completion to framework
+ - CS00010932925(By Jeong Min Cheol) Enabled the Linux Firmware API
+ - CS00011013460(By Kwak Hogil) Added to check pktlog disabled condition
+ - CS00011034351(By Jeong Min Cheol) Printed sssr buffer address for debugging
+ - CS00011067437(By Choi Jongmin) Disabled SoftAP 11ax for 4375
+ - CS00011096472(By Jeong Min Cheol) Fixed hang event report
+ - Added an event handler for country code changed event
+ - Added PNO log level and print important log by default
+ - Code cleanup for Android Packet Filter
+ - Code cleanup for SoftAP ACS
+ - Fixed for NAN COMMS regression issue
+ - Fixed for NAN/RTT COMMS failure
+ - Fixed for OCE Certification test case 5.2.x regression
+ - Fixed for the Service discovery failure when ranging enabled
+ - Fixed for whole BSSID print issue when connecting
+ - Fixed to avoid AXI error report to Bigdata server due to GKI file API policy
+ - Fixed to clear the flag when happened the scan timeout
+ - Fixed to indicate HE and OCE capabilities to the upper layer
+ - Fixed to update the latest BSSID in the AUTH event for updating the correct BSSID information to wpa_supplicant
+ - Supported nla attribute policy for HAL vendor command
+
+Vendor HAL Library
+- HAL_REL_1_60_7
+ - CS00011060731 (By Choi Hyeonu) Adjusted not to print out verbose log
+
+
+DHD 101.16.8.2 - 2020.08.28
+New Feature
+ - CS00011004492(By Choi Hyeonu) Enabled GAS frame MAC randomization
+
+Others
+ - CS00011008525(By Jeong Min Cheol) Fixed to support wakelock backport in various Android R OS platforms
+ - CS10988596(By Lee Sunghee) Added to check ciphers_pairwise(WEP) before set auth type for NL80211_AUTHTYPE_AUTOMATIC
+
+
+DHD 101.16.8.1 - 2020.08.28
+New Feature
+ - CS00010223616(By Lim Junhak) Supported always BSSID_HINT connecting operation for 4375
+   (This patch should be sync up with DHD 18.41.36 or higher version)
+ - Support android TWT scheduling private command interface (it is not enabled in Makefile)
+
+Others
+ - CS00010126556 CS00010785016(By Lee SoonHo) Enabled frameburst for VSDB scenario
+ - CS00010446591(By Xiao Zhiyong) Disabled GRO in latency mode
+ - CS00010743577(By Kim MinSoo) Merged Exynos specific PCIe features to 9810 & 9820
+ - CS00010792626(By Choi Hyeonu) Updated radio_on_time and cca_busy_time from an iovar
+ - CS00010855571(By LEE EONJI) Added the flags for filter rule in Makefile
+ - CS00010925111(By LEE EONJI) Fixed for P2P interface creation failure caused by mac address mismatch
+ - CS00010939076(By Choi Junsu) Fixed monitor mode firmware load issue
+ - CS00010942998(By Park Jun-young) Fixed current consumption issue
+ - CS00010983483(By Kim BeomJip) Fixed NAN VTS enableRequest_1_4InvalidArgs failure case
+ - CS00011008525(By Jeong Min Cheol) Changed wakelock implementation due to deprecated wakelock.h APIs
+ - CS00011011677(By Lee Jung-Hun) Enabled Android PNO feature flag
+ - CS00011013973(By Jeong Min Cheol) Added the missing definitions to makefile for 4375 & 4389
+ - Enabled DHD cap iovar to dictate DHD capabilities
+ - Enabled PNO feature in DHD
+ - Enabled back HE in SoftAP
+ - Enabled random mac address scan for PNO
+ - Fixed ACS(Auto Channel Selection) generic logic due to VTS failures
+ - Fixed dongle trap during VTS legacy RTT test case
+ - Fixed intermittent roam failures between OWE APs
+ - Fixed the auth type check for FILS AKM
+ - Fixed to missing minimum roam delta, roam RSSI limit default value on 4375
+ - Fixed to sync up HAL feature set (MKEEP_ALIVE)
+ - Removed <linux/wakelock.h> dependency for newer kernel bringup
+
+Vendor HAL Library
+- HAL_REL_1_60_6
+ - CS00010980134(By Choi Hyeonu) Changed not to handle event during wifi disable procedure
+ - CS00010983483(By BeomJip Kim) Fixed NAN VTS enableRequest_1_4InvalidArgs failure case
+ - Fixed to handle NAN interface delete event properly
+
+
+DHD 101.16.3.1 - 2020.08.10
+Others
+ - Fixed low RX TPUT issue on Exynos platform by changing lb primary cpus
+
+
+DHD 101.16.3 - 2020.08.07
+# Initial Release for 4375 Android R OS Project
+
+New Feature
+ - Support 'WLAN Fast Wi-Fi on'
+
+Kernel Panic
+ - CS00009350560(By LEE EONJI) Fixed to avoid kernel panic due to infinite loop
+ - CS00010519917(By Min SungBin) Fixed kernel panic from ndo_start_xmit due to CFI failure 
+ - CS00010778372(By Jeong Min Cheol) Fixed kernel panic from memdump due to CFI failure
+
+Others
+ - Optimized LLR(Lossless Roaming) feature for securing memory
+ - CS00010166647(By Choi Hyeonu) Reading mac address from OTP directly
+ - CS00010645277(By Kim MinSoo) Fixed Prevent issue (CID 66388, 66389, 66399, 76431, 81861)
+ - CS00010686040(By Kang MinHo) Added update_ft_ies cfg80211_ops function
+ - CS00010591014(By Jeong Min Cheol) Fixed to support module type driver
+ - CS00010645374(By Choi Hyeonu) Eliminated code which varies depending on Android platform version
+ - CS00010702075(By Lim Junhak) Removed to enable GCMP support
+ - CS00010777705(By LEE EONJI) Fixed MFG firmware loading failure by skipping dongle firmware download during DHD attach
+ - CS00010792626(By Choi Hyeonu) Set a total scan time for an R OS CTS test
+ - CS00010792626(By Choi Hyeonu) Set Wifi Channel statics for an R OS CTS test
+ - CS00010863056(By LEE EONJI) Fixed mac address failure by reading OTP info from BP
+
+Vendor HAL Library
+ - HAL_REL_1_60_4
+
+

@@ -14,7 +14,8 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  *
  */
 
@@ -62,7 +63,7 @@ static ssize_t audio_jack_select_store(struct device *dev,
 	return size;
 }
 
-static DEVICE_ATTR(select_jack, 0664,
+static DEVICE_ATTR(select_jack, S_IRUGO | S_IWUSR | S_IWGRP,
 			NULL, audio_jack_select_store);
 
 int audio_register_jack_state_cb(int (*jack_state) (void))
@@ -92,7 +93,7 @@ static ssize_t audio_jack_state_show(struct device *dev,
 	return snprintf(buf, 4, "%d\n", report);
 }
 
-static DEVICE_ATTR(state, 0664,
+static DEVICE_ATTR(state, S_IRUGO | S_IWUSR | S_IWGRP,
 			audio_jack_state_show, NULL);
 
 int audio_register_key_state_cb(int (*key_state) (void))
@@ -122,7 +123,7 @@ static ssize_t audio_key_state_show(struct device *dev,
 	return snprintf(buf, 4, "%d\n", report);
 }
 
-static DEVICE_ATTR(key_state, 0664,
+static DEVICE_ATTR(key_state, S_IRUGO | S_IWUSR | S_IWGRP,
 			audio_key_state_show, NULL);
 
 int audio_register_mic_adc_cb(int (*mic_adc) (void))
@@ -152,49 +153,81 @@ static ssize_t audio_mic_adc_show(struct device *dev,
 	return snprintf(buf, 16, "%d\n", report);
 }
 
-static DEVICE_ATTR(mic_adc, 0664,
+static DEVICE_ATTR(mic_adc, S_IRUGO | S_IWUSR | S_IWGRP,
 			audio_mic_adc_show, NULL);
 
-#ifdef CONFIG_EXTCON_PTT
-int audio_register_ptt_state_cb(int (*ptt_state) (void))
+int audio_register_force_enable_antenna_cb(int (*force_enable_antenna) (int))
 {
-	if (audio_data->get_ptt_state) {
+	if (audio_data->set_force_enable_antenna) {
 		dev_err(audio_data->jack_dev,
 				"%s: Already registered\n", __func__);
 		return -EEXIST;
 	}
 
-	audio_data->get_ptt_state = ptt_state;
+	audio_data->set_force_enable_antenna = force_enable_antenna;
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(audio_register_ptt_state_cb);
+EXPORT_SYMBOL_GPL(audio_register_force_enable_antenna_cb);
 
-static ssize_t audio_ptt_state_show(struct device *dev,
+static ssize_t force_enable_antenna_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	if (audio_data->set_force_enable_antenna) {
+		if ((!size) || (buf[0] != '1')) {
+			dev_info(dev, "%s: antenna disble\n", __func__);
+			audio_data->set_force_enable_antenna(0);
+		} else {
+			dev_info(dev, "%s: update antenna enable\n", __func__);
+			audio_data->set_force_enable_antenna(1);
+		}
+	} else {
+		dev_info(dev, "%s: No callback registered\n", __func__);
+	}
+
+	return size;
+}
+
+static DEVICE_ATTR(force_enable_antenna, S_IRUGO | S_IWUSR | S_IWGRP,
+			NULL, force_enable_antenna_store);
+
+int audio_register_antenna_state_cb(int (*antenna_state) (void))
+{
+	if (audio_data->get_antenna_state) {
+		dev_err(audio_data->jack_dev,
+				"%s: Already registered\n", __func__);
+		return -EEXIST;
+	}
+
+	audio_data->get_antenna_state = antenna_state;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(audio_register_antenna_state_cb);
+
+static ssize_t audio_antenna_state_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	int report = 0;
 
-	if (audio_data->get_ptt_state)
-		report = audio_data->get_ptt_state();
+	if (audio_data->get_antenna_state)
+		report = audio_data->get_antenna_state();
 	else
 		dev_info(dev, "%s: No callback registered\n", __func__);
 
-	return snprintf(buf, 16, "%d\n", report);
+	return snprintf(buf, 4, "%d\n", report);
 }
 
-static DEVICE_ATTR(ptt_state, 0664,
-			audio_ptt_state_show, NULL);
-#endif
+static DEVICE_ATTR(antenna_state, S_IRUGO | S_IWUSR | S_IWGRP,
+			audio_antenna_state_show, NULL);
 
 static struct attribute *sec_audio_jack_attr[] = {
 	&dev_attr_select_jack.attr,
 	&dev_attr_state.attr,
 	&dev_attr_key_state.attr,
 	&dev_attr_mic_adc.attr,
-#ifdef CONFIG_EXTCON_PTT
-	&dev_attr_ptt_state.attr,
-#endif
+	&dev_attr_force_enable_antenna.attr,
+	&dev_attr_antenna_state.attr,
 	NULL,
 };
 
@@ -229,7 +262,7 @@ static ssize_t audio_check_codec_id_show(struct device *dev,
 	return snprintf(buf, 4, "%d\n", report);
 }
 
-static DEVICE_ATTR(check_codec_id, 0664,
+static DEVICE_ATTR(check_codec_id, S_IRUGO | S_IWUSR | S_IWGRP,
 			audio_check_codec_id_show, NULL);
 
 

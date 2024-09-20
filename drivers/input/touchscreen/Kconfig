@@ -1214,26 +1214,18 @@ config TOUCHSCREEN_ROHM_BU21023
 	  To compile this driver as a module, choose M here: the
 	  module will be called bu21023_ts.
 
-config TOUCHSCREEN_DUMP_MODE
-	bool "touchscreen dump mode"
+config TOUCHSCREEN_HIMAX_CHIPSET
+	bool "Himax touchpanel CHIPSET"
 	depends on I2C
 	help
-	  Say Y here if you need to get raw data.
+		Say Y here if you have a Himax CHIPSET touchscreen.
+		HIMAX controllers are multi touch controllers which can
+		report 10 touches at a time.
 
-	  If unsure, say N.
-	  
-config CUSTOM_FORCETOUCH
-        tristate "Apollo Custom ForceTouch Handler"
-        help
-          Say Y here if you want ForceTouch Functionality on non-ONEUI Q ROMs
-          If unsure, say N.
+		If unsure, say N.
 
 source "drivers/input/touchscreen/sec_ts/Kconfig"
-source "drivers/input/touchscreen/sec_ts/y771/Kconfig"
 source "drivers/input/touchscreen/stm/Kconfig"
-source "drivers/input/touchscreen/stm/fts7/Kconfig"
-
-config WAKE_GESTURES
-	bool "wake gestures"
-
+source "drivers/input/touchscreen/melfas/mss100/Kconfig"
+source "drivers/input/touchscreen/himax/himax_83102E/Kconfig"
 endif

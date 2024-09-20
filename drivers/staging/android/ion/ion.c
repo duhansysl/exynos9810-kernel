@@ -97,6 +97,11 @@ void ion_debug_heap_usage_show(struct ion_heap *heap)
 						     node);
 		if (buffer->heap->id != heap->id)
 			continue;
+#ifdef CONFIG_ION_EXYNOS_STAT_LOG
+		pr_err("%16s %6u (%16s %6u) %16zu\n",
+		       buffer->task_comm, buffer->pid, buffer->thread_comm,
+		       buffer->tid, buffer->size);
+#endif
 		table = buffer->sg_table;
 		for_each_sg(table->sgl, sg, table->nents, i) {
 			page = sg_page(sg);
@@ -405,6 +410,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	nr_alloc_peak = atomic_long_read(&heap->total_allocated_peak);
 	if (nr_alloc_cur > nr_alloc_peak)
 		atomic_long_set(&heap->total_allocated_peak, nr_alloc_cur);
+
 	return buffer;
 
 err1:
@@ -938,7 +944,6 @@ static int is_client_alive(struct ion_client *client)
 
 static int ion_debug_client_show(struct seq_file *s, void *unused)
 {
-#ifdef CONFIG_ION_EXYNOS_STAT_LOG
 	struct ion_client *client = s->private;
 	struct rb_node *n;
 	size_t sizes[ION_NUM_HEAP_IDS] = {0};
@@ -988,7 +993,6 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 		seq_printf(s, "%16.16s: %16zu %18zu\n",
 				names[i], sizes[i], sizes_pss[i]);
 	}
-#endif
 	return 0;
 }
 
@@ -2514,9 +2518,9 @@ static struct ion_iovm_map *ion_buffer_iova_create(struct ion_buffer *buffer,
 	return iovm_map;
 }
 
-dma_addr_t ion_iovmm_map(struct dma_buf_attachment *attachment,
-			 off_t offset, size_t size,
-			 enum dma_data_direction direction, int prop)
+static dma_addr_t __ion_iovmm_map(struct dma_buf_attachment *attachment,
+				  off_t offset, size_t size,
+				  enum dma_data_direction direction, int prop)
 {
 	struct dma_buf *dmabuf = attachment->dmabuf;
 	struct ion_buffer *buffer = dmabuf->priv;
@@ -2527,19 +2531,6 @@ dma_addr_t ion_iovmm_map(struct dma_buf_attachment *attachment,
 		return 0;
 
 	BUG_ON(dmabuf->ops != &dma_buf_ops);
-
-	if (IS_ENABLED(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) &&
-			buffer->flags & ION_FLAG_PROTECTED) {
-		struct ion_buffer_info *info = buffer->priv_virt;
-
-		if (!info)
-			return -EINVAL;
-
-		if (info->prot_desc.dma_addr)
-			return info->prot_desc.dma_addr;
-		pr_err("%s: protected buffer but no secure iova\n", __func__);
-		return -EINVAL;
-	}
 
 	domain = get_domain_from_dev(attachment->dev);
 	if (!domain) {
@@ -2574,8 +2565,62 @@ dma_addr_t ion_iovmm_map(struct dma_buf_attachment *attachment,
 	return iovm_map->iova;
 }
 
+dma_addr_t ion_iovmm_map(struct dma_buf_attachment *attachment,
+			 off_t offset, size_t size,
+			 enum dma_data_direction direction, int prop)
+{
+	struct ion_buffer *buffer = attachment->dmabuf->priv;
+
+	if (IS_ENABLED(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) &&
+	    buffer->flags & ION_FLAG_PROTECTED) {
+		struct ion_buffer_info *info = buffer->priv_virt;
+
+		if (!info)
+			return -EINVAL;
+
+		if (info->prot_desc.dma_addr)
+			return info->prot_desc.dma_addr;
+		pr_err("%s: protected buffer but no secure iova\n", __func__);
+		return -EINVAL;
+	}
+
+	return __ion_iovmm_map(attachment, offset, size, direction, prop);
+}
+
+dma_addr_t ion_iovmm_map_attr(struct dma_buf_attachment *attachment,
+			      off_t offset, size_t size,
+			      enum dma_data_direction direction, int prop,
+			      int map_attr)
+{
+	struct ion_buffer *buffer = attachment->dmabuf->priv;
+	dma_addr_t iova = -EINVAL;
+
+	if (IS_ENABLED(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) &&
+	    (map_attr & IOMMU_EXYNOS_SECURE)) {
+		struct ion_buffer_prot_info *prot = buffer->priv_virt;
+
+		if (!prot)
+			return -EINVAL;
+
+		if (!(buffer->flags & ION_FLAG_PROTECTED))
+			dev_err(attachment->dev,
+				  "No secure address for normal buffer");
+		else
+			iova = prot->dma_addr;
+	} else {
+		iova = __ion_iovmm_map(attachment, offset, size,
+				       direction, prop);
+	}
+
+	return iova;
+}
+
 /* The unmapping is delayed until buffer is freed for performance */
 void ion_iovmm_unmap(struct dma_buf_attachment *attachment, dma_addr_t iova)
 {
-	return;
+}
+
+void ion_iovmm_unmap_attr(struct dma_buf_attachment *attachment,
+			  dma_addr_t iova, int map_attr)
+{
 }

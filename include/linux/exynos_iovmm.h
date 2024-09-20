@@ -240,6 +240,8 @@ dma_addr_t exynos_iovmm_map_userptr(struct device *dev, unsigned long vaddr,
  */
 void exynos_iovmm_unmap_userptr(struct device *dev, dma_addr_t iova);
 
+int iovmm_map_oto(struct device *dev, phys_addr_t phys, size_t size);
+void iovmm_unmap_oto(struct device *dev, phys_addr_t phys);
 /*
  * The handle_pte_fault() is called by exynos_sysmmu_map_user_pages().
  * Driver cannot include include/linux/huge_mm.h because

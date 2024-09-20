@@ -3268,7 +3268,6 @@ static int memcg_stat_show(struct seq_file *m, void *v)
 
 	return 0;
 }
-
 static u64 mem_cgroup_vmpressure_read(struct cgroup_subsys_state *css,
 				      struct cftype *cft)
 {

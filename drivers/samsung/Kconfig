@@ -1,0 +1,125 @@
+# drivers/samsung/Kconfig
+#
+# Copyright (c) 2010-2019 Samsung Electronics Co., Ltd.
+#		http://www.samsung.com/
+#
+# Licensed under GPLv2
+
+config SEC_EXT
+	bool "Samsung TN extension Feature"
+	default y
+
+config SEC_REBOOT
+	bool "Enable TN reboot features"
+	depends on SEC_EXT
+	default y
+	help
+	  Samsung TN reboot extension Feature. Do additional work when reboot.
+
+comment "Samsung sysfs Feature"
+config DRV_SAMSUNG
+	bool "Samsung sec class/sysfs Feature"
+	default y
+	depends on SEC_EXT
+	help
+	  Samsung sysfs name 'sec' directory create.
+
+config SEC_PARAM
+	bool "Enable Param modification"
+	depends on SEC_DEBUG
+	default y
+	help
+	  Samsung TN Param Feature.
+
+config CM_OFFSET
+	int "Charging Mode Offset"
+	default 0
+	depends on SEC_PARAM
+	help
+	  set Charging Mode Offset when you enable SEC_PARAM.
+
+config WC_OFFSET
+	int "Wireless Charging IC Offset"
+	default 0
+	depends on SEC_PARAM
+	help
+	  set Wireless Charging IC Info Offset.
+
+config FMM_LOCK_OFFSET
+	int "FMM lock Offset"
+	default 0
+	depends on SEC_PARAM
+	help
+	  set FMM lock Offset when you enable SEC_PARAM.
+
+config SEC_KEY_NOTIFIER
+	bool "Enable Samsung key event notifier"
+	depends on SEC_EXT
+	default n
+	help
+	  Samsung Key input event notifier
+
+comment "Samsung TN Build Options"
+config SEC_FACTORY
+	bool "SAMSUNG Factory build option"
+	depends on SEC_EXT && SEC_DEBUG
+	default n
+	select SEC_PANIC_PCIE_ERR
+	help
+	  Include some codes for Factory binary.
+	  This option is enabled by Factory build option.
+	  In samsung build script, '-F' enables this option.
+
+comment "Samsung TN BSP Options"
+config SAMSUNG_PRODUCT_SHIP
+	bool "set up for product shipping"
+	depends on SEC_EXT
+	default n
+
+comment "Samsung TN option for VTS test"
+config SEC_VTS_TEST
+	bool "VTS TEST"
+	default n
+	help
+	  This option notices this binary for VTS test.
+
+config SEC_DUMP_SINK
+	bool "Enable to dump_sink"
+	default y
+	help
+	  This option enables dump_sink.
+
+config ARGOS
+	bool "Throughput monitoring Feature"
+	default n
+	help
+	  This option enables monitoring the data throughput and doing several actions for
+	  enhancing the performance such as adjusting the CPU freqency, allocating the tasks
+	  to the appropriate CPU and so on
+
+config ARGOS_CLUSTER_NUM
+	int "The number of CPU clusters (1 ~ 3)"
+	range 1 3
+	depends on ARGOS
+	default 2
+	help
+	  This option enables that argos supports 3 clusters in SMP nodes.
+
+config SEC_SYSUP
+	bool "Samsung System Update"
+	default n
+	help
+	  Samsung system update Feature
+
+comment "Samsung Mobile Power Management Options"
+menuconfig SEC_PM
+	bool "Samsung Mobile Power Management"
+	default y
+	help
+	  This option enables support for various drivers and features for
+	  Samsung Mobile Power Management.
+
+source "drivers/samsung/debug/Kconfig"
+source "drivers/samsung/misc/Kconfig"
+source "drivers/samsung/pm/Kconfig"
+

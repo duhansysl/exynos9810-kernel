@@ -88,4 +88,21 @@
 #define VC_MIPISTAT		2
 #define VC_EMBEDDED		3
 
+//#ifdef CONFIG_CAMERA_FROM
+#define VC_PRIVATE		4
+
+#define SP_REAR		0
+#define SP_FRONT	1
+#define SP_REAR2	2
+#define SP_FRONT2	3
+#define SP_REAR3	4
+#define SP_FRONT3	5
+#define SP_REAR4	6
+#define SP_FRONT4	7
+#define SP_REAR_TOF	8
+#define SP_FRONT_TOF	9
+#define SP_SECURE	100
+#define SP_VIRTUAL	101
+//#endif
+
 #endif

@@ -72,6 +72,11 @@ scm_version()
 			printf -- '-svn%s' "`git svn find-rev $head`"
 		fi
 
+		# Check for uncommitted changes
+		if git diff-index --name-only HEAD | grep -qv "^scripts/package"; then
+			printf '%s' -dirty
+		fi
+
 		# All done with git
 		return
 	fi
@@ -89,6 +94,12 @@ scm_version()
 				printf '%s%s' -hg "$id"
 			fi
 		fi
+
+		# Are there uncommitted changes?
+		# These are represented by + after the changeset id.
+		case "$hgid" in
+			*+|*+\ *) printf '%s' -dirty ;;
+		esac
 
 		# All done with mercurial
 		return
@@ -144,5 +155,20 @@ fi
 
 # CONFIG_LOCALVERSION and LOCALVERSION (if set)
 res="${res}${CONFIG_LOCALVERSION}${LOCALVERSION}"
+
+# scm version string if not at a tagged commit
+if test "$CONFIG_LOCALVERSION_AUTO" = "y"; then
+	# full scm version string
+	res="$res$(scm_version)"
+else
+	# append a plus sign if the repository is not in a clean
+	# annotated or signed tagged state (as git describe only
+	# looks at signed or annotated tags - git tag -a/-s) and
+	# LOCALVERSION= is not specified
+	if test "${LOCALVERSION+set}" != "set"; then
+		scm=$(scm_version --short)
+		res="$res${scm:++}"
+	fi
+fi
 
 echo "$res"

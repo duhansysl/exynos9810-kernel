@@ -95,6 +95,14 @@ __vfs_getxattr(struct dentry *dentry, struct inode *inode, const char *name,
 #endif
 
 /*
+ * VA_START macro is not used since Android Kernel v5.4
+ */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+#define VA_START (PAGE_OFFSET)
+#endif
+
+/*
  * KASLR is backported to 4.4 kernels
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
@@ -149,7 +157,7 @@ static inline struct dentry *d_real_comp(struct dentry *dentry)
 #else
 static inline struct dentry *d_real_comp(struct dentry *dentry)
 {
-	return d_real(dentry, NULL);
+	return d_real(dentry, dentry->d_inode);
 }
 #endif
 
@@ -183,6 +191,16 @@ static inline struct file *get_task_exe_file(struct task_struct *task)
 	task_unlock(task);
 	return exe_file;
 }
+#endif
+
+#if defined(CONFIG_ANDROID) && LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
+/*
+ * __vfs_getxattr was changed in Android Kernel v5.4
+ * https://android.googlesource.com/kernel/common/+/3484eba91d6b529cc606486a2db79513f3db6c67
+ */
+#define XATTR_NOSECURITY 0x4	/* get value, do not involve security check */
+#define __vfs_getxattr(dentry, inode, name, value, size, flags) \
+		__vfs_getxattr(dentry, inode, name, value, size)
 #endif
 
 #endif /* __LINUX_PROCA_PORTING_H */

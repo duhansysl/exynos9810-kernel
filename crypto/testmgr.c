@@ -32,6 +32,7 @@
 #include <crypto/rng.h>
 #include <crypto/drbg.h>
 #include <crypto/akcipher.h>
+#include <crypto/diskcipher.h>
 #include <crypto/kpp.h>
 
 #include "internal.h"
@@ -1661,6 +1662,146 @@ out:
 	kfree(seed);
 	return err;
 }
+
+#if defined(CONFIG_CRYPTO_DISKCIPHER) && !defined(CONFIG_EXYNOS_FMP_FIPS)
+static int __test_diskcipher(struct crypto_diskcipher *tfm, int enc,
+			const struct cipher_testvec *template,
+			unsigned int tcount, const int align_offset)
+{
+	const char *algo =
+		crypto_tfm_alg_driver_name(crypto_diskcipher_tfm(tfm));
+	unsigned int i, j;
+	char *q;
+	struct scatterlist sg[8];
+	struct scatterlist sgout[8];
+	const char *e = (enc == ENCRYPT) ? "encryption" : "decryption";
+	void *data;
+	char iv[MAX_IVLEN];
+	char *xbuf[XBUFSIZE];
+	char *xoutbuf[XBUFSIZE];
+	int ret = -ENOMEM;
+	unsigned int ivsize = crypto_diskcipher_ivsize(tfm);
+	struct diskcipher_test_request req;
+	const char *input, *result;
+
+	if (testmgr_alloc_buf(xbuf))
+		goto out_nobuf;
+
+	if (testmgr_alloc_buf(xoutbuf))
+		goto out_nooutbuf;
+
+	j = 0;
+	for (i = 0; i < tcount; i++) {
+		if (template[i].np && !template[i].also_non_np)
+			continue;
+
+		if (template[i].fips_skip)
+			continue;
+
+		if (template[i].iv)
+			memcpy(iv, template[i].iv, ivsize);
+		else
+			memset(iv, 0, MAX_IVLEN);
+
+		input  = enc ? template[i].ptext : template[i].ctext;
+		result = enc ? template[i].ctext : template[i].ptext;
+		j++;
+		ret = -EINVAL;
+		if (WARN_ON(align_offset + template[i].len > PAGE_SIZE))
+			goto out;
+
+		ret = crypto_diskcipher_setkey(tfm, template[i].key,
+					     template[i].klen, 0, NULL);
+		if (ret == -ENOKEY) {
+			pr_err("alg: diskcipher: no support %d keylen for %s. skip it\n",
+			       template[i].klen, algo);
+			continue;
+		} else if (ret) {
+			pr_err("alg: diskcipher: setkey failed on test %d for %s\n",
+				   j, algo);
+			goto out;
+		}
+
+		data = xbuf[0];
+		data += align_offset;
+		memcpy(data, input, template[i].len);
+		sg_init_one(&sg[0], data, template[i].len);
+
+		data = xoutbuf[0];
+		data += align_offset;
+		sg_init_one(&sgout[0], data, template[i].len);
+
+		diskcipher_request_set_crypt(&req, sg, sgout,
+				template[i].len, iv, enc ? 1 : 0);
+		ret = diskcipher_do_crypt(tfm, &req);
+		if (ret) {
+			pr_err("alg: diskcipher: %s failed on test %d for %s: ret=%d\n",
+				   e, j, algo, -ret);
+			goto out;
+		}
+
+		q = data;
+		if (memcmp(q, result, template[i].len)) {
+			pr_err("alg: diskcipher: Test %d failed (invalid result) on %s for %s\n",
+			       j, e, algo);
+			hexdump(q, template[i].len);
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+	ret = 0;
+
+out:
+	testmgr_free_buf(xoutbuf);
+out_nooutbuf:
+	testmgr_free_buf(xbuf);
+out_nobuf:
+	return ret;
+}
+
+static int test_diskcipher(struct crypto_diskcipher *tfm, int enc,
+			 const struct cipher_testvec *template,
+			 unsigned int tcount)
+{
+	int ret;
+
+	ret = __test_diskcipher(tfm, enc, template, tcount, 0);
+	if (ret)
+		return ret;
+
+	/* test unaligned buffers, check with one byte offset */
+	ret = __test_diskcipher(tfm, enc, template, tcount, 1);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int alg_test_diskcipher(const struct alg_test_desc *desc,
+			     const char *driver, u32 type, u32 mask)
+{
+	struct crypto_diskcipher *tfm;
+	const struct cipher_test_suite *suite = &desc->suite.cipher;
+	int err = 0;
+
+	tfm = crypto_alloc_diskcipher(driver, type | CRYPTO_ALG_INTERNAL,
+					mask, 0);
+	if (!tfm || IS_ERR(tfm)) {
+		pr_err("alg: diskcipher: Failed to load transform for %s: %ld\n",
+			driver, PTR_ERR(tfm));
+		return PTR_ERR(tfm);
+	}
+
+	err = test_diskcipher(tfm, ENCRYPT, suite->vecs, suite->count);
+	if (err)
+		goto out;
+
+	err = test_diskcipher(tfm, DECRYPT, suite->vecs, suite->count);
+out:
+	crypto_free_diskcipher(tfm);
+	return err;
+}
+#endif
 
 static int alg_test_aead(const struct alg_test_desc *desc, const char *driver,
 			 u32 type, u32 mask)
@@ -4220,6 +4361,14 @@ static const struct alg_test_desc alg_test_descs[] = {
 				},
 			}
 		},
+#if defined(CONFIG_CRYPTO_DISKCIPHER) && !defined(CONFIG_EXYNOS_FMP_FIPS)
+	}, {
+		.alg = "cbc(aes)-disk",
+		.test = alg_test_diskcipher,
+		.suite = {
+			.cipher = __VECS(aes_cbc_tv_template)
+		}
+#endif
 	}, {
 		.alg = "xchacha20",
 		.test = alg_test_skcipher,
@@ -4311,6 +4460,14 @@ static const struct alg_test_desc alg_test_descs[] = {
 				}
 			}
 		}
+#if defined(CONFIG_CRYPTO_DISKCIPHER) && !defined(CONFIG_EXYNOS_FMP_FIPS)
+	}, {
+		.alg = "xts(aes)-disk",
+		.test = alg_test_diskcipher,
+		.suite = {
+			.cipher = __VECS(aes_xts_tv_template)
+		}
+#endif
 	}, {
 		.alg = "zstd",
 		.test = alg_test_comp,

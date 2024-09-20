@@ -1,0 +1,21 @@
+# drivers/samsung/pm/Kconfig
+#
+# Copyright (c) 2010-2019 Samsung Electronics Co., Ltd.
+#		http://www.samsung.com/
+#
+# Licensed under GPLv2
+#
+config SEC_PM_DEBUG
+	bool "Enable Samsung Mobile Power management debug support"
+	default y
+	depends on SEC_PM
+	help
+	  This option enables Samsung Mobile Power management debug support.
+	  Intended for test and debug only.
+
+config SEC_PM_BIGDATA
+	bool "Enable Samsung Mobile Power management big data support"
+	default y
+	depends on SEC_PM
+	help
+	  This option enables Samsung Mobile Power management big data support.

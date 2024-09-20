@@ -30,9 +30,9 @@ extern void dfd_set_dump_gpr(int en);
 extern void little_reset_control(int en);
 extern void big_reset_control(int en);
 #else
-#define dfd_set_dump_gpr(a)		do { } while (0)
-#define little_reset_control(a)		do { } while (0)
-#define big_reset_control(a)		do { } while (0)
+#define dfd_set_dump_gpr(a)            do { } while(0)
+#define little_reset_control(a)                do { } while(0)
+#define big_reset_control(a)           do { } while(0)
 #endif
 
 #define DEFAULT_S2D_BLOCK		(0xFFFFF3BF)

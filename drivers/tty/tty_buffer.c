@@ -620,9 +620,3 @@ void tty_buffer_flush_work(struct tty_port *port)
 {
 	flush_work(&port->buf.work);
 }
-
-void tty_buffer_flush_workqueue(struct tty_port *port)
-{
-	flush_workqueue(system_unbound_wq);
-}
-

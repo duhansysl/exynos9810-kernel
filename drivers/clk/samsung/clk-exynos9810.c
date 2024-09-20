@@ -483,6 +483,9 @@ static __initdata struct of_device_id ext_clk_match[] = {
 void exynos9810_vclk_init(void)
 {
 	/* Common clock init */
+#ifdef CONFIG_EXYNOS_USICMGP01_OSCCLK
+	 cal_clk_setrate(MUX_CLK_USI_CMGP01, 26000000);
+#endif
 }
 
 /* register exynos9810 clocks */

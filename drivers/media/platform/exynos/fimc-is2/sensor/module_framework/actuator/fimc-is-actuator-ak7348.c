@@ -187,7 +187,7 @@ int sensor_ak7348_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	/* EEPROM AF calData address */
 	if (gPtr_lib_support.binary_load_flg) {
 		/* get pan_focus */
-		cal_addr = gPtr_lib_support.minfo->kvaddr_rear_cal + EEPROM_OEM_BASE;
+		cal_addr = gPtr_lib_support.minfo->kvaddr_cal[SENSOR_POSITION_REAR] + EEPROM_OEM_BASE;
 		memcpy((void *)&cal_data, (void *)cal_addr, sizeof(cal_data));
 
 		if (cal_data > 0)

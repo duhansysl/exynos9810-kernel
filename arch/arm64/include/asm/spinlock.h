@@ -90,8 +90,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	/* Atomically increment the next ticket. */
 	ARM64_LSE_ATOMIC_INSN(
 	/* LL/SC */
-"	mov	%w4, #0x1\n"
-"	lsl	%w4, %w4, #31\n"
+"	mov	%w4, wzr\n"
 "	prfm	pstl1strm, %3\n"
 "1:	ldaxr	%w0, %3\n"
 "	add	%w1, %w0, %w6\n"
@@ -102,7 +101,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	/* LSE atomics */
 "	mov	%w2, %w6\n"
 "	ldadda	%w2, %w0, %3\n"
-	__nops(7)
+	__nops(6)
 	)
 
 	/* Did we get the lock? */

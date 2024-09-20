@@ -44,7 +44,7 @@ struct kmem_cache {
 #include <linux/kmemleak.h>
 #include <linux/random.h>
 #ifdef CONFIG_RKP_KDP
-#include <linux/rkp.h>
+#include <linux/kdp.h>
 #endif
 /*
  * State of the slab allocator.

@@ -192,7 +192,7 @@ config PM_SLEEP_DEBUG
 
 config DPM_WATCHDOG
 	bool "Device suspend/resume watchdog"
-	depends on PM_DEBUG && PSTORE && EXPERT
+	depends on PSTORE && EXPERT
 	---help---
 	  Sets up a watchdog timer to capture drivers that are
 	  locked up attempting to suspend/resume a device.
@@ -317,15 +317,3 @@ config PM_GENERIC_DOMAINS_OF
 
 config CPU_PM
 	bool
-
-config FOTA_LIMIT
-	bool "Fota limit information node"
-	default n
-	help
-	  Add sysfs to notify limit information to recovery module
-	  /sys/power/fota_limit
-
-config	BOEFFLA_WL_BLOCKER
-	bool "Boeffla generic wakelock blocker driver"
-	depends on PM
-	default n

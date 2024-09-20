@@ -23,19 +23,10 @@
 #include <linux/i2c.h>
 #include "../sec_charging_common.h"
 
-#if defined(CONFIG_WIRELESS_FIRMWARE_65)
-#define MFC_FW_BIN_VERSION			0x65
-#define MFC_FW_BIN_FULL_VERSION		0x00650001
-#define MFC_FW_BIN_VERSION_ADDR		0x167C //fw rev65 address
-#define MFC_FLASH_FW_HEX_PATH		"mfc/mfc_fw65_flash.bin"
-#define MFC_FW_SDCARD_BIN_PATH		"/sdcard/mfc_fw65_flash.bin"
-#else
 #define MFC_FW_BIN_VERSION			0x58
 #define MFC_FW_BIN_FULL_VERSION		0x00580001
 #define MFC_FW_BIN_VERSION_ADDR		0x14a8 //fw rev58 address
-#define MFC_FLASH_FW_HEX_PATH		"mfc/mfc_fw_flash.bin"
-#define MFC_FW_SDCARD_BIN_PATH		"/sdcard/mfc_fw_flash.bin"
-#endif
+#define FW_ADDRES_MAX 7
 
 /* REGISTER MAPS */
 #define MFC_CHIP_ID_L_REG					0x00
@@ -209,7 +200,7 @@ enum {
 	MFC_PAD_WPC,				/* 1 */
 	MFC_PAD_WPC_AFC,			/* 2 */
 	MFC_PAD_WPC_PACK,			/* 3 */
-	MFC_PAD_WPC_PACK_HV,		/* 4 */
+	MFC_PAD_WPC_PACK_TA,		/* 4 */
 	MFC_PAD_WPC_STAND,			/* 5 */
 	MFC_PAD_WPC_STAND_HV,		/* 6 */
 	MFC_PAD_PMA,				/* 7 */
@@ -225,7 +216,7 @@ static const u8 mfc_idt_vout_val[] = {
  0x0F, 0x19, 0x23, 0x2D, 0x37, 0x41, 0x14,
 };
 static const u8 mfc_lsi_vout_val[] = {
- 0x64, 0x78, 0x8C, 0xA0, 0xB4, 0xC8, 0x6E,
+ 0x72, 0x78, 0x8C, 0xA0, 0xC8, 0xC8, 0x6E,
 };
 
 enum {
@@ -261,16 +252,13 @@ enum {
 #define	WPC_COM_REQ_AFC_TX				0x0C /* Data Value (0x00) */
 #define	WPC_COM_COOLING_CTRL			0x0D /* Data Value ON(0x00), OFF(0xFF) */
 #define	WPC_COM_CHG_LEVEL				0x0F /* Battery level */
-#define	WPC_COM_ENTER_PHM				0x18 /* GEAR entered PHM */
 
 /* MFC_TX_DATA_COM_REG (0x58) : TX Command */
-#define	WPC_TX_COM_UNKNOWN		0x00
-#define	WPC_TX_COM_TX_ID		0x01
-#define	WPC_TX_COM_AFC_SET		0x02
-#define	WPC_TX_COM_ACK			0x03
-#define	WPC_TX_COM_NAK			0x04
-#define WPC_TX_COM_CHG_ERR		0x05
-#define WPC_TX_COM_WPS			0x07
+#define	WPC_TX_COM_UNKNOWN					0x00
+#define	WPC_TX_COM_TX_ID					0x01
+#define	WPC_TX_COM_AFC_SET					0x02
+#define	WPC_TX_COM_ACK						0x03
+#define	WPC_TX_COM_NAK						0x04
 
 #define TX_AFC_SET_5V			0x00
 #define TX_AFC_SET_10V			0x01
@@ -288,24 +276,10 @@ enum {
 #define TX_ID_MULTI_PORT_END		0x2F
 #define TX_ID_STAND_TYPE_START		0x30
 #define TX_ID_STAND_TYPE_END		0x3F
-#define TX_ID_BATT_PACK_TA			0x41 /* 0x40 ~ 0x41 is N/C*/
-#define TX_ID_BATT_PACK				0x42
-#define TX_ID_BATT_PACK_END			0x4F /* reserved 0x40 ~ 0x4F for wireless battery pack */
+#define TX_ID_BATT_PACK				0x40
+#define TX_ID_BATT_PACK_TA			0x41
 #define TX_ID_DREAM_STAND			0x31
 #define TX_ID_DREAM_DOWN			0x14
-#define TX_ID_UNO_TX				0x72
-#define TX_ID_UNO_TX_B0				0x80
-#define TX_ID_UNO_TX_B1				0x81
-#define TX_ID_UNO_TX_B2				0x82
-#define TX_ID_UNO_TX_MAX			0x9F
-
-#define TX_CHG_ERR_OTP			0x12
-#define TX_CHG_ERR_OCP			0x13
-#define TX_CHG_ERR_DARKZONE		0x14
-#define TX_CHG_ERR_FOD			0x20 ... 0x27
-
-/* value of WPC_TX_COM_WPS (0x07) */
-#define WPS_AICL_RESET		0x01
 
 #define	WPC_COM_AFC_DEBOUNCE			0x07 /* Data Values [ 0~1000mV : 0x0000~0x03E8 ], 2 bytes*/
 
@@ -482,6 +456,9 @@ enum {
 #define MFC_FW_RESULT_PASS				1
 #define MFC_FW_RESULT_FAIL				0
 
+#define MFC_FLASH_FW_HEX_PATH		"mfc/mfc_fw_flash.bin"
+#define MFC_FW_SDCARD_BIN_PATH		"/sdcard/mfc_fw_flash.bin"
+
 enum {
 	MFC_EVENT_IRQ = 0,
 	MFC_IRQS_NR,
@@ -525,18 +502,15 @@ enum {
 	MFC_POWER_CTR_HOLD_OFF,			/* 5 */
 	MFC_AFC_CONF_5V,				/* 6 */
 	MFC_AFC_CONF_10V,				/* 7 */
-	MFC_AFC_CONF_5V_TX,				/* 8 */
-	MFC_AFC_CONF_10V_TX,			/* 9 */
-	MFC_CONFIGURATION,				/* 10 */
-	MFC_IDENTIFICATION,				/* 11 */
-	MFC_EXTENDED_IDENT,				/* 12 */
-	MFC_LED_CONTROL_ON,				/* 13 */
-	MFC_LED_CONTROL_OFF,			/* 14 */
-	MFC_FAN_CONTROL_ON,				/* 15 */
-	MFC_FAN_CONTROL_OFF,			/* 16 */
-	MFC_REQUEST_AFC_TX,				/* 17 */
-	MFC_REQUEST_TX_ID,				/* 18 */
-	MFC_PHM_ON, 					/* 19 */
+	MFC_CONFIGURATION,				/* 8 */
+	MFC_IDENTIFICATION,				/* 9 */
+	MFC_EXTENDED_IDENT,				/* 10 */
+	MFC_LED_CONTROL_ON,				/* 11 */
+	MFC_LED_CONTROL_OFF,			/* 12 */
+	MFC_FAN_CONTROL_ON,				/* 13 */
+	MFC_FAN_CONTROL_OFF,			/* 14 */
+	MFC_REQUEST_AFC_TX,				/* 15 */
+	MFC_REQUEST_TX_ID,				/* 16 */
 };
 
 enum mfc_irq_source {
@@ -693,9 +667,8 @@ struct mfc_charger_platform_data {
 struct mfc_charger_data {
 	struct i2c_client				*client;
 	struct device					*dev;
-	mfc_charger_platform_data_t 	*pdata;
+	mfc_charger_platform_data_t	*pdata;
 	struct mutex io_lock;
-	struct mutex wpc_en_lock;
 	const struct firmware *firm_data_bin;
 
 	int wc_w_state;
@@ -707,7 +680,6 @@ struct mfc_charger_data {
 	struct wake_lock wpc_opfq_lock;
 	struct wake_lock wpc_afc_vout_lock;
 	struct wake_lock wpc_vout_mode_lock;
-	struct wake_lock wpc_tx_id_lock;
 	struct workqueue_struct *wqueue;
 	struct work_struct	wcin_work;
 	struct delayed_work	wpc_det_work;
@@ -721,7 +693,6 @@ struct mfc_charger_data {
 	struct delayed_work	wpc_fw_booting_work;
 	struct delayed_work	wpc_vout_mode_work;
 	struct delayed_work	wpc_cm_fet_work;
-	struct delayed_work wpc_i2c_error_work;
 
 	u16 addr;
 	int size;
@@ -737,13 +708,7 @@ struct mfc_charger_data {
 	int led_cover;
 	bool is_probed;
 	bool is_afc_tx;
-	bool tx_id_done;
 	int tx_id;
-	int tx_id_cnt;
-	u8 device_event;
-
-	int i2c_error_count;
-	int wpc_en_flag;
 
 	struct mutex fw_lock;
 };

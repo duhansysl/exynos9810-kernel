@@ -19,7 +19,6 @@ struct pmucal_seq cp_reset_assert[] = {
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "CP_DUMP_PC_SYS_PWR_REG", 0x14060000, 0x1338, (0x1 << 0), (0x0 << 0), 0, 0, 0xffffffff, 0),
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "CP_CTRL_NS", 0x14060000, 0x0030, (0x1 << 2), (0x1 << 2), 0, 0, 0xffffffff, 0),
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "CENTRAL_SEQ_CP_CONFIGURATION", 0x14060000, 0x0280, (0x1 << 16), (0x0 << 16), 0, 0, 0xffffffff, 0),
-	PMUCAL_SEQ_DESC(PMUCAL_DELAY, "DELAY", 0x14060000, 0, 0, 0x400, 0, 0, 0, 0),
 	PMUCAL_SEQ_DESC(PMUCAL_WAIT, "CENTRAL_SEQ_CP_STATUS", 0x14060000, 0x0284, (0xff << 16), (0x80 << 16), 0x14060000, 0x0284, (0xff << 16), (0x80 << 16)),
 };
 struct pmucal_seq cp_reset_release[] = {

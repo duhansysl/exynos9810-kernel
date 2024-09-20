@@ -479,14 +479,14 @@ config USB_CONFIGFS_F_CONN_GADGET
         depends on USB_CONFIGFS
         select USB_F_CONN_GADGET
         help
-          SideSync
+          SideSync or DexLive
 
 config USB_F_CONN_GADGET_NDOP
-    bool "Conn gadget that do not support DexLive"
-    depends on USB_CONFIGFS_F_CONN_GADGET
-	depends on ANDROID_MAJOR_VERSION >= "q"
-    help
-		Next SideSync
+	bool "Conn gadget that do not support DexLive"
+	depends on USB_CONFIGFS_F_CONN_GADGET
+	help
+	  Next SideSync
+
 config USB_CONFIGFS_F_SS_MON_GADGET
 	bool "F_SAMSUNG gadget"
 	depends on USB_CONFIGFS

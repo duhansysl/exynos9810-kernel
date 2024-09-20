@@ -60,7 +60,11 @@
 #include "muic_regmap.h"
 #include "muic_regmap_max77865.h"
 #include "muic_coagent.h"
+#if defined(CONFIG_BATTERY_SAMSUNG_LEGO_STYLE)
+#include "../../battery/common/include/sec_charging_common.h"
+#else
 #include "../../battery_v2/include/sec_charging_common.h"
+#endif
 
 #if defined(CONFIG_MUIC_HV_MAX77865)
 #include "muic_hv.h"

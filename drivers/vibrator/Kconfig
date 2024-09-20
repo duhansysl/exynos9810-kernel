@@ -1,0 +1,6 @@
+source "drivers/vibrator/common/Kconfig"
+
+source "drivers/vibrator/dc/Kconfig"
+
+source "drivers/vibrator/imagis/Kconfig"
+

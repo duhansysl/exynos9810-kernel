@@ -224,11 +224,6 @@ static int alarmtimer_suspend(struct device *dev)
 	struct rtc_device *rtc;
 	int i;
 	int ret;
-#ifdef CONFIG_SEC_PM_DEBUG
-	pid_t pid = 0;
-	char task_comm[TASK_COMM_LEN] = {0,};
-	void *func = NULL;
-#endif
 
 	spin_lock_irqsave(&freezer_delta_lock, flags);
 	min = freezer_delta;
@@ -252,27 +247,14 @@ static int alarmtimer_suspend(struct device *dev)
 		if (!next)
 			continue;
 		delta = ktime_sub(next->expires, base->gettime());
-		if (!min.tv64 || (delta.tv64 < min.tv64)) {
+		if (!min.tv64 || (delta.tv64 < min.tv64))
 			min = delta;
-#ifdef CONFIG_SEC_PM_DEBUG
-			if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
-				pid = next->pid;
-				strncpy(task_comm, next->task_comm,
-						TASK_COMM_LEN - 1);
-				func = next->func;
-			}
-#endif
-		}
 	}
 	if (min.tv64 == 0)
 		return 0;
 
 	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
 		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
-#ifdef CONFIG_SEC_PM_DEBUG
-		pr_err("%s: alarm will be expired in 2 secs[PID:%d(%s), %pf]\n",
-				__func__, pid, task_comm, func);
-#endif
 		return -EBUSY;
 	}
 
@@ -663,58 +645,6 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 	alarm_start(&timr->it.alarm.alarmtimer, exp);
 	return 0;
 }
-
-#if defined(CONFIG_RTC_ALARM_BOOT)
-#define BOOTALM_BIT_EN		0
-#define BOOTALM_BIT_YEAR	1
-#define BOOTALM_BIT_MONTH	5
-#define BOOTALM_BIT_DAY		7
-#define BOOTALM_BIT_HOUR	9
-#define BOOTALM_BIT_MIN		11
-#define BOOTALM_BIT_TOTAL	13
-
-int alarm_set_alarm(char *alarm_data)
-{
-	struct rtc_wkalrm alm;
-	int ret;
-	char buf_ptr[BOOTALM_BIT_TOTAL + 1];
-
-	pr_info("%s:\n", __func__);
-
-	if (!rtcdev) {
-		pr_err("%s: no RTC, time will be lost on reboot\n", __func__);
-		return -1;
-	}
-
-	strlcpy(buf_ptr, alarm_data, BOOTALM_BIT_TOTAL + 1);
-
-	alm.time.tm_sec = 0;
-	alm.time.tm_min = (buf_ptr[BOOTALM_BIT_MIN] - '0') * 10
-		+ (buf_ptr[BOOTALM_BIT_MIN + 1] - '0');
-	alm.time.tm_hour = (buf_ptr[BOOTALM_BIT_HOUR] - '0') * 10
-		+ (buf_ptr[BOOTALM_BIT_HOUR + 1] - '0');
-	alm.time.tm_mday = (buf_ptr[BOOTALM_BIT_DAY] - '0') * 10
-		+ (buf_ptr[BOOTALM_BIT_DAY + 1] - '0');
-	alm.time.tm_mon = (buf_ptr[BOOTALM_BIT_MONTH] - '0') * 10
-		+ (buf_ptr[BOOTALM_BIT_MONTH + 1] - '0');
-	alm.time.tm_year = (buf_ptr[BOOTALM_BIT_YEAR] - '0') * 1000
-		+ (buf_ptr[BOOTALM_BIT_YEAR + 1] - '0') * 100
-		+ (buf_ptr[BOOTALM_BIT_YEAR + 2] - '0') * 10
-		+ (buf_ptr[BOOTALM_BIT_YEAR + 3] - '0');
-	alm.enabled = (*buf_ptr == '1' || *buf_ptr == '2');
-	alm.time.tm_mon -= 1;
-	alm.time.tm_year -= 1900;
-
-	pr_info("%s: %d/%d/%d %d:%d:%d(%d)\n", __func__,
-			1900 + alm.time.tm_year, 1 + alm.time.tm_mon,
-			alm.time.tm_mday, alm.time.tm_hour, alm.time.tm_min,
-			alm.time.tm_sec, alm.time.tm_wday);
-
-	ret = rtc_set_alarm_boot(rtcdev, &alm);
-
-	return ret;
-}
-#endif
 
 /**
  * alarmtimer_nsleep_wakeup - Wakeup function for alarm_timer_nsleep

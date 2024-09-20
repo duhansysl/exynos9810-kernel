@@ -473,11 +473,11 @@ struct pmucal_seq g2d_status[] = {
 };
 
 struct pmucal_seq embedded_g3d_on[] = {
+	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "EMBEDDED_G3D_CONFIGURATION", 0x14060000, 0x4040, (0xf << 0), (0xF << 0), 0, 0, 0xffffffff, 0),
+	PMUCAL_SEQ_DESC(PMUCAL_WAIT, "EMBEDDED_G3D_STATUS", 0x14060000, 0x4044, (0xf << 0), (0xF << 0), 0x14060000, 0x4044, (0xf << 0), (0xF << 0)),
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "PLL_CON2_PLL_G3D", 0x17400000, 0x0148, (0xffffffff << 0), (0x30000003 << 0), 0, 0, 0xffffffff, 0),
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "PLL_CON0_PLL_G3D", 0x17400000, 0x0140, (0x1 << 4), (0x1 << 4), 0, 0, 0xffffffff, 0),
 	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "PLL_CON0_MUX_CLKCMU_EMBEDDED_G3D_USER", 0x17400000, 0x0100, (0x1 << 4), (0x1 << 4), 0, 0, 0xffffffff, 0),
-	PMUCAL_SEQ_DESC(PMUCAL_WRITE, "EMBEDDED_G3D_CONFIGURATION", 0x14060000, 0x4040, (0xf << 0), (0xF << 0), 0, 0, 0xffffffff, 0),
-	PMUCAL_SEQ_DESC(PMUCAL_WAIT, "EMBEDDED_G3D_STATUS", 0x14060000, 0x4044, (0xf << 0), (0xF << 0), 0x14060000, 0x4044, (0xf << 0), (0xF << 0)),
 };
 
 struct pmucal_seq embedded_g3d_save[] = {

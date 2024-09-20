@@ -356,8 +356,6 @@
 #define INTREQ__PPMU_ISPPRE_LOWER				345
 #define INTREQ__PDP0_STAT_DMA					346
 #define INTREQ__PDP1_STAT_DMA					347
-
-#ifdef CONFIG_SOC_EXYNOS9810_EVT1
 #define INTREQ__BLK_IVA_IVA_iva_ap_irq_aq_0			348
 #define INTREQ__BLK_IVA_IVA_iva_ap_irq_aq_1			349
 #define INTREQ__BLK_IVA_PPMU_IVA_O_interrupt_lower		350
@@ -365,16 +363,6 @@
 #define INTREQ__BLK_IVA_SYSMMU_IVA_O_INTERRUPT_NONSECURE	352
 #define INTREQ__BLK_IVA_SYSMMU_IVA_O_INTERRUPT_SECURE		353
 #define INTREQ__BLK_IVA_TREX_RB_IVA_o_debugInterrupt		354
-#else
-#define INTREQ__BLK_IVA_IVA_iva_ap_irq_aq_0			346
-#define INTREQ__BLK_IVA_IVA_iva_ap_irq_aq_1			347
-#define INTREQ__BLK_IVA_PPMU_IVA_O_interrupt_lower		348
-#define INTREQ__BLK_IVA_PPMU_IVA_O_interrupt_upper_or_normal	349
-#define INTREQ__BLK_IVA_SYSMMU_IVA_O_INTERRUPT_NONSECURE	350
-#define INTREQ__BLK_IVA_SYSMMU_IVA_O_INTERRUPT_SECURE		351
-#define INTREQ__BLK_IVA_TREX_RB_IVA_o_debugInterrupt		352
-#endif
-
 #define INTREQ__MFC						356
 #define INTREQ__WFD						357
 #define INTREQ__PPMU_MFCD0_interrupt_upper_or_normal		358
@@ -468,6 +456,8 @@
 #define INTREQ__EINT32						446
 #define INTREQ__EINT33						447
 #define INTREQ__SPEEDY_SUB_APM					448
+#define INTREQ__TEEGRIS_EVENT					453
+#define INTREQ__TEEGRIS_PANIC					454
 #define INTREQ__OTP_CON_TOP					462
 #define INTREQ__OTP_CON_BIRA					463
 #define INTREQ__WDT_CLUSTER0					464

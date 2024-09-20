@@ -268,16 +268,6 @@ config SND_SOC_SAMSUNG_EXYNOS9810_MOON
 	select EXTCON_MADERA
 	select EXTCON_MADERA_INPUT_EVENT
 
-config SND_SOC_SAMSUNG_STAR_ASHETON
-	tristate "Asheton audio codec support on Star project"
-	select SND_SOC_CS47L92
-	select MFD_MADERA_SPI
-	select MFD_CS47L92
-	select REGULATOR_ARIZONA_LDO1
-	select REGULATOR_ARIZONA_MICSUPP
-	select EXTCON_MADERA
-	select EXTCON_MADERA_INPUT_EVENT
-
 config SND_SOC_SAMSUNG_EXYNOS9810_MAX98506
 	tristate "MAX98506 amp support on exynos9810"
 	select SND_SOC_MAX98506
@@ -285,6 +275,18 @@ config SND_SOC_SAMSUNG_EXYNOS9810_MAX98506
 config SND_SOC_SAMSUNG_EXYNOS9810_MAX98512
 	tristate "MAX98512 amp support on exynos9810"
 	select SND_SOC_MAX98512
+
+config SND_SOC_SAMSUNG_GTACTIVE3_RT5665_RT5510
+	tristate "rt5665 codec and rt5510 amp support on exynos9810"
+	select SND_SOC_RT5665
+
+config SND_SOC_SAMSUNG_GTACTIVE3_RT5665_TAS2562
+	tristate "rt5665 codec and tas2562 amp support on exynos9810"
+	select SND_SOC_RT5665
+
+config SND_SOC_SAMSUNG_R7_RT5665_TAS2562
+	tristate "rt5665 codec and tas2562 amp support on exynos9810"
+	select SND_SOC_RT5665
 
 config SND_SOC_SAMSUNG_EXYNOS8895_COD3033
 	tristate "S.LSI audio codec COD3033 support on exynos8895"

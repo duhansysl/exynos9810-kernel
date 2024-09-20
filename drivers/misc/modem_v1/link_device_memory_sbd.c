@@ -919,8 +919,10 @@ static unsigned int init_ctrl_tables(struct sbd_link_device *sl, int num_iodevs,
 			iodevs[i].format == IPC_MULTI_RAW) {
 			/* Skip making rb if mismatch region info */
 			if (iodevs[i].attrs & IODEV_ATTR(ATTR_OPTION_REGION) &&
-				strcmp(iodevs[i].option_region, CONFIG_OPTION_REGION))
-				continue;
+				strncmp(iodevs[i].option_region,
+					CONFIG_OPTION_REGION,
+					strlen(iodevs[i].option_region)))
+				continue;;
 
 			/* Change channel to Qos priority */
 			if (iodevs[i].format == IPC_MULTI_RAW)

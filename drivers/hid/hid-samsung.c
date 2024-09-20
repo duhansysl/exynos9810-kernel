@@ -112,39 +112,17 @@ static int samsung_kbd_mouse_input_mapping(struct hid_device *hdev,
 
 	switch (usage->hid & HID_USAGE) {
 	/* report 2 */
-	case 0x183:
-		samsung_kbd_mouse_map_key_clear(KEY_MEDIA);
-		break;
-	case 0x195:
-		samsung_kbd_mouse_map_key_clear(KEY_EMAIL);
-		break;
-	case 0x196:
-		samsung_kbd_mouse_map_key_clear(KEY_CALC);
-		break;
-	case 0x197:
-		samsung_kbd_mouse_map_key_clear(KEY_COMPUTER);
-		break;
-	case 0x22b:
-		samsung_kbd_mouse_map_key_clear(KEY_SEARCH);
-		break;
-	case 0x22c:
-		samsung_kbd_mouse_map_key_clear(KEY_WWW);
-		break;
-	case 0x22d:
-		samsung_kbd_mouse_map_key_clear(KEY_BACK);
-		break;
-	case 0x22e:
-		samsung_kbd_mouse_map_key_clear(KEY_FORWARD);
-		break;
-	case 0x22f:
-		samsung_kbd_mouse_map_key_clear(KEY_FAVORITES);
-		break;
-	case 0x230:
-		samsung_kbd_mouse_map_key_clear(KEY_REFRESH);
-		break;
-	case 0x231:
-		samsung_kbd_mouse_map_key_clear(KEY_STOP);
-		break;
+	case 0x183: samsung_kbd_mouse_map_key_clear(KEY_MEDIA); break;
+	case 0x195: samsung_kbd_mouse_map_key_clear(KEY_EMAIL);	break;
+	case 0x196: samsung_kbd_mouse_map_key_clear(KEY_CALC); break;
+	case 0x197: samsung_kbd_mouse_map_key_clear(KEY_COMPUTER); break;
+	case 0x22b: samsung_kbd_mouse_map_key_clear(KEY_SEARCH); break;
+	case 0x22c: samsung_kbd_mouse_map_key_clear(KEY_WWW); break;
+	case 0x22d: samsung_kbd_mouse_map_key_clear(KEY_BACK); break;
+	case 0x22e: samsung_kbd_mouse_map_key_clear(KEY_FORWARD); break;
+	case 0x22f: samsung_kbd_mouse_map_key_clear(KEY_FAVORITES); break;
+	case 0x230: samsung_kbd_mouse_map_key_clear(KEY_REFRESH); break;
+	case 0x231: samsung_kbd_mouse_map_key_clear(KEY_STOP); break;
 	default:
 		return 0;
 	}
@@ -164,8 +142,8 @@ static int samsung_kbd_input_mapping(struct hid_device *hdev,
 		usage->hid & HID_USAGE);
 
 	if (HID_UP_KEYBOARD == (usage->hid & HID_USAGE_PAGE)) {
-		set_bit(EV_REP, hi->input->evbit);
 		switch (usage->hid & HID_USAGE) {
+		set_bit(EV_REP, hi->input->evbit);
 		/* Only for UK keyboard */
 		/* key found */
 #ifdef CONFIG_HID_KK_UPGRADE
@@ -378,8 +356,8 @@ static int samsung_universal_kbd_input_mapping(struct hid_device *hdev,
 		usage->hid & HID_USAGE);
 
 	if (HID_UP_KEYBOARD == (usage->hid & HID_USAGE_PAGE)) {
-		set_bit(EV_REP, hi->input->evbit);
 		switch (usage->hid & HID_USAGE) {
+		set_bit(EV_REP, hi->input->evbit);
 		/* Only for UK keyboard */
 		/* key found */
 #ifdef CONFIG_HID_KK_UPGRADE
@@ -476,6 +454,22 @@ static int samsung_universal_kbd_input_mapping(struct hid_device *hdev,
 		case 0x309:
 			samsung_kbd_mouse_map_key_clear(BTN_TRIGGER_HAPPY9);
 			break;
+		/* HotKey App 1 */
+		case 0x071:
+			samsung_kbd_mouse_map_key_clear(BTN_HOTKEY_APP1);
+			break;
+		/* HotKey App 2 */
+		case 0x072:
+			samsung_kbd_mouse_map_key_clear(BTN_HOTKEY_APP2);
+			break;
+		/* HotKey App 3 */
+		case 0x073:
+			samsung_kbd_mouse_map_key_clear(BTN_HOTKEY_APP3);
+			break;
+		/* Dex */
+		case 0x06e:
+			samsung_kbd_mouse_map_key_clear(KEY_DEX_ON);
+			break;
 		default:
 			return 0;
 		}
@@ -498,7 +492,7 @@ static int samsung_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 {
 	int ret = 0;
 
-	if (hdev->product == USB_DEVICE_ID_SAMSUNG_WIRELESS_KBD_MOUSE)
+	if (USB_DEVICE_ID_SAMSUNG_WIRELESS_KBD_MOUSE == hdev->product)
 		ret = samsung_kbd_mouse_input_mapping(hdev,
 			hi, field, usage, bit, max);
 	else if (hdev->product == USB_DEVICE_ID_SAMSUNG_WIRELESS_KBD)
@@ -513,7 +507,10 @@ static int samsung_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	else if (hdev->product == USB_DEVICE_ID_SAMSUNG_WIRELESS_UNIVERSAL_KBD)
 		ret = samsung_universal_kbd_input_mapping(hdev,
 			hi, field, usage, bit, max);
-
+	else if (hdev->product == USB_DEVICE_ID_SAMSUNG_WIRELESS_MULTI_HOGP_KBD)
+		ret = samsung_universal_kbd_input_mapping(hdev,
+			hi, field, usage, bit, max);
+			
 	return ret;
 }
 
@@ -555,6 +552,7 @@ static const struct hid_device_id samsung_devices[] = {
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_GAMEPAD) },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_ACTIONMOUSE) },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_UNIVERSAL_KBD) },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_MULTI_HOGP_KBD) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, samsung_devices);

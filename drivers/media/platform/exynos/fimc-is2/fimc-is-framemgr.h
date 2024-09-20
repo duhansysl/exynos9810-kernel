@@ -136,13 +136,11 @@ enum fimc_is_frame_state {
 	FS_INVALID
 };
 
-enum fimc_is_hw_frame_state {
-	FS_HW_FREE,
-	FS_HW_REQUEST,
-	FS_HW_CONFIGURE,
-	FS_HW_WAIT_DONE,
-	FS_HW_INVALID
-};
+#define FS_HW_FREE	FS_FREE
+#define FS_HW_REQUEST	FS_REQUEST
+#define FS_HW_CONFIGURE	FS_PROCESS
+#define FS_HW_WAIT_DONE	FS_COMPLETE
+#define FS_HW_INVALID	FS_INVALID
 
 #define NR_FRAME_STATE FS_INVALID
 
@@ -176,11 +174,8 @@ struct fimc_is_frame {
 	void			*subdev; /* fimc_is_subdev */
 
 	/* group leader use */
-	struct camera2_shot	*shot;
 	struct camera2_shot_ext	*shot_ext;
-	ulong			kvaddr_shot;
-	u32			dvaddr_shot;
-	ulong			cookie_shot;
+	struct camera2_shot	*shot;
 	size_t			shot_size;
 
 	/* stream use */
@@ -188,8 +183,31 @@ struct fimc_is_frame {
 
 	/* common use */
 	u32			planes; /* total planes include multi-buffers */
-	u32			dvaddr_buffer[FIMC_IS_MAX_PLANES];
-	ulong 		kvaddr_buffer[FIMC_IS_MAX_PLANES];
+	dma_addr_t		dvaddr_buffer[FIMC_IS_MAX_PLANES];
+	ulong			kvaddr_buffer[FIMC_IS_MAX_PLANES];
+
+	/*
+	 * target address for capture node
+	 * [0] invalid address, stop
+	 * [others] valid address
+	 */
+	u32 sourceAddress[FIMC_IS_MAX_PLANES]; /* DC1S: DCP slave input DMA */
+	u32 txcTargetAddress[FIMC_IS_MAX_PLANES]; /* 3AA capture DMA */
+	u32 txpTargetAddress[FIMC_IS_MAX_PLANES]; /* 3AA preview DMA */
+	u32 mrgTargetAddress[FIMC_IS_MAX_PLANES];
+	u32 efdTargetAddress[FIMC_IS_MAX_PLANES];
+	u32 ixcTargetAddress[FIMC_IS_MAX_PLANES];
+	u32 ixpTargetAddress[FIMC_IS_MAX_PLANES];
+	u64 mexcTargetAddress[FIMC_IS_MAX_PLANES]; /* ME out DMA */
+	u32 sccTargetAddress[FIMC_IS_MAX_PLANES]; /* DC0S: DCP master capture DMA */
+	u32 scpTargetAddress[FIMC_IS_MAX_PLANES]; /* DC1S: DCP slave capture DMA */
+	u32 sc0TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 sc1TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 sc2TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 sc3TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 sc4TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 sc5TargetAddress[FIMC_IS_MAX_PLANES];
+	u32 dxcTargetAddress[FIMC_IS_MAX_PLANES]; /* DC2S: DCP disparity capture DMA */
 
 	/* multi-buffer use */
 	u32			num_buffers; /* total number of buffers per frame */
@@ -213,6 +231,9 @@ struct fimc_is_frame {
 	u32			type;
 	unsigned long		core_flag;
 	atomic_t		shot_done_flag;
+#else
+	/* group leader use */
+	u32			dvaddr_shot;
 #endif
 
 #ifdef ENABLE_SYNC_REPROCESSING
@@ -269,6 +290,8 @@ int put_frame(struct fimc_is_framemgr *this, struct fimc_is_frame *frame,
 struct fimc_is_frame *get_frame(struct fimc_is_framemgr *this,
 			enum fimc_is_frame_state state);
 int trans_frame(struct fimc_is_framemgr *this, struct fimc_is_frame *frame,
+			enum fimc_is_frame_state state);
+int restore_frame(struct fimc_is_framemgr *this, struct fimc_is_frame *frame,
 			enum fimc_is_frame_state state);
 struct fimc_is_frame *peek_frame(struct fimc_is_framemgr *this,
 			enum fimc_is_frame_state state);

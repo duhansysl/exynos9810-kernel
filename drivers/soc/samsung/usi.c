@@ -88,20 +88,6 @@ static int usi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, data);
 
-#ifdef ENABLE_SENSORS_FPRINT_SECURE
-	if (data->ch_id == CONFIG_SENSORS_FP_USI_NUMBER) {
-		dev_info(&pdev->dev,
-			"usi configuration for secure channel is skipped(FP)\n");
-		return 0;
-	}
-#endif
-#ifdef CONFIG_ESE_SECURE
-	if (data->ch_id == CONFIG_ESE_SECURE_USI_MODE) {
-		dev_info(&pdev->dev, "usi configuration for secure channel is skipped\n");
-		return 0;
-	}
-#endif
-
 	writel(data->mode, data->base);
 
 	dev_info(&pdev->dev, "usi_probe() mode:%d\n", data->mode);
@@ -122,12 +108,6 @@ static int usi_resume_noirq(struct device *dev)
 	struct usi_data *data = platform_get_drvdata(pdev);
 	int ret;
 
-#ifdef CONFIG_ESE_SECURE
-	if (data->ch_id == CONFIG_ESE_SECURE_USI_MODE) {
-		dev_info(&pdev->dev, "usi configuration for secure channel is skipped\n");
-		return 0;
-	}
-#endif
 	if (data->mode && data->base) {
 		writel(data->mode, data->base);
 		dev_info(&pdev->dev, "%s mode:%d\n", __func__, data->mode);

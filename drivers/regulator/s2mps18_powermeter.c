@@ -286,10 +286,6 @@ static void s2m_adc_read_data2(struct device *dev, int channel)
 	}
 }
 
-#ifdef CONFIG_SEC_PM_DEBUG
-void s2mps18_print_adc_val_power(void) { }
-#endif
-
 static ssize_t adc_val_power_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 		return snprintf(buf, PAGE_SIZE, "CH0[%x]:%d uW (%d), CH1[%x]:%d uW (%d), CH2[%x]:%d uW (%d), CH3[%x]:%d uW (%d)\nCH4[%x]:%d uW (%d), CH5[%x]:%d uW (%d), CH6[%x]:%d uW (%d), CH7[%x]:%d uW (%d)\n",
@@ -814,15 +810,15 @@ void s2mps18_powermeter_init(struct s2mps18_dev *s2mps18)
 
 	pr_info("%s: s2mps18 power meter init start\n", __func__);
 
-	/* initial regulators : BUCK 1,2,3,4,5,6,8,14 */
+	/* initial regulators : BUCK 1,2,3,4,5,6,7,8 */
 	adc_meter->adc_reg[0] = 0x1;
 	adc_meter->adc_reg[1] = 0x2;
 	adc_meter->adc_reg[2] = 0x3;
 	adc_meter->adc_reg[3] = 0x4;
 	adc_meter->adc_reg[4] = 0x5;
 	adc_meter->adc_reg[5] = 0x6;
-	adc_meter->adc_reg[6] = 0x8;
-	adc_meter->adc_reg[7] = 0xE;
+	adc_meter->adc_reg[6] = 0x7;
+	adc_meter->adc_reg[7] = 0x8;
 
 	adc_meter->adc_mode = s2mps18->adc_mode;
 	adc_meter->adc_sync_mode = s2mps18->adc_sync_mode;

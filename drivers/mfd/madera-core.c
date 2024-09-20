@@ -276,15 +276,6 @@ static int madera_runtime_resume(struct device *dev)
 		goto err;
 	}
 
-	switch (madera->type) {
-	case CS47L92:
-	case CS47L93:
-		regmap_write(madera->regmap, MADERA_CTRL_SCRATCH, 0xA5);
-		break;
-	default:
-		break;
-	}
-
 	return 0;
 
 err:
@@ -820,15 +811,6 @@ int madera_dev_init(struct madera *madera)
 
 	madera_configure_micbias(madera);
 
-	switch (madera->type) {
-	case CS47L92:
-	case CS47L93:
-		regmap_write(madera->regmap, MADERA_CTRL_SCRATCH, 0xA5);
-		break;
-	default:
-		break;
-	}
-
 	pm_runtime_set_active(madera->dev);
 	pm_runtime_enable(madera->dev);
 	pm_runtime_set_autosuspend_delay(madera->dev, 100);
@@ -842,18 +824,11 @@ int madera_dev_init(struct madera *madera)
 		goto err_pm_runtime;
 	}
 
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-        sec_audio_bootlog(6, madera->dev, "%s: done\n", __func__);
-#endif
-
 	return 0;
 
 err_pm_runtime:
 	pm_runtime_disable(madera->dev);
 err_reset:
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-	sec_audio_bootlog(3, madera->dev, "%s: madera init failed\n", __func__);
-#endif
 	madera_enable_hard_reset(madera);
 	regulator_disable(madera->dcvdd);
 err_enable:

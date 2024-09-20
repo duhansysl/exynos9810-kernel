@@ -30,10 +30,6 @@
 #include "madera.h"
 #include "wm_adsp.h"
 
-#ifdef CONFIG_MORO_SOUND
-#include "moro_sound.h"
-#endif
-
 #define CS47L92_NUM_ADSP	1
 #define CS47L92_MONO_OUTPUTS	3
 
@@ -431,16 +427,6 @@ SOC_DOUBLE_R_TLV("SPKDAT1 Digital Volume", MADERA_DAC_DIGITAL_VOLUME_5L,
 SOC_DOUBLE("SPKDAT1 Switch", MADERA_PDM_SPK1_CTRL_1, MADERA_SPK1L_MUTE_SHIFT,
 	   MADERA_SPK1R_MUTE_SHIFT, 1, 1),
 
-SOC_DOUBLE_EXT("HPOUT1 DRE Switch", MADERA_DRE_ENABLE,
-	       MADERA_DRE1L_ENA_SHIFT, MADERA_DRE1R_ENA_SHIFT, 1, 0,
-	       snd_soc_get_volsw, madera_dre_put),
-SOC_DOUBLE_EXT("HPOUT2 DRE Switch", MADERA_DRE_ENABLE,
-	       MADERA_DRE2L_ENA_SHIFT, MADERA_DRE2R_ENA_SHIFT, 1, 0,
-	       snd_soc_get_volsw, madera_dre_put),
-SOC_DOUBLE_EXT("HPOUT3 DRE Switch", MADERA_DRE_ENABLE,
-	       MADERA_DRE3L_ENA_SHIFT, MADERA_DRE3R_ENA_SHIFT, 1, 0,
-	       snd_soc_get_volsw, madera_dre_put),
-
 SOC_DOUBLE("HPOUT1 EDRE Switch", MADERA_EDRE_ENABLE,
 	   MADERA_EDRE_OUT1L_THR1_ENA_SHIFT,
 	   MADERA_EDRE_OUT1R_THR1_ENA_SHIFT, 1, 0),
@@ -692,27 +678,6 @@ static const unsigned int cs47l92_aec_loopback_values[] = {
 	0, 1, 2, 3, 4, 5, 8, 9
 };
 
-static int cs47l92_auxpdm_ena(struct snd_soc_dapm_widget *w,
-			      struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-	struct madera_priv *priv = snd_soc_codec_get_drvdata(codec);
-	struct madera *madera = priv->madera;
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		dev_info(madera->dev, "AUXPDM Enable\n");
-		break;
-	case SND_SOC_DAPM_PRE_PMD:
-		dev_info(madera->dev, "AUXPDM Disable\n");
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-
 static const struct soc_enum cs47l92_aec_loopback =
 	SOC_VALUE_ENUM_SINGLE(MADERA_DAC_AEC_CONTROL_1,
 			      MADERA_AEC1_LOOPBACK_SRC_SHIFT, 0xf,
@@ -961,10 +926,8 @@ SND_SOC_DAPM_PGA("SPD1TX2", MADERA_SPD1_TX_CONTROL,
 SND_SOC_DAPM_OUT_DRV("SPD1", MADERA_SPD1_TX_CONTROL,
 		     MADERA_SPD1_ENA_SHIFT, 0, NULL, 0),
 
-SND_SOC_DAPM_SWITCH_E("AUXPDM1 Output", MADERA_AUXPDM1_CTRL_0,
-		      MADERA_AUXPDM1_ENABLE_SHIFT, 0, &cs47l92_auxpdm1_switch,
-		      cs47l92_auxpdm_ena,
-		      SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD),
+SND_SOC_DAPM_SWITCH("AUXPDM1 Output", MADERA_AUXPDM1_CTRL_0,
+		    MADERA_AUXPDM1_ENABLE_SHIFT, 0, &cs47l92_auxpdm1_switch),
 
 /*
  * mux_in widgets : arranged in the order of sources
@@ -1411,7 +1374,7 @@ static const struct snd_soc_dapm_route cs47l92_dapm_routes[] = {
 	{ "ASRC1IN1L", NULL, "ASRC1R1CLK" },
 	{ "ASRC1IN1R", NULL, "ASRC1R1CLK" },
 	{ "ASRC1IN2L", NULL, "ASRC1R2CLK" },
-	{ "ASRC1IN2R", NULL, "ASRC1R2CLK" },
+	{ "ASRC1IN2L", NULL, "ASRC1R2CLK" },
 	{ "DFC1", NULL, "DFCCLK" },
 	{ "DFC2", NULL, "DFCCLK" },
 	{ "DFC3", NULL, "DFCCLK" },
@@ -1985,17 +1948,7 @@ static int cs47l92_codec_probe(struct snd_soc_codec *codec)
 			   MADERA_AUXPDM1_TXEDGE_MASK |
 			   MADERA_AUXPDM1_MSTR_MASK, val);
 
-#ifdef CONFIG_MORO_SOUND
-	moro_sound_hook_madera_pcm_probe(madera->regmap);
-
-	cs47l92->core.madera->dapm = snd_soc_codec_get_dapm(codec);
-#endif
-
 	ret = madera_init_outputs(codec, CS47L92_MONO_OUTPUTS);
-	if (ret)
-		return ret;
-
-	ret = madera_init_aif(codec);
 	if (ret)
 		return ret;
 
@@ -2014,6 +1967,7 @@ static int cs47l92_codec_remove(struct snd_soc_codec *codec)
 	struct cs47l92 *cs47l92 = snd_soc_codec_get_drvdata(codec);
 
 	wm_adsp2_codec_remove(&cs47l92->core.adsp[0], codec);
+	madera_destroy_bus_error_irq(&cs47l92->core, 0);
 
 	cs47l92->core.madera->dapm = NULL;
 
@@ -2166,17 +2120,11 @@ static int cs47l92_probe(struct platform_device *pdev)
 	ret = snd_soc_register_codec(&pdev->dev, &soc_codec_dev_cs47l92,
 				     cs47l92_dai, ARRAY_SIZE(cs47l92_dai));
 	if (ret < 0) {
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-		sec_audio_bootlog(3, &pdev->dev, "%s: Failed to register codec: %d\n", __func__, ret);
-#endif
 		dev_err(&pdev->dev, "Failed to register codec: %d\n", ret);
 		snd_soc_unregister_platform(&pdev->dev);
 		goto error;
 	}
 
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-	sec_audio_bootlog(6, &pdev->dev, "%s: done\n", __func__);
-#endif
 	return ret;
 
 error:
@@ -2210,7 +2158,6 @@ static int cs47l92_remove(struct platform_device *pdev)
 static struct platform_driver cs47l92_codec_driver = {
 	.driver = {
 		.name = "cs47l92-codec",
-		.suppress_bind_attrs = true,
 	},
 	.probe = cs47l92_probe,
 	.remove = cs47l92_remove,

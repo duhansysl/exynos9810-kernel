@@ -818,8 +818,9 @@ static int modem_probe(struct platform_device *pdev)
 			continue;
 
 		if (pdata->iodevs[i].attrs & IODEV_ATTR(ATTR_OPTION_REGION)
-				&& strcmp(pdata->iodevs[i].option_region,
-					CONFIG_OPTION_REGION))
+			&& strncmp(pdata->iodevs[i].option_region,
+					CONFIG_OPTION_REGION,
+					strlen(pdata->iodevs[i].option_region)))
 			continue;
 
 		iod[i] = create_io_device(pdev, &pdata->iodevs[i], msd,
@@ -829,7 +830,8 @@ static int modem_probe(struct platform_device *pdev)
 			goto free_iod;
 		}
 
-		if (iod[i]->format == IPC_FMT || iod[i]->format == IPC_BOOT)
+		if (iod[i]->format == IPC_FMT || iod[i]->format == IPC_BOOT
+			|| iod[i]->id == SIPC_CH_ID_CASS)
 			list_add_tail(&iod[i]->list,
 					&modemctl->modem_state_notify_list);
 

@@ -387,7 +387,7 @@ config MALI_HW_ERRATA_1485982_USE_CLOCK_ALTERNATIVE
 endif
 
 config MALI_ARBITRATION
-	bool "Enable Virtualization reference code"
+	tristate "Enable Virtualization reference code"
 	depends on MALI_MIDGARD
 	default n
 	help

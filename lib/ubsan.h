@@ -1,10 +1,6 @@
 #ifndef _LIB_UBSAN_H
 #define _LIB_UBSAN_H
 
-#if defined(CONFIG_SEC_DEBUG_UBSAN)
-#include  <linux/sec_debug_ksan.h>
-#endif
-
 enum {
 	type_kind_int = 0,
 	type_kind_float = 1,
@@ -98,4 +94,5 @@ typedef unsigned __int128 u_max;
 typedef s64 s_max;
 typedef u64 u_max;
 #endif
+
 #endif

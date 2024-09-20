@@ -44,7 +44,7 @@ config EXYNOS_SNAPSHOT_IRQ_DISABLED
 
 config EXYNOS_SNAPSHOT_SPINLOCK
 	bool "Enable debugging of spinlock event by kevent(EXPERIMENTAL)"
-	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE
+	depends on EXYNOS_SNAPSHOT && DEBUG_SPINLOCK && !EXYNOS_SNAPSHOT_MINIMIZED_MODE
 	default y
 
 config EXYNOS_SNAPSHOT_CLK
@@ -92,11 +92,6 @@ config EXYNOS_SNAPSHOT_THERMAL
 	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE && EXYNOS_THERMAL
 	default y
 
-config EXYNOS_SNAPSHOT_UART
-	bool "Enable debugging of uart driver"
-	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE
-	default y
-
 config EXYNOS_SNAPSHOT_I2C
 	bool "Enable debugging of i2c driver"
 	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE
@@ -106,11 +101,6 @@ config EXYNOS_SNAPSHOT_SPI
 	bool "Enable debugging of spi driver"
 	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE
 	default y
-
-config EXYNOS_SNAPSHOT_LOGGING_HVC_CALL
-	bool "Support logging HVC call"
-	depends on EXYNOS_SNAPSHOT && !EXYNOS_SNAPSHOT_MINIMIZED_MODE && UH
-	default n
 
 config EXYNOS_SNAPSHOT_PANIC_REBOOT
 	bool "Enable forced reboot after panic for ramdump"
@@ -214,4 +204,9 @@ config EXYNOS_CORESIGHT_ETM_SYSFS
         help
           Show ETM, FUNNEL, ETB, ETF and ETR status through sysfs.
 
+config EXYNOS_SCAN2DRAM_SYSFS
+        bool "Enable scan2dram sysfs node"
+        default n
+        help
+          enable scan2dram sysfs node by default.
 endif

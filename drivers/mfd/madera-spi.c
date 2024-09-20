@@ -128,7 +128,6 @@ static struct spi_driver madera_spi_driver = {
 		.owner	= THIS_MODULE,
 		.pm	= &madera_pm_ops,
 		.of_match_table	= of_match_ptr(madera_of_match),
-		.suppress_bind_attrs = true,
 	},
 	.probe		= madera_spi_probe,
 	.remove		= madera_spi_remove,

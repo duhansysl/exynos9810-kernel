@@ -112,6 +112,38 @@ int trans_frame(struct fimc_is_framemgr *this, struct fimc_is_frame *frame,
 	return put_frame(this, frame, state);
 }
 
+int restore_frame(struct fimc_is_framemgr *this, struct fimc_is_frame *frame,
+			enum fimc_is_frame_state state)
+{
+	if (!frame) {
+		err("invalid frame");
+		return -EFAULT;
+	}
+
+	if ((frame->state == FS_INVALID) || (state == FS_INVALID))
+		return -EINVAL;
+
+	if (!this->queued_count[frame->state]) {
+		err("%s frame queue is empty (%s)",
+			frame_state_name[frame->state], this->name);
+		return -EINVAL;
+	}
+
+	list_del(&frame->list);
+	this->queued_count[frame->state]--;
+
+	frame->state = state;
+
+	list_add(&frame->list, &this->queued_list[state]);
+	this->queued_count[state]++;
+
+#ifdef TRACE_FRAME
+	print_frame_queue(this, state);
+#endif
+
+	return 0;
+}
+
 struct fimc_is_frame *peek_frame(struct fimc_is_framemgr *this,
 			enum fimc_is_frame_state state)
 {

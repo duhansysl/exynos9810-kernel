@@ -15,7 +15,7 @@ static inline int printk_get_level(const char *buffer)
 	if (buffer[0] == KERN_SOH_ASCII && buffer[1]) {
 		switch (buffer[1]) {
 		case '0' ... '7':
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 		case 'B' ... 'J':
 #endif
 		case 'd':	/* KERN_DEFAULT */
@@ -293,14 +293,14 @@ extern asmlinkage void dump_stack(void) __cold;
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 
 #define pr_auto(index, fmt, ...) \
 	printk(KERN_AUTO index pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_auto_disable(index) \
-	sec_debug_auto_summary_log_disable(index)
+	sec_debug_auto_comment_log_disable(index)
 #define pr_auto_once(index) \
-	sec_debug_auto_summary_log_once(index)
+	sec_debug_auto_comment_log_once(index)
 
 #define ASL1	KERN_AUTO1
 #define ASL2	KERN_AUTO2

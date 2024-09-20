@@ -38,7 +38,7 @@
 #include "hdr_metadata.h"
 
 #define FEATURE_SUPPORT_SPD_INFOFRAME
-
+#define FEATURE_USE_PREFERRED_TIMING_1ST
 #define FEATURE_SUPPORT_DISPLAYID
 
 #define DISPLAYID_EXT 0x70
@@ -420,10 +420,10 @@ typedef enum {
 	V640X480P60,
 	V720X480P60,
 	V720X576P50,
+	V1280X800P60RB,
 	V1280X720P50,
 	V1280X720P60EXT,
 	V1280X720P60,
-	V1280X800P60RB,
 	V1366X768P60,
 	V1280X1024P60,
 	V1920X1080P24,
@@ -440,6 +440,7 @@ typedef enum {
 	V2560X1080P60,
 	V2048X1536P60,
 	V1920X1440P60,
+	V2400X1200P90RELU,
 	V2560X1440P60EXT,
 	V2560X1440P59,
 	V1440x2560P60,
@@ -447,6 +448,8 @@ typedef enum {
 	V2560X1440P60,
 	V2560X1600P60,
 	V3440X1440P50,
+	V3840X1080P60,
+	V3840X1200P60,
 	V3440X1440P60,
 /*	V3440X1440P100,*/
 	V3840X2160P24,
@@ -538,6 +541,13 @@ static const unsigned int extcon_id[] = {
 };
 #endif
 
+#if defined(CONFIG_USE_DISPLAYPORT_CCIC_EVENT_QUEUE)
+struct ccic_event {
+	struct list_head list;
+	CC_NOTI_TYPEDEF event;
+};
+#endif
+
 struct edid_data {
 	int max_support_clk;
 	bool support_10bpc;
@@ -552,6 +562,12 @@ enum dex_state {
 	DEX_ON,
 	DEX_RECONNECTING,
 };
+#if defined(CONFIG_USB_TYPEC_MANAGER_NOTIFIER)
+enum wait_state {
+	DP_READY_NO,
+	DP_READY_YES,
+};
+#endif
 enum dex_support_type {
 	DEX_NOT_SUPPORT = 0,
 	DEX_FHD_SUPPORT,
@@ -606,6 +622,14 @@ struct displayport_device {
 	bool dp_not_support;
 	bool ccic_link_conf;
 	bool ccic_hpd;
+	uint64_t ccic_cable_state;
+#if defined(CONFIG_USE_DISPLAYPORT_CCIC_EVENT_QUEUE)
+	struct list_head list_cc;
+	struct delayed_work ccic_event_proceed_work;
+	struct mutex ccic_lock;
+#endif
+	enum wait_state dp_ready_wait_state;
+	wait_queue_head_t dp_ready_wait;
 #endif
 	int hpd_current_state;
 	enum hotplug_state hpd_state;
@@ -635,6 +659,7 @@ struct displayport_device {
 	u8 dex_ver[2];
 	enum dex_support_type dex_adapter_type;
 	videoformat dex_video_pick;
+	int dex_res;
 
 	enum drm_state drm_start_state;
 	enum drm_state drm_smc_state;
@@ -652,6 +677,8 @@ struct displayport_debug_param {
 	u8 link_rate;
 	u8 lane_cnt;
 };
+
+#define DP_CCIC_REGISTRATION_DELAY	10000
 
 /* EDID functions */
 /* default preset configured on probe */
@@ -816,6 +843,21 @@ struct displayport_supported_preset {
 		V4L2_DV_BT_STD_DMT | V4L2_DV_BT_STD_CVT, 0) \
 }
 */
+
+#define V4L2_DV_BT_CEA_3840X1080P60_ADDED { \
+	.type = V4L2_DV_BT_656_1120, \
+	V4L2_INIT_BT_TIMINGS(3840, 1080, 0, V4L2_DV_HSYNC_POS_POL, \
+		266500000, 48, 32, 80, 3, 10, 18, 0, 0, 0, \
+		V4L2_DV_BT_STD_DMT | V4L2_DV_BT_STD_CVT, 0) \
+}
+
+#define V4L2_DV_BT_CEA_3840X1200P60_ADDED { \
+	.type = V4L2_DV_BT_656_1120, \
+	V4L2_INIT_BT_TIMINGS(3840, 1200, 0, V4L2_DV_HSYNC_POS_POL, \
+		296250000, 48, 32, 80, 3, 10, 22, 0, 0, 0, \
+		V4L2_DV_BT_STD_DMT | V4L2_DV_BT_STD_CVT, 0) \
+}
+
 #define V4L2_DV_BT_CVT_2560x1080P60_ADDED { \
 	.type = V4L2_DV_BT_656_1120, \
 	V4L2_INIT_BT_TIMINGS(2560, 1080, 0, \
@@ -850,6 +892,12 @@ struct displayport_supported_preset {
 	.type = V4L2_DV_BT_656_1120, \
 	V4L2_INIT_BT_TIMINGS(3840, 2160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) \
 }
+
+#define DISPLAYID_2400X1200P90_RELUMINO { \
+	.type = V4L2_DV_BT_656_1120, \
+	V4L2_INIT_BT_TIMINGS(2400, 1200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) \
+}
+
 extern const int supported_videos_pre_cnt;
 extern struct displayport_supported_preset supported_videos[];
 

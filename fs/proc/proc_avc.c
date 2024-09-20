@@ -30,7 +30,7 @@ static unsigned int sec_avc_log_size;
 
 int __init sec_avc_log_init(void)
 {
-	unsigned int size = SZ_4M;
+	unsigned int size = SZ_256K;
 	unsigned int *sec_avc_log_mag;
 
 	sec_avc_log_size = size;

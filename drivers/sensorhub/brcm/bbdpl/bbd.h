@@ -19,9 +19,6 @@
 #define __BBD_H__
 
 #pragma pack(4)
-typedef unsigned char   uint8_t;
-typedef unsigned short  uint16_t;
-typedef unsigned        uint32_t;
 
 union long_union_t
 {

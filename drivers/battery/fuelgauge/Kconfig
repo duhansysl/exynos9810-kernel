@@ -1,0 +1,62 @@
+
+config FUELGAUGE_DUMMY
+	tristate "dummy fuel gauge driver"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support
+	 for dummy fuel gauge driver.
+	 This driver source code implemented
+	 skeleton source code for fuel gauge functions.
+
+config FUELGAUGE_MAX77705
+	tristate "MAX77705 fuel gauge driver"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support
+	 for MAXIM MAX77705 fuel gauge driver.
+	 This fuel-gauge can be used in coulomb-counting mode.
+
+config FUELGAUGE_SM5705
+	tristate "Siliconmitus SM5705 Fuel Gauge"
+	default n
+	depends on I2C
+	help
+	  SM5705 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The SM5705 is configured
+	  to operate with a single lithium cell
+
+config FUELGAUGE_S2MU107
+	tristate "S2MU107 fuel gauge driver"
+	default n
+	depends on I2C
+	help
+	 Say Y to include support
+	 for S.LSI S2MU107 fuel gauge driver.
+	 Ths fuel-gauge supports current tracking and
+	 voltage tracking to model the battery SOC.
+
+config FUELGAUGE_S2MU107_TEMP_COMPEN
+	tristate "S2MU107 fuel gauge temperature compensation"
+	default n
+	depends on (FUELGAUGE_S2MU107) && I2C
+	help
+	 Say Y to enable temperature compensation
+	 for S.LSI S2MU107 fuel gauge driver.
+
+config FUELGAUGE_S2MU107_BATCAP_LRN
+	tristate "S2MU107 fuel gauge battery capacity learning"
+	default n
+	depends on (FUELGAUGE_S2MU107) && I2C
+	help
+	 Say Y to enable battery capacity learning
+	 for S.LSI S2MU107 fuel gauge driver.
+
+config FUELGAUGE_S2MU107_USE_10MILLIOHM
+	tristate "S2MU107 fuel gauge with 10mohm resistor"
+	default n
+	depends on (FUELGAUGE_S2MU107) && I2C
+	help
+	 Say Y to use 10mohm current sensing resistor
+	 instead of 5mohm for S.LSI S2MU107 fuel gauge.

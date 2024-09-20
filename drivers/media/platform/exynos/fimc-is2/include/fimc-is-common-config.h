@@ -18,10 +18,11 @@
  * =================================================================================================
  */
 #define FIMC_IS_SENSOR_COUNT	4
-#define FIMC_IS_STREAM_COUNT	4
+#define FIMC_IS_STREAM_COUNT	6
 #define FIMC_IS_STR_LEN		10
 
 #define FIMC_IS_MAX_PRIO	(MAX_RT_PRIO)
+#define NI_BACKUP_MAX		32
 /*
  * =================================================================================================
  * CONFIG - FEATURE ENABLE
@@ -31,7 +32,6 @@
 /* #define FW_SUSPEND_RESUME */
 #define ENABLE_CLOCK_GATE
 #define HAS_FW_CLOCK_GATE
-/* #define ENABLE_CACHE */
 #define ENABLE_FULL_BYPASS
 #define ENABLE_ONE_SLOT
 
@@ -101,7 +101,6 @@ extern int debug_stream;
 extern int debug_video;
 extern int debug_hw;
 extern int debug_device;
-extern int debug_psv;
 extern int debug_irq;
 extern int debug_sensor;
 
@@ -521,8 +520,8 @@ extern int debug_sensor;
 #define dbg_tasklet(fmt, args...)	\
 	dbg_common(debug_irq, "[FBNS]", fmt, ##args)
 
-#define dbg_csiisr(fmt, args...)	\
-	dbg_common(debug_irq, "[CSI]", fmt, ##args)
+#define dbg_isr(fmt, object, args...)		\
+	dbg_common(debug_irq, "[%s]", fmt, object->name, ##args)
 
 #if defined(CONFIG_USE_DIRECT_IS_CONTROL)
 #define dbg_hw(level, fmt, args...) \
@@ -583,34 +582,6 @@ extern int debug_sensor;
 	info_common("[ITFC]", fmt, ##args)
 #define err_itfc(fmt, args...) \
 	err_common("[ITFC][ERR]%s:%d:", fmt "\n", __func__, __LINE__, ##args)
-#endif
-
-#if defined(CONFIG_VENDER_PSV)
-#define dbg_psv(fmt, args...) \
-	dbg_common(debug_psv, "[PSV] ", fmt, ##args)
-#define dbg_vec(fmt, args...) \
-	dbg_common(debug_psv, "[VEC] ", fmt, ##args)
-#define dbg_sfr(fmt, args...) \
-	dbg_common(debug_psv, "[SFR] ", fmt, ##args)
-
-#define info_psv(fmt, args...) \
-	info("[PSV] " fmt, ##args)
-#define info_vec(fmt, args...) \
-	info("[VEC] " fmt, ##args)
-#define info_sfr(fmt, args...) \
-	info("[SFR] " fmt, ##args)
-#define warn_psv(fmt, args...) \
-	warn_common("[PSV][WRN]%d: ", fmt "\n", __LINE__, ##args)
-#define err_psv(fmt, args...) \
-	err_common("PSV][ERR]%d: ", fmt "\n", __LINE__, ##args)
-#define warn_vec(fmt, args...) \
-	warn_common("[VEC][WRN]%d: ", fmt "\n", __LINE__, ##args)
-#define err_vec(fmt, args...) \
-	err_common("[VEC][ERR]%d: ", fmt "\n", __LINE__, ##args)
-#define warn_sfr(fmt, args...) \
-	warn_common("[SFR][WAN]%d: ", fmt "\n", __LINE__, ##args)
-#define err_sfr(fmt, args...) \
-	err_common("[SFR][ERR]%d: ", fmt "\n", __LINE__, ##args)
 #endif
 
 #ifdef USE_FIMC_BUG

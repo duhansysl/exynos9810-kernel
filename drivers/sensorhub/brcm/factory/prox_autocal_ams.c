@@ -10,11 +10,16 @@
 #define CHIP_ID		"TMD4905"
 #elif defined(CONFIG_SENSORS_SSP_TMD4906)
 #define CHIP_ID		"TMD4906"
+#elif defined(CONFIG_SENSORS_SSP_TMD3725)
+#define CHIP_ID		"TMD3725"
 #else
 #define CHIP_ID		"UNKNOWN"
 #endif
 
 #define PROX_ADC_BITS_NUM		14
+
+#define PROX_CAL_FILE_PATH	"/efs/FactoryApp/gyro_cal_data"
+#define PROX_CAL_FILE_INDEX			25
 
 /*************************************************************************/
 /* Functions                                                             */
@@ -494,6 +499,175 @@ static ssize_t prox_light_get_dhr_sensor_info_show(struct device *dev,
 		p_drive_current, persistent_time, p_pulse, p_gain, p_time, p_pulse_length, l_atime, offset);
 }
 
+int load_prox_cal_from_nvm(int *cal_data, int size)
+{
+	int ret = 0;
+	mm_segment_t old_fs;
+	struct file *cal_filp = NULL;
+
+	if (size < 2 * sizeof(int)) {
+		pr_err("[SSP]: %s - invalid size(%d)", __func__, size);
+		return -EIO;
+	}
+	pr_info("[SSP] %s ", __func__);
+
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	cal_filp = filp_open(PROX_CAL_FILE_PATH, O_RDONLY, 0660);
+	if (IS_ERR(cal_filp)) {
+		ret = PTR_ERR(cal_filp);
+		if (ret != -ENOENT)
+			pr_err("[SSP]: %s - Can't open cancellation file\n",
+				__func__);
+		goto exit;
+	}
+
+	cal_filp->f_pos = PROX_CAL_FILE_INDEX;
+	ret = vfs_read(cal_filp, (u8 *)cal_data, size, &cal_filp->f_pos);
+	if (ret != size) {
+		memset(cal_data, 0, size);
+		pr_err("[SSP]: %s - Can't read the cancel data\n", __func__);
+		ret = -EIO;
+	}
+
+	filp_close(cal_filp, current->files);
+exit:
+	set_fs(old_fs);
+
+	pr_info("[SSP] %s: flag %d, threshold %d\n", __func__, cal_data[0], cal_data[1]);
+
+	return ret;
+}
+
+int proximity_save_calibration(int *cal_data, int size)
+{
+	int ret = 0;
+	mm_segment_t old_fs;
+	struct file *cal_filp = NULL;
+
+	if (size < 2 * sizeof(int)) {
+		pr_err("[SSP]: %s - invalid size(%d)", __func__, size);
+		return -EIO;
+	}
+
+	pr_info("[SSP] %s ", __func__);
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	cal_filp = filp_open(PROX_CAL_FILE_PATH, O_CREAT | O_WRONLY | O_NOFOLLOW | O_NONBLOCK, 0660);
+	if (IS_ERR(cal_filp)) {
+		pr_err("[SSP]: %s - Can't open calibration file\n", __func__);
+		set_fs(old_fs);
+		ret = PTR_ERR(cal_filp);
+		return -EIO;
+	}
+
+	cal_filp->f_pos = PROX_CAL_FILE_INDEX;
+
+	ret = vfs_write(cal_filp, (char *)cal_data, size, &cal_filp->f_pos);
+	if (ret < 0) {
+		pr_err("[SSP]: %s - Can't write prox cal to file\n", __func__);
+		ret = -EIO;
+	}
+	
+	pr_info("[SSP] %s: flag %d, threshold %d\n", __func__, cal_data[0], cal_data[1]);
+
+	filp_close(cal_filp, current->files);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+int set_prox_cal_to_ssp(struct ssp_data *data)
+{
+	int ret = 0;
+	int prox_cal[2] = {0, };
+	struct ssp_msg *msg;
+
+	if (!(data->uSensorState & (1 << PROXIMITY_SENSOR))) {
+		pr_info("[SSP] %s - Skip this function!!!, proximity sensor is not connected(0x%llx)\n",
+			__func__, data->uSensorState);
+		return -EIO;
+	}
+
+	pr_info("[SSP] %s ", __func__);
+
+	ret = load_prox_cal_from_nvm(prox_cal, sizeof(prox_cal));
+	
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	msg->cmd = MSG2SSP_AP_MCU_SET_PROX_CAL;
+	msg->length = sizeof(prox_cal);
+	msg->options = AP2HUB_WRITE;
+	msg->buffer = kzalloc(sizeof(prox_cal), GFP_KERNEL);
+	msg->free_buffer = 1;
+	memcpy(msg->buffer, &prox_cal, sizeof(prox_cal));
+
+	ret = ssp_spi_async(data, msg);
+
+	if (ret != SUCCESS) {
+		pr_err("[SSP] %s - fail %d\n", __func__, ret);
+	}
+
+	pr_info("[SSP] %s : flag: %d, threshold %d", __func__, prox_cal[0], prox_cal[1]);
+
+	return ret;
+}
+
+static ssize_t proximity_cal_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int cal_data[2] = {0, };
+	
+	load_prox_cal_from_nvm(cal_data, sizeof(cal_data));
+
+	pr_info("[SSP] %s ", __func__);
+
+	return snprintf(buf, PAGE_SIZE, "%d,%d\n", cal_data[0], cal_data[1]);
+}
+
+static ssize_t proximity_cal_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	int iRet = 0;
+	int64_t enable = 0;
+	struct ssp_data *data = dev_get_drvdata(dev);
+	int cal_data[2] = {0, };
+	
+
+	if (!(data->uSensorState & (1 << PROXIMITY_SENSOR))) {
+		pr_info("[SSP] %s - Skip this function!!!, proximity sensor is not connected(0x%llx)\n",
+			__func__, data->uSensorState);
+		return -EINVAL;
+	}
+
+	iRet = kstrtoll(buf, 10, &enable);
+
+	if (iRet < 0)
+		return iRet;
+
+	pr_info("[SSP] %s - enable %d", __func__, enable);
+	
+	if (enable) {
+		// ToDo: start proximity calibration
+		iRet = ssp_send_cmd(data, MSG2SSP_AP_PROX_CAL_START, 0);
+
+	} else {
+		iRet = proximity_save_calibration(cal_data, sizeof(cal_data));
+		if (iRet < 0)
+			pr_err("[SSP] %s : initilaize fail", __func__); 
+	}
+
+	return size;
+}
+
+static ssize_t proximity_offset_pass_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", 1);
+}
 
 static DEVICE_ATTR(vendor, 0440, proximity_vendor_show, NULL);
 static DEVICE_ATTR(name, 0440, proximity_name_show, NULL);
@@ -507,6 +681,8 @@ static DEVICE_ATTR(raw_data, 0440, proximity_raw_data_show, NULL);
 static DEVICE_ATTR(prox_avg, 0660, proximity_avg_show, proximity_avg_store);
 
 static DEVICE_ATTR(barcode_emul_en, 0660, barcode_emul_enable_show, barcode_emul_enable_store);
+static DEVICE_ATTR(prox_cal, 0660, proximity_cal_show, proximity_cal_store);
+static DEVICE_ATTR(prox_offset_pass, 0440, proximity_offset_pass_show, NULL);
 
 #ifdef CONFIG_SENSORS_SSP_PROX_SETTING
 static DEVICE_ATTR(setting, 0660, proximity_setting_show, proximity_setting_store);
@@ -532,6 +708,8 @@ static struct device_attribute *prox_attrs[] = {
 #endif
 	&dev_attr_prox_alert_thresh,
 	&dev_attr_dhr_sensor_info,
+	&dev_attr_prox_cal,
+	&dev_attr_prox_offset_pass,
 	NULL,
 };
 

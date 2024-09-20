@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
  *	      http://www.samsung.com/
  *
  * Exynos - Support SoC specific Reboot
@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <linux/soc/samsung/exynos-soc.h>
+#include <linux/exynos-ss.h>
 
 #ifdef CONFIG_EXYNOS_ACPM
 #include <soc/samsung/acpm_ipc_ctrl.h>
@@ -74,9 +75,9 @@ int soc_has_big(void)
 }
 
 #define CPU_RESET_DISABLE_FROM_SOFTRESET	(0x041C)
-#define CPU_RESET_DISABLE_FROM_WDTRESET	(0x0414)
-#define BIG_CPU0_RESET			(0x3C0C)
-#define BIG_NONCPU_ETC_RESET		(0x3C8C)
+#define CPU_RESET_DISABLE_FROM_WDTRESET		(0x0414)
+#define BIG_CPU0_RESET				(0x3C0C)
+#define BIG_NONCPU_ETC_RESET			(0x3C8C)
 #define LITTLE_CPU0_ETC_RESET			(0x3C4C)
 #define SWRESET					(0x0400)
 #define RESET_SEQUENCER_CONFIGURATION		(0x0500)
@@ -99,7 +100,7 @@ int soc_has_big(void)
 #define RESET_DISABLE_WDT_L2RESET		(1 << 31)
 
 #define DFD_EDPCSR_DUMP_EN			(1 << 0)
-#define DFD_L2RSTDISABLE_BIG_EN		(1 << 11)
+#define DFD_L2RSTDISABLE_BIG_EN			(1 << 11)
 #define DFD_DBGL1RSTDISABLE_BIG_EN		(1 << 10)
 #define DFD_L2RSTDISABLE_LITTLE_EN		(1 << 9)
 #define DFD_DBGL1RSTDISABLE_LITTLE_EN		(0xF << 24)
@@ -124,7 +125,7 @@ int soc_has_big(void)
 #define	DFD_BIG_NONCPU_ETC_RESET	(RESET_DISABLE_WDT_PRESET_DBG	\
 					| RESET_DISABLE_PRESET_DBG	\
 					| RESET_DISABLE_WDT_L2RESET)
-#define	PMU_CPU_OFFSET		(0x10)
+#define	PMU_CPU_OFFSET			(0x10)
 
 void dfd_set_dump_gpr(int en)
 {
@@ -263,7 +264,7 @@ static void exynos_power_off(void)
 static void exynos_reboot(enum reboot_mode mode, const char *cmd)
 {
 	void __iomem *addr;
-	u32 soc_id;
+	u32 soc_id, revision;
 
 	if (!exynos_pmu_base)
 		return;
@@ -286,7 +287,8 @@ static void exynos_reboot(enum reboot_mode mode, const char *cmd)
 
 	/* Check by each SoC */
 	soc_id = exynos_soc_info.product_id;
-	pr_info("SOC ID %X.\n", soc_id);
+	revision = exynos_soc_info.revision;
+	pr_info("SOC ID %X. Revision: %x\n", soc_id, revision);
 	switch(soc_id) {
 	case EXYNOS9810_SOC_ID:
 		/* Check reset_sequencer_configuration register */
@@ -294,6 +296,13 @@ static void exynos_reboot(enum reboot_mode mode, const char *cmd)
 			little_reset_control(0);
 			big_reset_control(0);
 			dfd_set_dump_gpr(0);
+		}
+		if (revision < EXYNOS_MAIN_REV_1) {
+			pr_emerg("%s: Exynos SoC reset right now with fake watchdog\n", __func__);
+			s3c2410wdt_set_emergency_reset(1000, 1);
+			s3c2410wdt_reset_confirm(100, 1);
+			while (1)
+				wfi();
 		}
 		break;
 	default:

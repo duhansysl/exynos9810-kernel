@@ -262,9 +262,10 @@ int csi_hw_s_config_dma(u32 __iomem *base_reg, u32 channel, struct fimc_is_frame
 int csi_hw_s_config_dma(u32 __iomem *base_reg, u32 channel, struct fimc_is_image *image, u32 hwformat);
 #endif
 int csi_hw_dma_common_reset(void);
-int csi_hw_s_dma_common(u32 __iomem *base_reg);
+int csi_hw_s_dma_common_dynamic(u32 __iomem *base_reg, size_t size, u32 dma_ch);
 #endif
-int csi_hw_s_dma_common_pattern(u32 __iomem *base_reg, u32 width, u32 height, u32 fps, u32 clk);
+int csi_hw_s_dma_common_pattern_enable(u32 __iomem *base_reg, u32 width, u32 height, u32 fps, u32 clk);
+void csi_hw_s_dma_common_pattern_disable(u32 __iomem *base_reg);
 
 int csi_hw_s_dma_irq_msk(u32 __iomem *base_reg, bool on);
 int csi_hw_g_dma_irq_src(u32 __iomem *base_reg, struct csis_irq_src *src, bool clear);
@@ -309,8 +310,16 @@ void fimc_is_enter_lib_isr(void);
 void fimc_is_exit_lib_isr(void);
 int fimc_is_hw_group_cfg(void *group_data);
 int fimc_is_hw_group_open(void *group_data);
+void fimc_is_hw_camif_init(void);
 int fimc_is_hw_camif_cfg(void *sensor_data);
 int fimc_is_hw_camif_open(void *sensor_data);
+#ifdef USE_CAMIF_FIX_UP
+int fimc_is_hw_camif_fix_up(struct fimc_is_device_sensor *sensor);
+int fimc_is_hw_camif_pdp_in_ctrl(struct fimc_is_device_sensor *sensor, bool enable);
+#else
+#define fimc_is_hw_camif_fix_up(a) ({ int __retval = 0; do {} while (0); __retval; })
+#define fimc_is_hw_camif_pdp_in_ctrl(a, b) ({ int __retval = 0; do {} while (0); __retval; })
+#endif
 void fimc_is_hw_ischain_qe_cfg(void);
 int fimc_is_hw_ischain_cfg(void *ischain_data);
 int fimc_is_hw_get_address(void *itfc_data, void *pdev_data, int hw_id);
@@ -325,6 +334,7 @@ int fimc_is_hw_shared_meta_update(struct fimc_is_device_ischain *device,
 		struct fimc_is_group *group, struct fimc_is_frame *frame, int shot_done_flag);
 void __iomem *fimc_is_hw_get_sysreg(ulong core_regs);
 u32 fimc_is_hw_find_settle(u32 mipi_speed);
+unsigned int get_dma(struct fimc_is_device_sensor *device, u32 *dma_ch);
 /*
  * *****************
  * FIMC-BNS H/W APIS

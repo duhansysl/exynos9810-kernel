@@ -1416,17 +1416,17 @@ void fimc_is_scaler_set_poly_scaler_coef(void __iomem *base_addr,
 	} else if (hratio > RATIO_X8_8 && hratio <= RATIO_X7_8) {
 		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X7_8 && hratio <= RATIO_X6_8) {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x6_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X6_8 && hratio <= RATIO_X5_8) {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x5_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X5_8 && hratio <= RATIO_X4_8) {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x4_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X4_8 && hratio <= RATIO_X3_8) {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x3_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X3_8 && hratio <= RATIO_X2_8) {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x2_8 : MCSC_COEFF_x2_8;
+		h_coef = MCSC_COEFF_x2_8;
 	} else {
-		h_coef = adjust_coef == true ? MCSC_COEFF_x2_8 : MCSC_COEFF_x2_8;
+		h_coef = MCSC_COEFF_x2_8;
 	}
 
 	/* adjust V coef */
@@ -1437,17 +1437,17 @@ void fimc_is_scaler_set_poly_scaler_coef(void __iomem *base_addr,
 	} else if (vratio > RATIO_X8_8 && vratio <= RATIO_X7_8) {
 		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X7_8 && vratio <= RATIO_X6_8) {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x6_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X6_8 && vratio <= RATIO_X5_8) {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x5_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X5_8 && vratio <= RATIO_X4_8) {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x4_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X4_8 && vratio <= RATIO_X3_8) {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x7_8 : MCSC_COEFF_x3_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X3_8 && vratio <= RATIO_X2_8) {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x2_8 : MCSC_COEFF_x2_8;
+		v_coef = MCSC_COEFF_x2_8;
 	} else {
-		v_coef = adjust_coef == true ? MCSC_COEFF_x2_8 : MCSC_COEFF_x2_8;
+		v_coef = MCSC_COEFF_x2_8;
 	}
 
 	fimc_is_scaler_set_h_init_phase_offset(base_addr, output_id, h_phase_offset);
@@ -1767,13 +1767,13 @@ void fimc_is_scaler_set_post_scaler_coef(void __iomem *base_addr, u32 output_id,
 	} else if (hratio > RATIO_X8_8 && hratio <= RATIO_X7_8) {
 		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X7_8 && hratio <= RATIO_X6_8) {
-		h_coef = MCSC_COEFF_x6_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X6_8 && hratio <= RATIO_X5_8) {
-		h_coef = MCSC_COEFF_x5_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X5_8 && hratio <= RATIO_X4_8) {
-		h_coef = MCSC_COEFF_x4_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X4_8 && hratio <= RATIO_X3_8) {
-		h_coef = MCSC_COEFF_x3_8;
+		h_coef = MCSC_COEFF_x7_8;
 	} else if (hratio > RATIO_X3_8 && hratio <= RATIO_X2_8) {
 		h_coef = MCSC_COEFF_x2_8;
 	} else {
@@ -1788,13 +1788,13 @@ void fimc_is_scaler_set_post_scaler_coef(void __iomem *base_addr, u32 output_id,
 	} else if (vratio > RATIO_X8_8 && vratio <= RATIO_X7_8) {
 		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X7_8 && vratio <= RATIO_X6_8) {
-		v_coef = MCSC_COEFF_x6_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X6_8 && vratio <= RATIO_X5_8) {
-		v_coef = MCSC_COEFF_x5_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X5_8 && vratio <= RATIO_X4_8) {
-		v_coef = MCSC_COEFF_x4_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X4_8 && vratio <= RATIO_X3_8) {
-		v_coef = MCSC_COEFF_x3_8;
+		v_coef = MCSC_COEFF_x7_8;
 	} else if (vratio > RATIO_X3_8 && vratio <= RATIO_X2_8) {
 		v_coef = MCSC_COEFF_x2_8;
 	} else {

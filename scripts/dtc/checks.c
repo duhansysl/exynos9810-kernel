@@ -272,6 +272,30 @@ static void check_node_name_format(struct check *c, struct dt_info *dti,
 }
 ERROR(node_name_format, check_node_name_format, NULL, &node_name_chars);
 
+static void check_unit_address_vs_reg(struct check *c, struct dt_info *dti,
+				      struct node *node)
+{
+	const char *unitname = get_unitname(node);
+	struct property *prop = get_property(node, "reg");
+
+	if (!prop) {
+		prop = get_property(node, "ranges");
+		if (prop && !prop->val.len)
+			prop = NULL;
+	}
+
+	if (prop) {
+		if (!unitname[0])
+			FAIL(c, "Node %s has a reg or ranges property, but no unit name",
+			    node->fullpath);
+	} else {
+		if (unitname[0])
+			FAIL(c, "Node %s has a unit name, but no reg property",
+			    node->fullpath);
+	}
+}
+WARNING(unit_address_vs_reg, check_unit_address_vs_reg, NULL);
+
 static void check_property_name_chars(struct check *c, struct dt_info *dti,
 				      struct node *node)
 {
@@ -727,6 +751,8 @@ static struct check *check_table[] = {
 	&node_name_chars_strict,
 
 	&addr_size_cells, &reg_format, &ranges_format,
+
+	&unit_address_vs_reg,
 
 	&avoid_default_addr_size,
 	&obsolete_chosen_interrupt_controller,

@@ -10,7 +10,6 @@
  * option) any later version.
  */
 
-#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -25,14 +24,7 @@
 #include "max98512.h"
 #ifdef CONFIG_SND_SOC_MAXIM_DSM
 #include <sound/maxim_dsm_cal.h>
-#include <sound/maxim_dsm.h>
-#include <sound/maxim_dsm_power.h>
 #endif /* CONFIG_SND_SOC_MAXIM_DSM_CAL */
-
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-#define CHANGE_DEV_PRINT
-#include <sound/samsung/sec_audio_debug.h>
-#endif
 
 #define DEBUG_MAX98512
 #ifdef DEBUG_MAX98512
@@ -42,50 +34,7 @@
 #define msg_maxim(format, args...)
 #endif /* DEBUG_MAX98512 */
 
-#ifdef CONFIG_MORO_SOUND
-#include "moro_sound.h"
-int moro_speaker_gain_value, moro_speaker_digital_value, moro_earpiece_gain_value, moro_earpiece_digital_value, moro_both_gain_value, moro_both_digital_value;
-#endif
-
-struct max98512_priv *g_max98512;
-
-static int max98512_remap_reg(int reg, int revID)
-{
-	if (revID != ID_MAX98512_REV_B)
-		return reg;
-
-	switch (reg) {
-	case MAX98512_R0001_INT_RAW1... MAX98512_R001F_PCM_TX_CH_SRC_B:
-		return reg;
-	case MAX98512_R0020_PCM_MODE_CFG ... MAX98512_R0028_ICC_RX_EN_B:
-		return reg + 3;
-	case MAX98512_R002B_ICC_TX_EN_A ... MAX98512_R004C_MEAS_ADC_CH2_READ:
-		return reg + 1;
-	case MAX98512_R004F_BROWNOUT_STATUS
-		... MAX98512_R0053_BROWNOUT_LVL_HOLD:
-		return reg + 2;
-	case MAX98512_R0058_BROWNOUT_LVL1_THRESH
-		... MAX98512_R005F_BROWNOUT_AMP1_CLIP_MODE:
-		return reg - 2;
-	case MAX98512_R0070_BROWNOUT_LVL1_CUR_LIMIT
-		... MAX98512_R007F_BROWNOUT_LVL4_AMP1_CTRL3:
-		return reg - 18;
-	case MAX98512_R0080_ENV_TRACK_VOUT_HEADROOM
-		... MAX98512_R008D_IVADC_BYPASS:
-		return reg - 13;
-	case MAX98512_R0400_GLOBAL_SHDN:
-		return MAX98512B_R0500_GLOBAL_SHDN;
-	case MAX98512_R0401_SOFT_RESET:
-		return MAX98512B_R0501_SOFT_RESET;
-	case MAX98512_R0402_REV_ID:
-		return MAX98512B_R0600_REV_ID;
-	default:
-		return reg;
-	}
-}
-#define REMAP(reg, revID) max98512_remap_reg(reg, revID)
-
-static const struct reg_default max98512_reg[] = {
+static struct reg_default max98512_reg[] = {
 	{MAX98512_R0001_INT_RAW1, 0x00},
 	{MAX98512_R0002_INT_RAW2, 0x00},
 	{MAX98512_R0003_INT_RAW3, 0x00},
@@ -160,7 +109,7 @@ static const struct reg_default max98512_reg[] = {
 	{MAX98512_R004A_MEAS_ADC_CH0_READ, 0x00},
 	{MAX98512_R004B_MEAS_ADC_CH1_READ, 0x00},
 	{MAX98512_R004C_MEAS_ADC_CH2_READ, 0x00},
-	{MAX98512_R004E_SQUELCH, 0x10},
+	{MAX98512_R004E_SQUELCH, 0x15},
 	{MAX98512_R004F_BROWNOUT_STATUS, 0x00},
 	{MAX98512_R0050_BROWNOUT_EN, 0x00},
 	{MAX98512_R0051_BROWNOUT_INFINITE_HOLD, 0x00},
@@ -196,134 +145,9 @@ static const struct reg_default max98512_reg[] = {
 	{MAX98512_R0083_ENV_TRACK_HOLD_RATE, 0x00},
 	{MAX98512_R0084_ENV_TRACK_CTRL, 0x00},
 	{MAX98512_R0085_ENV_TRACK_BOOST_VOUT_READ, 0x00},
-	{MAX98512_R0086_BOOST_BYPASS_1,  0x00},
-	{MAX98512_R0087_BOOST_BYPASS_2,  0x00},
-	{MAX98512_R0088_BOOST_BYPASS_3,  0x00},
 	{MAX98512_R0400_GLOBAL_SHDN, 0x00},
 	{MAX98512_R0401_SOFT_RESET, 0x00},
 	{MAX98512_R0402_REV_ID, 0x40},
-	{MAX98512B_R0600_REV_ID,  0x40},
-};
-
-static const struct reg_default max98512b_reg[] = {
-	{MAX98512B_R0001_INT_RAW1, 0x00},
-	{MAX98512B_R0002_INT_RAW2, 0x00},
-	{MAX98512B_R0003_INT_RAW3, 0x00},
-	{MAX98512B_R0004_INT_STATE1, 0x00},
-	{MAX98512B_R0005_INT_STATE2, 0x00},
-	{MAX98512B_R0006_INT_STATE3, 0x00},
-	{MAX98512B_R0007_INT_FLAG1, 0x00},
-	{MAX98512B_R0008_INT_FLAG2, 0x00},
-	{MAX98512B_R0009_INT_FLAG3, 0x00},
-	{MAX98512B_R000A_INT_EN1, 0x00},
-	{MAX98512B_R000B_INT_EN2, 0x00},
-	{MAX98512B_R000C_INT_EN3, 0x00},
-	{MAX98512B_R000D_INT_FLAG_CLR1, 0x00},
-	{MAX98512B_R000E_INT_FLAG_CLR2, 0x00},
-	{MAX98512B_R000F_INT_FLAG_CLR3, 0x00},
-	{MAX98512B_R0010_IRQ_CTRL, 0x00},
-	{MAX98512B_R0011_CLK_MON, 0x00},
-	{MAX98512B_R0012_WDOG_CTRL, 0x00},
-	{MAX98512B_R0013_WDOG_RST, 0x00},
-	{MAX98512B_R0014_MEAS_ADC_THERM_WARN_THRESH, 0x75},
-	{MAX98512B_R0015_MEAS_ADC_THERM_SHDN_THRESH, 0x8C},
-	{MAX98512B_R0016_MEAS_ADC_THERM_HYSTERESIS, 0x08},
-	{MAX98512B_R0017_PIN_CFG, 0x55},
-	{MAX98512B_R0018_PCM_RX_EN_A, 0x00},
-	{MAX98512B_R0019_PCM_RX_EN_B, 0x00},
-	{MAX98512B_R001A_PCM_TX_EN_A, 0x00},
-	{MAX98512B_R001B_PCM_TX_EN_B, 0x00},
-	{MAX98512B_R001C_PCM_TX_HIZ_CTRL_A, 0x00},
-	{MAX98512B_R001D_PCM_TX_HIZ_CTRL_B, 0x00},
-	{MAX98512B_R001E_PCM_TX_CH_SRC_A, 0x00},
-	{MAX98512B_R001F_PCM_TX_CH_SRC_B, 0x00},
-	{MAX98512B_R0023_PCM_MODE_CFG, 0x22},
-	{MAX98512B_R0024_PCM_MASTER_MODE, 0x00},
-	{MAX98512B_R0025_PCM_CLK_SETUP, 0x22},
-	{MAX98512B_R0026_PCM_SR_SETUP1, 0x00},
-	{MAX98512B_R0027_PCM_SR_SETUP2, 0x00},
-	{MAX98512B_R0028_PCM_TO_SPK_MONOMIX_A, 0x00},
-	{MAX98512B_R0029_PCM_TO_SPK_MONOMIX_B, 0x00},
-	{MAX98512B_R002A_ICC_RX_EN_A, 0x00},
-	{MAX98512B_R002B_ICC_RX_EN_B, 0x00},
-	{MAX98512B_R002C_ICC_TX_EN_A, 0x00},
-	{MAX98512B_R002D_ICC_TX_EN_B, 0x00},
-	{MAX98512B_R002E_ICC_HIZ_MANUAL_MODE, 0x00},
-	{MAX98512B_R002F_ICC_TX_HIZ_EN_A, 0x00},
-	{MAX98512B_R0030_ICC_TX_HIZ_EN_B, 0x00},
-	{MAX98512B_R0031_ICC_LNK_EN, 0x00},
-	{MAX98512B_R0032_PDM_TX_EN, 0x00},
-	{MAX98512B_R0033_PDM_TX_HIZ_CTRL, 0x00},
-	{MAX98512B_R0034_PDM_TX_CTRL, 0x00},
-	{MAX98512B_R0035_PDM_RX_CTRL, 0x40},
-	{MAX98512B_R0036_AMP_VOL_CTRL, 0x00},
-	{MAX98512B_R0037_AMP_DSP_CFG, 0x02},
-	{MAX98512B_R0038_TONE_GEN_DC_CFG, 0x00},
-	{MAX98512B_R0039_AMP_EN, 0x00},
-	{MAX98512B_R003A_SPK_SRC_SEL, 0x00},
-	{MAX98512B_R003B_SPK_GAIN, 0x00},
-	{MAX98512B_R003C_SSM_CFG, 0x01},
-	{MAX98512B_R003D_MEAS_EN, 0x00},
-	{MAX98512B_R003E_MEAS_DSP_CFG, 0x04},
-	{MAX98512B_R003F_BOOST_CTRL0, 0x00},
-	{MAX98512B_R0040_BOOST_CTRL3, 0x00},
-	{MAX98512B_R0041_BOOST_CTRL1, 0x00},
-	{MAX98512B_R0042_MEAS_ADC_CFG, 0x00},
-	{MAX98512B_R0043_MEAS_ADC_BASE_MSB, 0x00},
-	{MAX98512B_R0044_MEAS_ADC_BASE_LSB, 0x00},
-	{MAX98512B_R0045_ADC_CH0_DIVIDE, 0x00},
-	{MAX98512B_R0046_ADC_CH1_DIVIDE, 0x00},
-	{MAX98512B_R0047_ADC_CH2_DIVIDE, 0x00},
-	{MAX98512B_R0048_ADC_CH0_FILT_CFG, 0x00},
-	{MAX98512B_R0049_ADC_CH1_FILT_CFG, 0x00},
-	{MAX98512B_R004A_ADC_CH2_FILT_CFG, 0x00},
-	{MAX98512B_R004B_MEAS_ADC_CH0_READ, 0x00},
-	{MAX98512B_R004C_MEAS_ADC_CH1_READ, 0x00},
-	{MAX98512B_R004D_MEAS_ADC_CH2_READ, 0x00},
-	{MAX98512B_R004E_SQUELCH, 0x10},
-	{MAX98512B_R0051_BROWNOUT_STATUS, 0x00},
-	{MAX98512B_R0052_BROWNOUT_EN, 0x00},
-	{MAX98512B_R0053_BROWNOUT_INFINITE_HOLD, 0x00},
-	{MAX98512B_R0054_BROWNOUT_INFINITE_HOLD_CLR, 0x00},
-	{MAX98512B_R0055_BROWNOUT_LVL_HOLD, 0x00},
-	{MAX98512B_R0056_BROWNOUT_LVL1_THRESH, 0x00},
-	{MAX98512B_R0057_BROWNOUT_LVL2_THRESH, 0x00},
-	{MAX98512B_R0058_BROWNOUT_LVL3_THRESH, 0x00},
-	{MAX98512B_R0059_BROWNOUT_LVL4_THRESH, 0x00},
-	{MAX98512B_R005A_BROWNOUT_THRESH_HYSTERYSIS, 0x00},
-	{MAX98512B_R005B_BROWNOUT_AMP_LIMITER_ATK_REL, 0x00},
-	{MAX98512B_R005C_BROWNOUT_AMP_GAIN_ATK_REL, 0x00},
-	{MAX98512B_R005D_BROWNOUT_AMP1_CLIP_MODE, 0x00},
-	{MAX98512B_R005E_BROWNOUT_LVL1_CUR_LIMIT, 0x00},
-	{MAX98512B_R005F_BROWNOUT_LVL1_AMP1_CTRL1, 0x00},
-	{MAX98512B_R0060_BROWNOUT_LVL1_AMP1_CTRL2, 0x00},
-	{MAX98512B_R0061_BROWNOUT_LVL1_AMP1_CTRL3, 0x00},
-	{MAX98512B_R0062_BROWNOUT_LVL2_CUR_LIMIT, 0x00},
-	{MAX98512B_R0063_BROWNOUT_LVL2_AMP1_CTRL1, 0x00},
-	{MAX98512B_R0064_BROWNOUT_LVL2_AMP1_CTRL2, 0x00},
-	{MAX98512B_R0065_BROWNOUT_LVL2_AMP1_CTRL3, 0x00},
-	{MAX98512B_R0066_BROWNOUT_LVL3_CUR_LIMIT, 0x00},
-	{MAX98512B_R0067_BROWNOUT_LVL3_AMP1_CTRL1, 0x00},
-	{MAX98512B_R0068_BROWNOUT_LVL3_AMP1_CTRL2, 0x00},
-	{MAX98512B_R0069_BROWNOUT_LVL3_AMP1_CTRL3, 0x00},
-	{MAX98512B_R006A_BROWNOUT_LVL4_CUR_LIMIT, 0x00},
-	{MAX98512B_R006B_BROWNOUT_LVL4_AMP1_CTRL1, 0x00},
-	{MAX98512B_R006C_BROWNOUT_LVL4_AMP1_CTRL2, 0x00},
-	{MAX98512B_R006D_BROWNOUT_LVL4_AMP1_CTRL3, 0x00},
-	{MAX98512B_R0073_ENV_TRACK_VOUT_HEADROOM, 0x00},
-	{MAX98512B_R0074_ENV_TRACK_BOOST_VOUT_DELAY, 0x00},
-	{MAX98512B_R0075_ENV_TRACK_REL_RATE, 0x00},
-	{MAX98512B_R0076_ENV_TRACK_HOLD_RATE, 0x00},
-	{MAX98512B_R0077_ENV_TRACK_CTRL, 0x00},
-	{MAX98512B_R0078_ENV_TRACK_BOOST_VOUT_READ, 0x00},
-	{MAX98512B_R0079_BOOST_BYPASS_1, 0x00},
-	{MAX98512B_R007A_BOOST_BYPASS_2, 0x00},
-	{MAX98512B_R007B_BOOST_BYPASS_3, 0x00},
-	{MAX98512_R0400_GLOBAL_SHDN, 0x00},
-	{MAX98512_R0401_SOFT_RESET, 0x00},
-	{MAX98512_R0402_REV_ID, 0x00},
-	{MAX98512B_R0500_GLOBAL_SHDN, 0x00},
-	{MAX98512B_R0501_SOFT_RESET, 0x00},
 };
 
 int max98512_regmap_read(struct regmap *map,
@@ -353,10 +177,6 @@ int max98512_wrapper_read(struct max98512_priv *max98512,
 {
 	int ret = -999;
 	int count = 0;
-	int reg_r = reg;
-
-	reg = REMAP(reg, max98512->revID);
-	reg_r = REMAP(reg_r, max98512->revID_r);
 
 	while (count++ < MAX_TRY_COUNT && ret != 0) {
 		switch (speaker) {
@@ -367,14 +187,14 @@ int max98512_wrapper_read(struct max98512_priv *max98512,
 		case MAX98512R:
 			if (max98512->pdata->sub_reg)
 				ret = max98512_regmap_read(max98512->regmap_r,
-							   reg_r, val);
+							   reg, val);
 			break;
 		case MAX98512B:
 			ret = max98512_regmap_read(max98512->regmap_l,
 						   reg, val);
 			if (max98512->pdata->sub_reg)
 				ret = max98512_regmap_read(max98512->regmap_r,
-							   reg_r, val);
+							   reg, val);
 			break;
 		default:
 			msg_maxim("Unknown type %d", speaker);
@@ -394,10 +214,6 @@ int max98512_wrapper_write(struct max98512_priv *max98512,
 {
 	int ret = -999;
 	int count = 0;
-	int reg_r = reg;
-
-	reg = REMAP(reg, max98512->revID);
-	reg_r = REMAP(reg_r, max98512->revID_r);
 
 	while (count++ < MAX_TRY_COUNT && ret != 0) {
 		switch (speaker) {
@@ -408,14 +224,14 @@ int max98512_wrapper_write(struct max98512_priv *max98512,
 		case MAX98512R:
 			if (max98512->pdata->sub_reg)
 				ret = max98512_regmap_write(max98512->regmap_r,
-							    reg_r, val);
+							    reg, val);
 			break;
 		case MAX98512B:
 			ret = max98512_regmap_write(max98512->regmap_l,
 						    reg, val);
 			if (max98512->pdata->sub_reg)
 				ret = max98512_regmap_write(max98512->regmap_r,
-							    reg_r, val);
+							    reg, val);
 			break;
 		default:
 			msg_maxim("Unknown type %d", speaker);
@@ -437,64 +253,24 @@ int max98512_wrapper_update(struct max98512_priv *max98512,
 {
 	int ret = -999;
 	int count = 0;
-	int reg_r = reg;
-#ifdef CONFIG_MORO_SOUND
-	int moro_mode = 0;
-#endif
-
-	reg = REMAP(reg, max98512->revID);
-	reg_r = REMAP(reg_r, max98512->revID_r);
-
-#ifdef CONFIG_MORO_SOUND
-	if (val) {
-		switch (mask) {
-			case MAX98512_AMP_VOL_MASK:
-				moro_mode = 2;
-				break;
-			case MAX98512_SPK_PCM_GAIN_MASK:
-				moro_mode = 1;
-				break;
-			default:
-				break;
-		}
-	}
-#endif
 
 	while (count++ < MAX_TRY_COUNT && ret != 0) {
 		switch (speaker) {
 		case MAX98512L:
-#ifdef CONFIG_MORO_SOUND
-			if (moro_earpiece_digital_value && moro_mode == 2)
-				val = moro_earpiece_digital_value;
-			else if (moro_earpiece_gain_value && moro_mode == 1)
-				val = moro_earpiece_gain_value;
-#endif
 			ret = regmap_update_bits(max98512->regmap_l,
 						 reg, mask, val);
 			break;
 		case MAX98512R:
-#ifdef CONFIG_MORO_SOUND
-			if (moro_speaker_digital_value && moro_mode == 2)
-				val = moro_speaker_digital_value;
-			else if (moro_speaker_gain_value && moro_mode == 1)
-				val = moro_speaker_gain_value;
-#endif
 			if (max98512->pdata->sub_reg)
 				ret = regmap_update_bits(max98512->regmap_r,
-							 reg_r, mask, val);
+							 reg, mask, val);
 			break;
 		case MAX98512B:
-#ifdef CONFIG_MORO_SOUND
-			if (moro_both_digital_value && moro_mode == 2)
-				val = moro_both_digital_value;
-			else if (moro_both_gain_value && moro_mode == 1)
-				val = moro_both_gain_value;
-#endif
 			ret = regmap_update_bits(max98512->regmap_l,
 						 reg, mask, val);
 			if (max98512->pdata->sub_reg)
 				ret = regmap_update_bits(max98512->regmap_r,
-							 reg_r, mask, val);
+							 reg, mask, val);
 			break;
 		default:
 			msg_maxim("Unknown type %d", speaker);
@@ -539,17 +315,9 @@ static int max98512_set_dump_status(struct snd_kcontrol *kcontrol,
 static ssize_t max98512_log_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {
-	return maxdsm_log_prepare(buf, LOG_LEFT);
+	return maxdsm_log_prepare(buf);
 }
-static DEVICE_ATTR(dsm_log, 0444, max98512_log_show, NULL);
-
-static ssize_t max98512_log_r_show(struct device *dev,
-				 struct device_attribute *attr, char *buf)
-{
-	return maxdsm_log_prepare(buf, LOG_RIGHT);
-}
-static DEVICE_ATTR(dsm_log_r, 0444, max98512_log_r_show, NULL);
-
+static DEVICE_ATTR(dsm_log, S_IRUGO, max98512_log_show, NULL);
 
 static ssize_t max98512_log_spk_excu_max_show(struct device *dev,
 					      struct device_attribute *attr,
@@ -557,27 +325,13 @@ static ssize_t max98512_log_spk_excu_max_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
-	maxdsm_log_max_refresh(SPK_EXCURSION_MAX, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
+	maxdsm_log_max_refresh(SPK_EXCURSION_MAX);
 
-	return snprintf(buf, PAGE_SIZE, "%d", values.excursion_max);
+	return sprintf(buf, "%d", values.excursion_max);
 }
-static DEVICE_ATTR(spk_excu_max, 0444,
+static DEVICE_ATTR(spk_excu_max, S_IRUGO,
 		   max98512_log_spk_excu_max_show, NULL);
-
-static ssize_t max98512_log_spk_excu_max_r_show(struct device *dev,
-					      struct device_attribute *attr,
-					      char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-	maxdsm_log_max_refresh(SPK_EXCURSION_MAX, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%d", values.excursion_max);
-}
-static DEVICE_ATTR(spk_excu_max_r, 0444,
-		   max98512_log_spk_excu_max_r_show, NULL);
 
 static ssize_t max98512_log_spk_excu_maxtime_show(struct device *dev,
 						  struct device_attribute *attr,
@@ -585,25 +339,12 @@ static ssize_t max98512_log_spk_excu_maxtime_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
 
-	return snprintf(buf, PAGE_SIZE, "%s", values.dsm_timestamp);
+	return sprintf(buf, "%s", values.dsm_timestamp);
 }
-static DEVICE_ATTR(spk_excu_maxtime, 0444,
+static DEVICE_ATTR(spk_excu_maxtime, S_IRUGO,
 		   max98512_log_spk_excu_maxtime_show, NULL);
-
-static ssize_t max98512_log_spk_excu_maxtime_r_show(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%s", values.dsm_timestamp);
-}
-static DEVICE_ATTR(spk_excu_maxtime_r, 0444,
-		   max98512_log_spk_excu_maxtime_r_show, NULL);
 
 static ssize_t max98512_log_spk_excu_overcnt_show(struct device *dev,
 						  struct device_attribute *attr,
@@ -611,27 +352,13 @@ static ssize_t max98512_log_spk_excu_overcnt_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
-	maxdsm_log_max_refresh(SPK_EXCURSION_OVERCNT, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
+	maxdsm_log_max_refresh(SPK_EXCURSION_OVERCNT);
 
-	return snprintf(buf, PAGE_SIZE, "%d", values.excursion_overcnt);
+	return sprintf(buf, "%d", values.excursion_overcnt);
 }
-static DEVICE_ATTR(spk_excu_overcnt, 0444,
+static DEVICE_ATTR(spk_excu_overcnt, S_IRUGO,
 		   max98512_log_spk_excu_overcnt_show, NULL);
-
-static ssize_t max98512_log_spk_excu_overcnt_r_show(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-	maxdsm_log_max_refresh(SPK_EXCURSION_OVERCNT, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%d", values.excursion_overcnt);
-}
-static DEVICE_ATTR(spk_excu_overcnt_r, 0444,
-		   max98512_log_spk_excu_overcnt_r_show, NULL);
 
 static ssize_t max98512_log_spk_temp_max_show(struct device *dev,
 					      struct device_attribute *attr,
@@ -639,50 +366,13 @@ static ssize_t max98512_log_spk_temp_max_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
-	maxdsm_log_max_refresh(SPK_TEMP_MAX, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
+	maxdsm_log_max_refresh(SPK_TEMP_MAX);
 
-	return snprintf(buf, PAGE_SIZE, "%d", values.coil_temp_max);
+	return sprintf(buf, "%d", values.coil_temp_max);
 }
-static DEVICE_ATTR(spk_temp_max, 0444,
+static DEVICE_ATTR(spk_temp_max, S_IRUGO,
 		   max98512_log_spk_temp_max_show, NULL);
-
-static ssize_t max98512_log_spk_temp_max_r_show(struct device *dev,
-					      struct device_attribute *attr,
-					      char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-	maxdsm_log_max_refresh(SPK_TEMP_MAX, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%d", values.coil_temp_max);
-}
-static DEVICE_ATTR(spk_temp_max_r, 0444,
-		   max98512_log_spk_temp_max_r_show, NULL);
-
-static ssize_t max98512_log_spk_temp_max_keep_show(struct device *dev,
-						   struct device_attribute *attr,
-						   char *buf)
-{
-	msg_maxim("val: %d", coil_temp_max_keep);
-
-	return snprintf(buf, PAGE_SIZE, "%d", coil_temp_max_keep);
-}
-static DEVICE_ATTR(spk_temp_max_keep, 0444,
-		   max98512_log_spk_temp_max_keep_show, NULL);
-
-static ssize_t max98512_log_spk_temp_max_keep_r_show(struct device *dev,
-						     struct device_attribute *attr,
-						     char *buf)
-{
-
-	msg_maxim("val: %d", coil_temp_max_keep_r);
-
-	return snprintf(buf, PAGE_SIZE, "%d", coil_temp_max_keep_r);
-}
-static DEVICE_ATTR(spk_temp_max_keep_r, 0444,
-		   max98512_log_spk_temp_max_keep_r_show, NULL);
 
 static ssize_t max98512_log_spk_temp_maxtime_show(struct device *dev,
 						  struct device_attribute *attr,
@@ -690,25 +380,12 @@ static ssize_t max98512_log_spk_temp_maxtime_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
 
-	return snprintf(buf, PAGE_SIZE, "%s", values.dsm_timestamp);
+	return sprintf(buf, "%s", values.dsm_timestamp);
 }
-static DEVICE_ATTR(spk_temp_maxtime, 0444,
+static DEVICE_ATTR(spk_temp_maxtime, S_IRUGO,
 		   max98512_log_spk_temp_maxtime_show, NULL);
-
-static ssize_t max98512_log_spk_temp_maxtime_r_show(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%s", values.dsm_timestamp);
-}
-static DEVICE_ATTR(spk_temp_maxtime_r, 0444,
-		   max98512_log_spk_temp_maxtime_r_show, NULL);
 
 static ssize_t max98512_log_spk_temp_overcnt_show(struct device *dev,
 						  struct device_attribute *attr,
@@ -716,28 +393,13 @@ static ssize_t max98512_log_spk_temp_overcnt_show(struct device *dev,
 {
 	struct maxim_dsm_log_max_values values;
 
-	maxdsm_log_max_prepare(&values, LOG_LEFT);
-	maxdsm_log_max_refresh(SPK_TEMP_OVERCNT, LOG_LEFT);
+	maxdsm_log_max_prepare(&values);
+	maxdsm_log_max_refresh(SPK_TEMP_OVERCNT);
 
-	return snprintf(buf, PAGE_SIZE, "%d", values.coil_temp_overcnt);
+	return sprintf(buf, "%d", values.coil_temp_overcnt);
 }
-static DEVICE_ATTR(spk_temp_overcnt, 0444,
+static DEVICE_ATTR(spk_temp_overcnt, S_IRUGO,
 		   max98512_log_spk_temp_overcnt_show, NULL);
-
-static ssize_t max98512_log_spk_temp_overcnt_r_show(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
-{
-	struct maxim_dsm_log_max_values values;
-
-	maxdsm_log_max_prepare(&values, LOG_RIGHT);
-	maxdsm_log_max_refresh(SPK_TEMP_OVERCNT, LOG_RIGHT);
-
-	return snprintf(buf, PAGE_SIZE, "%d", values.coil_temp_overcnt);
-}
-static DEVICE_ATTR(spk_temp_overcnt_r, 0444,
-		   max98512_log_spk_temp_overcnt_r_show, NULL);
-
 #endif /* USE_DSM_LOG */
 
 #ifdef USE_DSM_UPDATE_CAL
@@ -760,7 +422,7 @@ static ssize_t max98512_cal_show(struct device *dev,
 {
 	return maxdsm_cal_prepare(buf);
 }
-static DEVICE_ATTR(dsm_cal, 0444, max98512_cal_show, NULL);
+static DEVICE_ATTR(dsm_cal, S_IRUGO, max98512_cal_show, NULL);
 #endif /* USE_DSM_UPDATE_CAL */
 
 #if defined(USE_DSM_LOG) || defined(USE_DSM_UPDATE_CAL)
@@ -770,21 +432,12 @@ static const char *class_name_log = DEFAULT_LOG_CLASS_NAME;
 static struct attribute *max98512_attributes[] = {
 #ifdef USE_DSM_LOG
 	&dev_attr_dsm_log.attr,
-	&dev_attr_dsm_log_r.attr,
 	&dev_attr_spk_excu_max.attr,
-	&dev_attr_spk_excu_max_r.attr,
 	&dev_attr_spk_excu_maxtime.attr,
-	&dev_attr_spk_excu_maxtime_r.attr,
 	&dev_attr_spk_excu_overcnt.attr,
-	&dev_attr_spk_excu_overcnt_r.attr,
 	&dev_attr_spk_temp_max.attr,
-	&dev_attr_spk_temp_max_r.attr,
-	&dev_attr_spk_temp_max_keep.attr,
-	&dev_attr_spk_temp_max_keep_r.attr,
 	&dev_attr_spk_temp_maxtime.attr,
-	&dev_attr_spk_temp_maxtime_r.attr,
 	&dev_attr_spk_temp_overcnt.attr,
-	&dev_attr_spk_temp_overcnt_r.attr,
 #endif /* USE_DSM_LOG */
 #ifdef USE_DSM_UPDATE_CAL
 	&dev_attr_dsm_cal.attr,
@@ -931,7 +584,7 @@ static int max98512_set_clock(struct max98512_priv *max98512,
 	int value;
 
 	if (max98512->master) {
-		long i;
+		int i;
 		/* match rate to closest value */
 		for (i = 0; i < ARRAY_SIZE(rate_table); i++) {
 			if (rate_table[i] >= max98512->sysclk)
@@ -1086,46 +739,6 @@ err:
 #define MAX98512_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
 	SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
-void max98512_dc_blocker_enable(int enable)
-{
-	msg_maxim("dc blocker enable %d", enable);
-	if (enable) {
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R0036_AMP_DSP_CFG,
-				       0x01);
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R003D_MEAS_DSP_CFG,
-				       0xF7);
-	} else {
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R0036_AMP_DSP_CFG,
-				       0x00);
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R003D_MEAS_DSP_CFG,
-				       0xF4);
-	}
-}
-EXPORT_SYMBOL_GPL(max98512_dc_blocker_enable);
-
-void max98512_boost_bypass(int mode)
-{
-	msg_maxim("boost bypass mode %d", mode);
-
-	if (mode == 0x1)
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R0087_BOOST_BYPASS_2,
-				       0x1);
-	else if (mode == 0x0 || mode == 0x2)
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				MAX98512_R0087_BOOST_BYPASS_2,
-				0x2);
-	else
-		max98512_wrapper_write(g_max98512, MAX98512B,
-				       MAX98512_R0087_BOOST_BYPASS_2,
-				       0x3);
-}
-EXPORT_SYMBOL_GPL(max98512_boost_bypass);
-
 static int max98512_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 				   unsigned int freq, int dir)
 {
@@ -1137,321 +750,30 @@ static int max98512_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 	return 0;
 }
 
-static void max98512_reinit_reg(struct max98512_priv *max98512)
-{
-	max98512_wrapper_write(max98512, MAX98512B,
-		       MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
-		       0xFF);
-
-	max98512_wrapper_write(max98512, MAX98512B,
-		       MAX98512_R001A_PCM_TX_EN_A,
-		       0x00);
-}
-
-static int max98512_adc_config(struct max98512_priv *max98512)
-{
-	max98512_reinit_reg(max98512);
-
-	max98512_wrapper_write(max98512, MAX98512L,
-			       MAX98512_R001E_PCM_TX_CH_SRC_A,
-			       (max98512->i_l_slot <<
-			       MAX98512_PCM_TX_CH_SRC_A_I_SHIFT |
-			       max98512->v_l_slot) & 0xFF);
-	if (max98512->mono_stereo) {
-		max98512_wrapper_write(max98512, MAX98512R,
-			MAX98512_R001E_PCM_TX_CH_SRC_A,
-			(max98512->i_r_slot<<MAX98512_PCM_TX_CH_SRC_A_I_SHIFT|
-			max98512->v_r_slot)&0xFF);
-	}
-
-	if (max98512->v_l_slot < 8) {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
-					1 << max98512->v_l_slot, 0);
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001A_PCM_TX_EN_A,
-					1 << max98512->v_l_slot,
-					1 << max98512->v_l_slot);
-	} else {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
-					1 << (max98512->v_l_slot - 8), 0);
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001B_PCM_TX_EN_B,
-					1 << (max98512->v_l_slot - 8),
-					1 << (max98512->v_l_slot - 8));
-	}
-
-	if (max98512->i_l_slot < 8) {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
-					1 << max98512->i_l_slot, 0);
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001A_PCM_TX_EN_A,
-					1 << max98512->i_l_slot,
-					1 << max98512->i_l_slot);
-	} else {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
-					1 << (max98512->i_l_slot - 8), 0);
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R001B_PCM_TX_EN_B,
-					1 << (max98512->i_l_slot - 8),
-					1 << (max98512->i_l_slot - 8));
-	}
-
-	if (max98512->mono_stereo) {
-		if (max98512->v_r_slot < 8) {
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
-				1 << max98512->v_r_slot, 0);
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001A_PCM_TX_EN_A,
-				1 << max98512->v_r_slot,
-				1 << max98512->v_r_slot);
-		} else {
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
-				1 << (max98512->v_r_slot - 8), 0);
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001B_PCM_TX_EN_B,
-				1 << (max98512->v_r_slot - 8),
-				1 << (max98512->v_r_slot - 8));
-		}
-
-		if (max98512->i_l_slot < 8) {
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
-				1 << max98512->i_r_slot, 0);
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001A_PCM_TX_EN_A,
-				1 << max98512->i_r_slot,
-				1 << max98512->i_r_slot);
-		} else {
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
-				1 << (max98512->i_r_slot - 8), 0);
-			max98512_wrapper_update(max98512, MAX98512R,
-				MAX98512_R001B_PCM_TX_EN_B,
-				1 << (max98512->i_r_slot - 8),
-				1 << (max98512->i_r_slot - 8));
-		}
-	}
-	/* Set interleave mode */
-	if (max98512->interleave_mode) {
-		max98512_wrapper_update(max98512, MAX98512B,
-					MAX98512_R001F_PCM_TX_CH_SRC_B,
-					MAX98512_PCM_TX_CH_INTERLEAVE_MASK,
-					MAX98512_PCM_TX_CH_INTERLEAVE_MASK);
-		max98512_wrapper_update(max98512, MAX98512B,
-					MAX98512_R0024_PCM_SR_SETUP2,
-					MAX98512_PCM_SR_SET2_IVADC_SR_MASK,
-					MAX98512_PCM_SR_SET1_SR_24000);
-	} else
-		max98512_wrapper_update(max98512, MAX98512B,
-					MAX98512_R001F_PCM_TX_CH_SRC_B,
-					MAX98512_PCM_TX_CH_INTERLEAVE_MASK,
-					0);
-
-	if (max98512->revID == ID_MAX98512_REV_B) {
-		max98512_wrapper_write(max98512, MAX98512L,
-				       MAX98512_R001E_PCM_TX_CH_SRC_A,
-				       0x40);
-		max98512_wrapper_write(max98512, MAX98512L,
-				       MAX98512_R001F_PCM_TX_CH_SRC_B,
-				       0x3);
-	}
-	if (max98512->revID_r == ID_MAX98512_REV_B) {
-		max98512_wrapper_write(max98512, MAX98512R,
-				       MAX98512_R001E_PCM_TX_CH_SRC_A,
-				       0x41);
-		max98512_wrapper_write(max98512, MAX98512R,
-				       MAX98512_R001F_PCM_TX_CH_SRC_B,
-				       0x3);
-	}
-
-	return 0;
-}
-
-#ifdef CONFIG_MORO_SOUND
-
-int get_speaker_analog_gain(void)
-{
-	return moro_speaker_gain_value;
-}
-
-int get_speaker_digital_gain(void)
-{
-	return moro_speaker_digital_value;
-}
-
-void set_speaker_gain(struct max98512_priv *max98512)
-{
-	if (moro_speaker_digital_value) {
-// MAX98512_R0035_AMP_VOL_CTRL
-		max98512_wrapper_update(max98512, MAX98512R,
-						MAX98512_R0035_AMP_VOL_CTRL,
-						MAX98512_AMP_VOL_MASK,
-						moro_speaker_digital_value);
-	}
-
-	if (moro_speaker_gain_value) {
-// MAX98512_R003A_SPK_GAIN
-		max98512_wrapper_update(max98512, MAX98512R,
-						MAX98512_R003A_SPK_GAIN,
-						MAX98512_SPK_PCM_GAIN_MASK,
-						moro_speaker_gain_value);
-
-		max98512->spk_gain_right = moro_speaker_gain_value;
-		max98512->spk_gain = moro_speaker_gain_value;
-	}
-}
-
-int set_speaker_analog_gain_value(int gain)
-{
-	moro_speaker_gain_value = gain;
-
-	set_speaker_gain(g_max98512);
-
-	return moro_speaker_gain_value;
-}
-
-int set_speaker_digital_gain_value(int gain)
-{
-	moro_speaker_digital_value = gain;
-
-	set_speaker_gain(g_max98512);
-
-	return moro_speaker_digital_value;
-}
-
-int get_earpiece_analog_gain(void)
-{
-	return moro_earpiece_gain_value;
-}
-
-int get_earpiece_digital_gain(void)
-{
-	return moro_earpiece_digital_value;
-}
-
-void set_earpiece_gain(struct max98512_priv *max98512)
-{
-	if (moro_earpiece_digital_value) {
-// MAX98512_R0035_AMP_VOL_CTRL
-		max98512_wrapper_update(max98512, MAX98512L,
-						MAX98512_R0035_AMP_VOL_CTRL,
-						MAX98512_AMP_VOL_MASK,
-						moro_earpiece_digital_value);
-	}
-
-	if (moro_earpiece_gain_value) {
-// MAX98512_R003A_SPK_GAIN
-		max98512_wrapper_update(max98512, MAX98512L,
-						MAX98512_R003A_SPK_GAIN,
-						MAX98512_SPK_PCM_GAIN_MASK,
-						moro_earpiece_gain_value);
-
-		max98512->spk_gain_left = moro_earpiece_gain_value;
-	}
-}
-
-int set_earpiece_analog_gain_value(int gain)
-{
-	moro_earpiece_gain_value = gain;
-
-	set_earpiece_gain(g_max98512);
-
-	return moro_earpiece_gain_value;
-}
-
-int set_earpiece_digital_gain_value(int gain)
-{
-	moro_earpiece_digital_value = gain;
-
-	set_earpiece_gain(g_max98512);
-
-	return moro_earpiece_digital_value;
-}
-
-int get_both_analog_gain(void)
-{
-	return moro_both_gain_value;
-}
-
-int get_both_digital_gain(void)
-{
-	return moro_both_digital_value;
-}
-
-void set_both_gain(struct max98512_priv *max98512)
-{
-	if (moro_both_digital_value) {
-// MAX98512_R0035_AMP_VOL_CTRL
-		max98512_wrapper_update(max98512, MAX98512B,
-						MAX98512_R0035_AMP_VOL_CTRL,
-						MAX98512_AMP_VOL_MASK,
-						moro_both_digital_value);
-	}
-
-	if (moro_both_gain_value) {
-// MAX98512_R003A_SPK_GAIN
-		max98512_wrapper_update(max98512, MAX98512B,
-						MAX98512_R003A_SPK_GAIN,
-						MAX98512_SPK_PCM_GAIN_MASK,
-						moro_both_gain_value);
-
-		
-	}
-}
-
-int set_both_analog_gain_value(int gain)
-{
-	moro_both_gain_value = gain;
-
-	set_both_gain(g_max98512);
-
-	return moro_both_gain_value;
-}
-
-int set_both_digital_gain_value(int gain)
-{
-	moro_both_digital_value = gain;
-
-	set_both_gain(g_max98512);
-
-	return moro_both_digital_value;
-}
-#endif
-
 static int __max98512_spk_enable(struct max98512_priv *max98512)
 {
 	struct max98512_pdata *pdata = max98512->pdata;
 	struct max98512_volume_step_info *vstep = &max98512->vstep;
 	unsigned int gain_l, gain_r;
-	unsigned int digital_gain_l, digital_gain_r;
 	unsigned int enable_l, enable_r;
-	unsigned int pcm_ch_enable_l, pcm_ch_enable_r;
-	unsigned int pcm_to_monomix_a_l, pcm_to_monomix_a_r;
-	unsigned int pcm_to_monomix_b_l, pcm_to_monomix_b_r;
-	unsigned int dem_l, dem_r;
 	unsigned int vimon = 0;
-	unsigned int interleave_mode;
-	int battery_temp;
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+	unsigned int smode_table[MAX98512_OSM_MAX] = {
+		2, /* MAX98512_OSM_MONO_L */
+		1, /* MAX98512_OSM_MONO_R */
+		2, /* MAX98512_OSM_RCV_L */
+		1, /* MAX98512_OSM_RCV_R */
+		0, /* MAX98512_OSM_STEREO */
+		3, /* MAX98512_OSM_STEREO_MODE2 */
+	};
+#endif /* CONFIG_SND_SOC_MAXIM_DSM */
 
-	gain_l = max98512->spk_gain_left;
-	gain_r = max98512->spk_gain_right;
-	digital_gain_l = digital_gain_r = max98512->digital_gain;
-	interleave_mode = max98512->interleave_mode;
+	max98512_wrapper_read(max98512, MAX98512L,
+			      MAX98512_R003E_BOOST_CTRL0,
+			      &pdata->boostv);
 
+	gain_l = gain_r = max98512->spk_gain;
 	enable_l = enable_r = 0x00;
-	dem_l = dem_r = 0x80;
-	pcm_ch_enable_l = 0x01;
-	pcm_ch_enable_r = 0x02;
-	pcm_to_monomix_a_l = 0x00;
-	pcm_to_monomix_a_r = 0x41;
-	pcm_to_monomix_b_l = 0x00;
-	pcm_to_monomix_b_r = 0x01;
 
 	if (vstep->adc_status && !pdata->nodsm)
 		vimon = MAX98512_MEAS_VI_EN;
@@ -1462,38 +784,27 @@ static int __max98512_spk_enable(struct max98512_priv *max98512)
 		enable_l = enable_r = 1;
 		break;
 	case MAX98512_OSM_RCV_L:
-	case MAX98512_OSM_RCV_R:
-		digital_gain_l = digital_gain_r = max98512->digital_gain_rcv;
-		dem_l = dem_r = 0x40;
+		gain_l = 0x03;
 		vimon = 0; /* turn off VIMON */
-		pcm_ch_enable_l = pcm_ch_enable_r = 0x03;
-		pcm_to_monomix_a_l = pcm_to_monomix_a_r = 0x80;
-		pcm_to_monomix_b_l = pcm_to_monomix_b_r = 0x01;
-		if (pdata->osm == MAX98512_OSM_RCV_L)
-			enable_l = 1;
-		else
-			enable_r = 1;
-		break;
+		pdata->boostv &= MAX98512_BOOST_CTRL0_PVDD_MASK; /* 6.5V */
 	case MAX98512_OSM_MONO_L:
-		digital_gain_l = max98512->digital_gain_rcv;
-	case MAX98512_OSM_MONO_R:
-		pcm_ch_enable_l = pcm_ch_enable_r = 0x03;
-		pcm_to_monomix_a_l = 0x00;
-		if (pdata->osm == MAX98512_OSM_MONO_L)
-			enable_l = 1;
-		else
-			enable_r = 1;
-		break;
-	case MAX98512_OSM_STEREO_L:
 		enable_l = 1;
 		break;
-	case MAX98512_OSM_STEREO_R:
+	case MAX98512_OSM_RCV_R:
+		gain_r = 0x03;
+		vimon = 0; /* turn off VIMON */
+		pdata->boostv &= MAX98512_BOOST_CTRL0_PVDD_MASK; /* 6.5V */
+	case MAX98512_OSM_MONO_R:
 		enable_r = 1;
 		break;
 	default:
 		msg_maxim("Invalid one_stop_mode");
 		return -EINVAL;
 	}
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+	maxdsm_set_stereo_mode_configuration(smode_table[pdata->osm]);
+#endif /* CONFIG_SND_SOC_MAXIM_DSM */
 
 	msg_maxim("Gain[%d][%d] Enable[%d][%d] OSM[%d]",
 		  gain_l, gain_r, enable_l, enable_r, pdata->osm);
@@ -1505,7 +816,7 @@ static int __max98512_spk_enable(struct max98512_priv *max98512)
 	max98512_wrapper_update(max98512, MAX98512L,
 				MAX98512_R0035_AMP_VOL_CTRL,
 				MAX98512_AMP_VOL_MASK,
-				digital_gain_l);
+				max98512->digital_gain);
 	if (max98512->mono_stereo) {
 		max98512_wrapper_update(max98512, MAX98512R,
 					MAX98512_R003A_SPK_GAIN,
@@ -1514,85 +825,29 @@ static int __max98512_spk_enable(struct max98512_priv *max98512)
 		max98512_wrapper_update(max98512, MAX98512R,
 					MAX98512_R0035_AMP_VOL_CTRL,
 					MAX98512_AMP_VOL_MASK,
-					digital_gain_r);
+					max98512->digital_gain);
 	}
+
+	max98512_wrapper_write(max98512, MAX98512B,
+			       MAX98512_R003E_BOOST_CTRL0,
+			       pdata->boostv);
 
 	max98512_wrapper_update(max98512, MAX98512B,
 				MAX98512_R003C_MEAS_EN,
 				MAX98512_MEAS_VI_EN,
 				vimon);
+	vstep->adc_status = !!vimon;
 
-	battery_temp = maxdsm_cal_get_temp_from_power_supply();
-
-	if (battery_temp > 55) {
-		msg_maxim("battery_temp[%d] over 55", battery_temp);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0059_BROWNOUT_LVL2_THRESH,
-				       0x30);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R005A_BROWNOUT_LVL3_THRESH,
-				       0x10);
-	} else {
-		msg_maxim("battery_temp[%d] under 55", battery_temp);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0059_BROWNOUT_LVL2_THRESH,
-				       0x40);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R005A_BROWNOUT_LVL3_THRESH,
-				       0x20);
-	}
-
-	/* reconfig default mode*/
-	if (pdata->boost_mode == 0x4) {
-		if (max98512->revID == ID_MAX98512_REV_B)
-			pdata->boost_mode = 0x0; /* Automatic Bypass */
-		else
-			pdata->boost_mode = 0x2; /* Bypass Off */
-	}
-
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0087_BOOST_BYPASS_2,
-			       pdata->boost_mode);
-	msg_maxim("boost mode[%d]", pdata->boost_mode);
-
-	max98512_wrapper_write(max98512, MAX98512L,
-				MAX98512_R0018_PCM_RX_EN_A,
-				pcm_ch_enable_l);
-	max98512_wrapper_write(max98512, MAX98512L,
-				MAX98512_R0025_PCM_TO_SPK_MONOMIX_A,
-				pcm_to_monomix_a_l);
-	max98512_wrapper_write(max98512, MAX98512L,
-				MAX98512_R0026_PCM_TO_SPK_MONOMIX_B,
-				pcm_to_monomix_b_l);
 	max98512_wrapper_update(max98512, MAX98512L,
 				MAX98512_R0038_AMP_EN,
 				MAX98512_AMP_EN_MASK, enable_l);
 	max98512_wrapper_update(max98512, MAX98512L,
-				MAX98512_R0038_AMP_EN,
-				MAX98512_DEM_EN_MASK|MAX98512_DEM_OFF_TRIM_MASK,
-				dem_l);
-	max98512_wrapper_update(max98512, MAX98512L,
 				MAX98512_R0400_GLOBAL_SHDN,
 				MAX98512_GLOBAL_EN_MASK, enable_l);
-
 	if (max98512->mono_stereo) {
-		max98512_wrapper_write(max98512, MAX98512R,
-					MAX98512_R0018_PCM_RX_EN_A,
-					pcm_ch_enable_r);
-		max98512_wrapper_write(max98512, MAX98512R,
-					MAX98512_R0025_PCM_TO_SPK_MONOMIX_A,
-					pcm_to_monomix_a_r);
-		max98512_wrapper_write(max98512, MAX98512R,
-					MAX98512_R0026_PCM_TO_SPK_MONOMIX_B,
-					pcm_to_monomix_b_r);
 		max98512_wrapper_update(max98512, MAX98512R,
 					MAX98512_R0038_AMP_EN,
 					MAX98512_AMP_EN_MASK, enable_r);
-		max98512_wrapper_update(max98512, MAX98512R,
-					MAX98512_R0038_AMP_EN,
-					MAX98512_DEM_EN_MASK |
-					MAX98512_DEM_OFF_TRIM_MASK,
-					dem_r);
 		max98512_wrapper_update(max98512, MAX98512R,
 					MAX98512_R0400_GLOBAL_SHDN,
 					MAX98512_GLOBAL_EN_MASK, enable_r);
@@ -1619,33 +874,11 @@ static void max98512_spk_enable(struct max98512_priv *max98512, int enable)
 					MAX98512_R003C_MEAS_EN,
 					MAX98512_MEAS_VI_EN,
 					0);
-		usleep_range(15000, 16000);
 	}
 
 #ifdef CONFIG_SND_SOC_MAXIM_DSM
-	maxdsm_set_spk_state(enable, max98512->pdata->osm);
-
-	if (enable)
-		maxdsm_set_stereo_mode_configuration(max98512->pdata->osm);
-
+	maxdsm_set_spk_state(enable);
 #endif /* CONFIG_SND_SOC_MAXIM_DSM */
-}
-
-static void max98512_spk_enable_l(struct max98512_priv *max98512, int enable)
-{
-	msg_maxim("max98512_spk_enable_l enable[%d], max98512->spk_gain_left[%d]", enable, max98512->spk_gain_left);
-
-	if (enable) {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R003A_SPK_GAIN,
-					MAX98512_SPK_PCM_GAIN_MASK,
-					max98512->spk_gain_left);
-	} else {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R003A_SPK_GAIN,
-					MAX98512_SPK_PCM_GAIN_MASK,
-					0);
-	}
 }
 
 static int max98512_dai_mute_stream(struct snd_soc_dai *dai,
@@ -1654,7 +887,7 @@ static int max98512_dai_mute_stream(struct snd_soc_dai *dai,
 	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(dai->codec);
 #ifdef CONFIG_SND_SOC_MAXIM_DSM
 	struct max98512_pdata *pdata = max98512->pdata;
-	int rdc = 0, rdc_r = 0, temp = 0;
+	int rdc = 0, temp = 0;
 	int ret = 0;
 
 #ifdef USE_DSM_LOG
@@ -1665,7 +898,7 @@ static int max98512_dai_mute_stream(struct snd_soc_dai *dai,
 #endif
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		msg_maxim("max98512_spk_enable mute = %d", mute);
+		msg_maxim("max98512_spk_enable mute = %d\n", mute);
 		max98512_spk_enable(max98512, mute != 0 ? 0 : 1);
 	}
 
@@ -1673,7 +906,7 @@ static int max98512_dai_mute_stream(struct snd_soc_dai *dai,
 	if ((!pdata->nodsm) && (stream == SNDRV_PCM_STREAM_CAPTURE)
 		&& (mute == 0)) {
 
-		msg_maxim("set maxdsm calibration");
+		msg_maxim("set maxdsm calibration\n");
 
 		ret = maxdsm_cal_get_rdc(&rdc);
 		if (ret || rdc <= 0) {
@@ -1687,17 +920,10 @@ static int max98512_dai_mute_stream(struct snd_soc_dai *dai,
 			goto exit;
 		}
 
-		/* left channel */
-		ret = maxdsm_set_rdc_temp_ch(rdc, (int)(temp / 10), 0);
-
-		if (max98512->mono_stereo) {
-			ret = maxdsm_cal_get_rdc_r(&rdc_r);
-			if (ret < 0 || rdc_r <= 0) {
-				pr_err("%s: Failed to set calibration ret = (%d) rdc_r(0x%08x)\n",
-					__func__, ret, rdc_r);
-				goto exit;
-			}
-			maxdsm_set_rdc_temp_ch(rdc_r, (int)(temp / 10), 1);
+		ret = maxdsm_set_rdc_temp(rdc, (int)(temp / 10));
+		if (ret < 0) {
+			pr_err("%s: Failed to set calibration ret = (%d)\n",
+			       __func__, ret);
 		}
 	}
 exit:
@@ -1828,44 +1054,6 @@ static int max98512_put_pdm_l_one(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int max98512_get_amp_l_status(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	int val = 0;
-
-	max98512_wrapper_read(max98512, MAX98512L,
-			      MAX98512_R003A_SPK_GAIN, &val);
-	ucontrol->value.integer.value[0] = MAX98512_SPK_PCM_GAIN_MASK & val;
-	return 0;
-}
-
-static int max98512_set_amp_l_status(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-
-	max98512_spk_enable_l(max98512, ucontrol->value.integer.value[0]);
-	return 0;
-}
-
-static int max98512_get_thermal_min_gain_status(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_value *ucontrol)
-{
-	ucontrol->value.integer.value[0] = maxdsm_get_thermal_min_gain();
-	return 0;
-}
-
-static int max98512_set_thermal_min_gain_status(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_value *ucontrol)
-{
-	maxdsm_set_thermal_min_gain(ucontrol->value.integer.value[0]);
-
-	return 0;
-}
-
 static const char *const pdm_1_text[] = {
 	"Current", "Voltage",
 };
@@ -1883,22 +1071,10 @@ static const char * const max98512_monomix_output_text[] = {
 };
 
 static const char * const max98512_one_stop_mode_text[] = {
-	"Stereo", "Stereo II",
 	"Mono Left", "Mono Right",
 	"Receiver Left", "Receiver Right",
-	"Stereo Left", "Stereo Right"
-};
-
-static const char * const max98512_boost_mode_text[] = {
-	"Automatic Bypass", "Bypass On", "Bypass Off", "Automatic Manual", "Default"
-};
-
-static const char * const max98512_spk_analog_gain_text[] = {
-	"mute", "3dB", "6dB", "9dB", "12dB", "15dB", "18dB"
-};
-
-static const char * const max98512_spk_analog_right_gain_text[] = {
-	"mute", "3dB", "6dB", "9dB", "12dB", "15dB", "18dB"
+	"Stereo",
+	"Stereo II",
 };
 
 static bool max98512_readable_register(struct device *dev, unsigned int reg)
@@ -1907,17 +1083,16 @@ static bool max98512_readable_register(struct device *dev, unsigned int reg)
 	case MAX98512_R0001_INT_RAW1 ... MAX98512_R0028_ICC_RX_EN_B:
 	case MAX98512_R002B_ICC_TX_EN_A ... MAX98512_R002C_ICC_TX_EN_B:
 	case MAX98512_R002D_ICC_HIZ_MANUAL_MODE
-		... MAX98512_R004E_SQUELCH:
+		... MAX98512_R004C_MEAS_ADC_CH2_READ:
 	case MAX98512_R004F_BROWNOUT_STATUS
 		... MAX98512_R0053_BROWNOUT_LVL_HOLD:
 	case MAX98512_R0058_BROWNOUT_LVL1_THRESH
 		... MAX98512_R005F_BROWNOUT_AMP1_CLIP_MODE:
 	case MAX98512_R0070_BROWNOUT_LVL1_CUR_LIMIT
-		... MAX98512_R0088_BOOST_BYPASS_3:
+		... MAX98512_R0085_ENV_TRACK_BOOST_VOUT_READ:
 	case MAX98512_R0400_GLOBAL_SHDN:
 	case MAX98512_R0401_SOFT_RESET:
 	case MAX98512_R0402_REV_ID:
-	case MAX98512B_R0600_REV_ID:
 		return true;
 	default:
 		return false;
@@ -1928,37 +1103,6 @@ static bool max98512_volatile_reg(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
 	case MAX98512_R0001_INT_RAW1 ... MAX98512_R0009_INT_FLAG3:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static bool max98512b_readable_register(struct device *dev, unsigned int reg)
-{
-	switch (reg) {
-	case MAX98512B_R0001_INT_RAW1 ... MAX98512B_R0081_ADVANCED_SETUP:
-	case MAX98512B_R0500_GLOBAL_SHDN:
-	case MAX98512B_R0501_SOFT_RESET:
-	case MAX98512B_R0600_REV_ID:
-	case MAX98512B_R0FAA_ENABLE_HVDD:
-		return true;
-	default:
-		return false;
-	}
-};
-
-static bool max98512b_volatile_reg(struct device *dev, unsigned int reg)
-{
-	switch (reg) {
-	case MAX98512B_R0001_INT_RAW1 ... MAX98512B_R0009_INT_FLAG3:
-	case MAX98512B_R004B_MEAS_ADC_CH0_READ:
-	case MAX98512B_R004C_MEAS_ADC_CH1_READ:
-	case MAX98512B_R004D_MEAS_ADC_CH2_READ:
-	case MAX98512B_R0051_BROWNOUT_STATUS:
-	case MAX98512B_R0078_ENV_TRACK_BOOST_VOUT_READ:
-	case MAX98512B_R0501_SOFT_RESET:
-	case MAX98512B_R0600_REV_ID:
 		return true;
 	default:
 		return false;
@@ -1976,10 +1120,6 @@ static SOC_ENUM_SINGLE_DECL(max98512_boost_voltage,
 			    MAX98512_R003E_BOOST_CTRL0, 0,
 			    max98512_boost_voltage_text);
 
-static SOC_ENUM_SINGLE_DECL(max98512b_boost_voltage,
-			    MAX98512B_R003F_BOOST_CTRL0, 0,
-			    max98512_boost_voltage_text);
-
 static const char * const max98512_current_limit_text[] = {
 	"1.00A", "1.10A", "1.20A", "1.30A", "1.40A", "1.50A", "1.60A", "1.70A",
 	"1.80A", "1.90A", "2.00A", "2.10A", "2.20A", "2.30A", "2.40A", "2.50A",
@@ -1989,10 +1129,6 @@ static const char * const max98512_current_limit_text[] = {
 
 static SOC_ENUM_SINGLE_DECL(max98512_current_limit,
 			    MAX98512_R0040_BOOST_CTRL1, 1,
-			    max98512_current_limit_text);
-
-static SOC_ENUM_SINGLE_DECL(max98512b_current_limit,
-			    MAX98512B_R0041_BOOST_CTRL1, 1,
 			    max98512_current_limit_text);
 
 static int max98512_pdm_gain_get(struct snd_kcontrol *kcontrol,
@@ -2026,106 +1162,6 @@ static int max98512_pdm_gain_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int max98512_rcv_digital_gain_get(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-
-	ucontrol->value.integer.value[0] = max98512->digital_gain_rcv;
-	msg_maxim("digital_gain_rcv setting returned %d",
-		  (int) ucontrol->value.integer.value[0]);
-
-	return 0;
-}
-
-static int max98512_rcv_digital_gain_put(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	unsigned int sel = ucontrol->value.integer.value[0];
-
-	if (sel < (1 << MAX98512_AMP_VOL_WIDTH) - 1) {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R0035_AMP_VOL_CTRL,
-					MAX98512_AMP_VOL_MASK,
-					sel);
-
-		max98512->digital_gain_rcv = sel;
-	}
-
-	return 0;
-}
-
-static int max98512_analog_gain_l_get(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-
-	ucontrol->value.integer.value[0] = max98512->spk_gain_left;
-	msg_maxim("spk_gain_left for left analog  setting returned %d",
-		  (int) ucontrol->value.integer.value[0]);
-
-	return 0;
-}
-
-static int max98512_analog_gain_l_put(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	int sel = (int)ucontrol->value.integer.value[0];
-
-	msg_maxim("set spk_gain_left [%d] for left channel", sel);
-
-	if (sel < (1 << MAX98512_AMP_VOL_WIDTH) - 1) {
-		max98512_wrapper_update(max98512, MAX98512L,
-					MAX98512_R003A_SPK_GAIN,
-					MAX98512_SPK_PCM_GAIN_MASK,
-					sel);
-
-		max98512->spk_gain_left = sel;
-	}
-
-	return 0;
-}
-
-static int max98512_analog_gain_r_get(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-
-	ucontrol->value.integer.value[0] = max98512->spk_gain_right;
-	msg_maxim("spk_gain_right for right analog  setting returned %d",
-		  (int) ucontrol->value.integer.value[0]);
-
-	return 0;
-}
-
-static int max98512_analog_gain_r_put(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	int sel = (int)ucontrol->value.integer.value[0];
-
-	msg_maxim("set spk_gain_right [%d] for right channel", sel);
-
-	if (sel < (1 << MAX98512_AMP_VOL_WIDTH) - 1) {
-		max98512_wrapper_update(max98512, MAX98512R,
-					MAX98512_R003A_SPK_GAIN,
-					MAX98512_SPK_PCM_GAIN_MASK,
-					sel);
-
-		max98512->spk_gain_right = sel;
-	}
-
-	return 0;
-}
-
 static int max98512_one_stop_mode_get(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
@@ -2145,58 +1181,14 @@ static int max98512_one_stop_mode_put(struct snd_kcontrol *kcontrol,
 	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
 	struct max98512_pdata *pdata = max98512->pdata;
 	int osm = (int)ucontrol->value.integer.value[0];
-	int state = 0;
 
 	osm = osm < 0 ? 0 : osm;
 	if (osm < MAX98512_OSM_MAX && pdata->osm != osm) {
 		pdata->osm = osm;
-		state = maxdsm_get_spk_state();
-		if (state)
-			max98512_spk_enable(max98512, state);
+		__max98512_spk_enable(max98512);
 	}
-
-	msg_maxim("mixer set OSM[%d]", pdata->osm);
 
 	return osm >= MAX98512_OSM_MAX ? -EINVAL : 0;
-}
-
-static int max98512_boost_mode_get(struct snd_kcontrol *kcontrol,
-				      struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	struct max98512_pdata *pdata = max98512->pdata;
-
-	ucontrol->value.integer.value[0] = pdata->boost_mode;
-
-	return 0;
-}
-
-static int max98512_boost_mode_put(struct snd_kcontrol *kcontrol,
-				      struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
-	struct max98512_pdata *pdata = max98512->pdata;
-	int boost_mode = (int)ucontrol->value.integer.value[0];
-
-	boost_mode = boost_mode < 0 ? 0 : boost_mode;
-
-	/* reconfig default mode*/
-	if (boost_mode == 0x4) {
-		if (max98512->revID == ID_MAX98512_REV_B)
-			boost_mode = 0x0; /* Automatic Bypass */
-		else
-			boost_mode = 0x2; /* Bypass Off */
-	}
-
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0087_BOOST_BYPASS_2,
-			       boost_mode);
-	msg_maxim("mixer set boost[%d]", boost_mode);
-	pdata->boost_mode = boost_mode;
-
-	return 0;
 }
 
 static const struct soc_enum max98512_enum[] = {
@@ -2204,12 +1196,6 @@ static const struct soc_enum max98512_enum[] = {
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(pdm_1_text), pdm_1_text),
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(max98512_one_stop_mode_text),
 			    max98512_one_stop_mode_text),
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(max98512_boost_mode_text),
-			    max98512_boost_mode_text),
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(max98512_spk_analog_gain_text),
-			    max98512_spk_analog_gain_text),
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(max98512_spk_analog_right_gain_text),
-				max98512_spk_analog_right_gain_text),
 };
 
 static const struct snd_kcontrol_new max98512_snd_controls[] = {
@@ -2234,13 +1220,6 @@ static const struct snd_kcontrol_new max98512_snd_controls[] = {
 			   max98512_pdm_gain_get,
 			   max98512_pdm_gain_put,
 			   max98512_pdm_tlv),
-	SOC_SINGLE_EXT_TLV("Rcv Digital Gain",
-			   MAX98512_R0035_AMP_VOL_CTRL,
-			   0,
-			   (1 << MAX98512_AMP_VOL_WIDTH) - 1, 0,
-			   max98512_rcv_digital_gain_get,
-			   max98512_rcv_digital_gain_put,
-			   max98512_digital_tlv),
 	SOC_ENUM_EXT("PDM_L_CH_0", max98512_enum[0],
 		     max98512_get_pdm_l_zero, max98512_put_pdm_l_zero),
 	SOC_ENUM_EXT("PDM_L_CH_1", max98512_enum[1],
@@ -2248,72 +1227,6 @@ static const struct snd_kcontrol_new max98512_snd_controls[] = {
 
 	SOC_ENUM_EXT("One Stop Mode", max98512_enum[2],
 		     max98512_one_stop_mode_get, max98512_one_stop_mode_put),
-	SOC_ENUM_EXT("Boost Bypass Mode", max98512_enum[3],
-		     max98512_boost_mode_get, max98512_boost_mode_put),
-	SOC_ENUM_EXT("SPK Analog Left Gain", max98512_enum[4],
-		     max98512_analog_gain_l_get, max98512_analog_gain_l_put),
-	SOC_ENUM_EXT("SPK Analog Right Gain", max98512_enum[5],
-		     max98512_analog_gain_r_get, max98512_analog_gain_r_put),
-	SOC_SINGLE_EXT("Spk AmpL Power", SND_SOC_NOPM, 0, 1, 0,
-		       max98512_get_amp_l_status, max98512_set_amp_l_status),
-	SOC_SINGLE_EXT("Safety mode", SND_SOC_NOPM, 0, 1, 0,
-		       max98512_get_thermal_min_gain_status, max98512_set_thermal_min_gain_status),
-#ifdef USE_DSM_LOG
-	SOC_SINGLE_EXT("DSM LOG", SND_SOC_NOPM, 0, 3, 0,
-		       max98512_get_dump_status, max98512_set_dump_status),
-#endif /* USE_DSM_LOG */
-#ifdef USE_DSM_UPDATE_CAL
-	SOC_SINGLE_EXT("DSM SetParam", SND_SOC_NOPM, 0, 1, 0,
-		       max98512_get_dsm_param, max98512_set_dsm_param),
-#endif /* USE_DSM_UPDATE_CAL */
-};
-
-static const struct snd_kcontrol_new max98512b_snd_controls[] = {
-	SOC_SINGLE_TLV("Speaker Volume", MAX98512B_R003B_SPK_GAIN,
-		       0, 6, 0,
-		       max98512_spk_tlv),
-	SOC_SINGLE_TLV("Digital Volume", MAX98512B_R0036_AMP_VOL_CTRL,
-		       0, (1 << MAX98512_AMP_VOL_WIDTH) - 1, 0,
-		       max98512_digital_tlv),
-	SOC_SINGLE("Amp DSP Switch", MAX98512B_R0052_BROWNOUT_EN,
-		   MAX98512_BROWNOUT_DSP_SHIFT, 1, 0),
-	SOC_SINGLE("Ramp Switch", MAX98512B_R0037_AMP_DSP_CFG,
-		   MAX98512_AMP_DSP_CFG_RMP_SHIFT, 1, 0),
-	SOC_SINGLE("Volume Location Switch", MAX98512B_R0036_AMP_VOL_CTRL,
-		   MAX98512_AMP_VOL_SEL_SHIFT, 1, 0),
-	SOC_ENUM("Boost Output Voltage", max98512b_boost_voltage),
-	SOC_ENUM("Current Limit", max98512b_current_limit),
-	SOC_SINGLE_EXT_TLV("Pdm Gain",
-			   MAX98512B_R003B_SPK_GAIN,
-			   MAX98512_PDM_GAIN_SHIFT,
-			   (1 << MAX98512_PDM_GAIN_WIDTH) - 1, 0,
-			   max98512_pdm_gain_get,
-			   max98512_pdm_gain_put,
-			   max98512_pdm_tlv),
-	SOC_SINGLE_EXT_TLV("Rcv Digital Gain",
-			   MAX98512B_R0036_AMP_VOL_CTRL,
-			   0,
-			   (1 << MAX98512_AMP_VOL_WIDTH) - 1, 0,
-			   max98512_rcv_digital_gain_get,
-			   max98512_rcv_digital_gain_put,
-			   max98512_digital_tlv),
-	SOC_ENUM_EXT("PDM_L_CH_0", max98512_enum[0],
-		     max98512_get_pdm_l_zero, max98512_put_pdm_l_zero),
-	SOC_ENUM_EXT("PDM_L_CH_1", max98512_enum[1],
-		     max98512_get_pdm_l_one, max98512_put_pdm_l_one),
-
-	SOC_ENUM_EXT("One Stop Mode", max98512_enum[2],
-		     max98512_one_stop_mode_get, max98512_one_stop_mode_put),
-	SOC_ENUM_EXT("Boost Bypass Mode", max98512_enum[3],
-		     max98512_boost_mode_get, max98512_boost_mode_put),
-	SOC_ENUM_EXT("SPK Analog Left Gain", max98512_enum[4],
-		     max98512_analog_gain_l_get, max98512_analog_gain_l_put),
-	SOC_ENUM_EXT("SPK Analog Right Gain", max98512_enum[5],
-		     max98512_analog_gain_r_get, max98512_analog_gain_r_put),
-	SOC_SINGLE_EXT("Spk AmpL Power", SND_SOC_NOPM, 0, 1, 0,
-		       max98512_get_amp_l_status, max98512_set_amp_l_status),
-	SOC_SINGLE_EXT("Safety mode", SND_SOC_NOPM, 0, 1, 0,
-		       max98512_get_thermal_min_gain_status, max98512_set_thermal_min_gain_status),
 #ifdef USE_DSM_LOG
 	SOC_SINGLE_EXT("DSM LOG", SND_SOC_NOPM, 0, 3, 0,
 		       max98512_get_dump_status, max98512_set_dump_status),
@@ -2350,36 +1263,50 @@ static int max98512_probe(struct snd_soc_codec *codec)
 	struct max98512_priv *max98512 = snd_soc_codec_get_drvdata(codec);
 	struct max98512_pdata *pdata = max98512->pdata;
 	struct max98512_volume_step_info *vstep = &max98512->vstep;
-	int ret = 0;
-	unsigned int vimon = pdata->nodsm ? 0 : MAX98512_MEAS_VI_EN;
+	int ret = 0, reg = 0x0;
+	unsigned int vimon = 0;
 
 	max98512->codec = codec;
 	codec->control_data = max98512->regmap_l;
 	codec->cache_bypass = 1;
 
-	if (max98512->revID == ID_MAX98512_REV)
-		ret = snd_soc_add_codec_controls(codec, max98512_snd_controls,
+	ret = snd_soc_add_codec_controls(codec, max98512_snd_controls,
 					 ARRAY_SIZE(max98512_snd_controls));
-	else
-		ret = snd_soc_add_codec_controls(codec, max98512b_snd_controls,
-					 ARRAY_SIZE(max98512b_snd_controls));
-
 	if (ret < 0) {
 		msg_maxim("Failed to add controls to max98512: %d\n", ret);
 		return ret;
 	}
 
+	ret = max98512_wrapper_read(max98512, MAX98512L,
+				    MAX98512_R0402_REV_ID, &reg);
+	msg_maxim("L device version 0x%02X", reg);
+
+	reg = 0x0;
+	if (max98512->mono_stereo) {
+		ret = max98512_wrapper_read(max98512, MAX98512R,
+					    MAX98512_R0402_REV_ID, &reg);
+		msg_maxim("R device version 0x%02X", reg);
+	}
+
+	/* max98512_handle_pdata(codec); */
+
 	max98512_wrapper_read(max98512, MAX98512L,
 			      MAX98512_R003E_BOOST_CTRL0, &pdata->boostv);
+
+	max98512_wrapper_read(max98512, MAX98512L,
+			      MAX98512_R003C_MEAS_EN, &vimon);
+	vstep->adc_status = !!vimon;
 
 	/* Software Reset */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0401_SOFT_RESET,
 			       MAX98512_SOFT_RESET);
-
+#if 0
+	/* Sync up with reference configuration */
 	max98512_wrapper_write(max98512, MAX98512B,
-		MAX98512_R003C_MEAS_EN, vimon);
-	vstep->adc_status = !!vimon;
+			       MAX98512_R0016_MEAS_ADC_THERM_HYSTERESIS,
+			       MAX98512_SOFT_RESET);
+#endif
 	/* IV default slot configuration */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
@@ -2419,7 +1346,7 @@ static int max98512_probe(struct snd_soc_codec *codec)
 	/* Enable DC blocker */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0036_AMP_DSP_CFG,
-			       0x01);
+			       0x03);
 	/* Enable IMON VMON DC blocker */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R003D_MEAS_DSP_CFG,
@@ -2431,180 +1358,80 @@ static int max98512_probe(struct snd_soc_codec *codec)
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0040_BOOST_CTRL1,
 			       0x3E);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R003F_BOOST_CTRL3,
-			       0x01);
 	/* Measurement ADC config */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0041_MEAS_ADC_CFG,
-			       0x07);
+			       0x04);
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0042_MEAS_ADC_BASE_MSB,
 			       0x00);
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0043_MEAS_ADC_BASE_LSB,
-			       0x0B);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0044_ADC_CH0_DIVIDE,
-			       0x02);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0045_ADC_CH1_DIVIDE,
-			       0x02);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0046_ADC_CH2_DIVIDE,
-			       0x02);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0047_ADC_CH0_FILT_CFG,
-			       0x0C);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0048_ADC_CH1_FILT_CFG,
-			       0x0C);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0049_ADC_CH2_FILT_CFG,
-			       0x0C);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R004E_SQUELCH,
-			       0x10);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0050_BROWNOUT_EN,
-			       0x07);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0053_BROWNOUT_LVL_HOLD,
-			       0xFF);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0058_BROWNOUT_LVL1_THRESH,
-			       0xA0);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0059_BROWNOUT_LVL2_THRESH,
-			       0x30);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R005A_BROWNOUT_LVL3_THRESH,
-			       0x10);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R005C_BROWNOUT_THRESH_HYSTERYSIS,
-			       0x0F);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R005D_BROWNOUT_AMP_LIMITER_ATK_REL,
-			       0x76);
-	max98512_wrapper_write(max98512, MAX98512L,
-			       MAX98512_R0070_BROWNOUT_LVL1_CUR_LIMIT,
-			       max98512->current_limit_left);
-	max98512_wrapper_write(max98512, MAX98512R,
-			       MAX98512_R0070_BROWNOUT_LVL1_CUR_LIMIT,
-			       max98512->current_limit_right);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0071_BROWNOUT_LVL1_AMP1_CTRL1,
-			       0x06);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0072_BROWNOUT_LVL1_AMP1_CTRL2,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0073_BROWNOUT_LVL1_AMP1_CTRL3,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512L,
-			       MAX98512_R0074_BROWNOUT_LVL2_CUR_LIMIT,
-			       max98512->current_limit_left);
-	max98512_wrapper_write(max98512, MAX98512R,
-			       MAX98512_R0074_BROWNOUT_LVL2_CUR_LIMIT,
-			       max98512->current_limit_right);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0075_BROWNOUT_LVL2_AMP1_CTRL1,
-			       0x09);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0076_BROWNOUT_LVL2_AMP1_CTRL2,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0077_BROWNOUT_LVL2_AMP1_CTRL3,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512L,
-			       MAX98512_R0078_BROWNOUT_LVL3_CUR_LIMIT,
-			       max98512->current_limit_left);
-	max98512_wrapper_write(max98512, MAX98512R,
-			       MAX98512_R0078_BROWNOUT_LVL3_CUR_LIMIT,
-			       max98512->current_limit_right);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0079_BROWNOUT_LVL3_AMP1_CTRL1,
-			       0x0C);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R007A_BROWNOUT_LVL3_AMP1_CTRL2,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R007B_BROWNOUT_LVL3_AMP1_CTRL3,
-			       0x00);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R007C_BROWNOUT_LVL4_CUR_LIMIT,
-			       0x00);
+			       0x24);
 	/* Brownout Level */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R007D_BROWNOUT_LVL4_AMP1_CTRL1,
-			       0x00);
+			       0x06);
 	/* Envelope Tracking configuration */
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0080_ENV_TRACK_VOUT_HEADROOM,
-			       0x0A);
+			       0x08);
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0084_ENV_TRACK_CTRL,
 			       0x01);
 	max98512_wrapper_write(max98512, MAX98512B,
 			       MAX98512_R0085_ENV_TRACK_BOOST_VOUT_READ,
 			       0x10);
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0086_BOOST_BYPASS_1,
-			       0x05);
-
-	/* set boost_mode value as Default */
-	if (max98512->revID == ID_MAX98512_REV_B)
-		pdata->boost_mode = 0x0; /* Automatic Bypass */
-	else
-		pdata->boost_mode = 0x2; /* Bypass Off */
-
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0087_BOOST_BYPASS_2,
-			       pdata->boost_mode);
-
-	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0088_BOOST_BYPASS_3,
-			       0x01);
 
 	/* voltage, current slot configuration */
-	max98512_adc_config(max98512);
-
 	max98512_wrapper_write(max98512, MAX98512B,
-			       MAX98512_R0011_CLK_MON,
-			       0x0);
+			       MAX98512_R001E_PCM_TX_CH_SRC_A,
+			       (max98512->i_l_slot <<
+			       MAX98512_PCM_TX_CH_SRC_A_I_SHIFT |
+			       max98512->v_l_slot) & 0xFF);
 
-	if (max98512->revID == ID_MAX98512_REV_B || max98512->revID_r == ID_MAX98512_REV_B) {
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R000A_INT_EN1,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R000B_INT_EN2,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0010_IRQ_CTRL,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0021_PCM_MASTER_MODE,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0022_PCM_CLK_SETUP,
-				       0x22);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R003B_SSM_CFG,
-				       0x05);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R005E_BROWNOUT_AMP_GAIN_ATK_REL,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0081_ENV_TRACK_BOOST_VOUT_DELAY,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0082_ENV_TRACK_REL_RATE,
-				       0x00);
-		max98512_wrapper_write(max98512, MAX98512B,
-				       MAX98512_R0083_ENV_TRACK_HOLD_RATE,
-				       0x00);
+	if (max98512->v_l_slot < 8) {
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
+					1 << max98512->v_l_slot, 0);
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001A_PCM_TX_EN_A,
+					1 << max98512->v_l_slot,
+					1 << max98512->v_l_slot);
+	} else {
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
+					1 << (max98512->v_l_slot - 8), 0);
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001B_PCM_TX_EN_B,
+					1 << (max98512->v_l_slot - 8),
+					1 << (max98512->v_l_slot - 8));
 	}
+
+	if (max98512->i_l_slot < 8) {
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001C_PCM_TX_HIZ_CTRL_A,
+					1 << max98512->i_l_slot, 0);
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001A_PCM_TX_EN_A,
+					1 << max98512->i_l_slot,
+					1 << max98512->i_l_slot);
+	} else {
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001D_PCM_TX_HIZ_CTRL_B,
+					1 << (max98512->i_l_slot - 8), 0);
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001B_PCM_TX_EN_B,
+					1 << (max98512->i_l_slot - 8),
+					1 << (max98512->i_l_slot - 8));
+	}
+
+	/* Set interleave mode */
+	if (max98512->interleave_mode)
+		max98512_wrapper_update(max98512, MAX98512B,
+					MAX98512_R001F_PCM_TX_CH_SRC_B,
+					MAX98512_PCM_TX_CH_INTERLEAVE_MASK,
+					MAX98512_PCM_TX_CH_INTERLEAVE_MASK);
 
 #if defined(USE_DSM_LOG) || defined(USE_DSM_UPDATE_CAL)
 	if (!g_class)
@@ -2636,28 +1463,21 @@ static int max98512_probe(struct snd_soc_codec *codec)
 
 static const struct snd_soc_codec_driver soc_codec_dev_max98512 = {
 	.probe = max98512_probe,
+#if 0
+	.controls = max98512_snd_controls,
+	.num_controls = ARRAY_SIZE(max98512_snd_controls),
+#endif
 };
 
 static const struct regmap_config max98512_regmap = {
 	.reg_bits = 16,
 	.val_bits = 8,
-	.max_register = MAX98512B_R0600_REV_ID,
+	.max_register = MAX98512_R0402_REV_ID,
 	.reg_defaults = max98512_reg,
 	.num_reg_defaults = ARRAY_SIZE(max98512_reg),
 	.readable_reg = max98512_readable_register,
 	.volatile_reg = max98512_volatile_reg,
 	.cache_type = REGCACHE_RBTREE,
-};
-
-static const struct regmap_config max98512b_regmap = {
-	.reg_bits         = 16,
-	.val_bits         = 8,
-	.max_register     = MAX98512B_R0FAA_ENABLE_HVDD,
-	.reg_defaults     = max98512b_reg,
-	.num_reg_defaults = ARRAY_SIZE(max98512b_reg),
-	.readable_reg	  = max98512b_readable_register,
-	.volatile_reg	  = max98512b_volatile_reg,
-	.cache_type       = REGCACHE_RBTREE,
 };
 
 static void max98512_slot_config(struct i2c_client *i2c,
@@ -2673,12 +1493,12 @@ static void max98512_slot_config(struct i2c_client *i2c,
 	if (!of_property_read_u32(i2c->dev.of_node, "imon-l-slot-no", &value))
 		max98512->i_l_slot = value & 0xF;
 	else
-		max98512->i_l_slot = 0;
+		max98512->i_l_slot = 1;
 
 	if (!of_property_read_u32(i2c->dev.of_node, "vmon-r-slot-no", &value))
 		max98512->v_r_slot = value & 0xF;
 	else
-		max98512->v_r_slot = 1;
+		max98512->v_r_slot = 0;
 
 	if (!of_property_read_u32(i2c->dev.of_node, "imon-r-slot-no", &value))
 		max98512->i_r_slot = value & 0xF;
@@ -2688,7 +1508,7 @@ static void max98512_slot_config(struct i2c_client *i2c,
 
 static struct i2c_board_info max98512_i2c_sub_board[] = {
 	{
-		I2C_BOARD_INFO("max98512_sub", 0x3a),
+		I2C_BOARD_INFO("max98512_sub", 0x39),
 	}
 };
 
@@ -2724,7 +1544,6 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 	struct max98512_pdata *pdata;
 	struct max98512_volume_step_info *vstep;
 	int ret = 0, value;
-	int rev_id, reg;
 
 	msg_maxim("Start. driver_data %ld", id->driver_data);
 
@@ -2775,54 +1594,11 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 		}
 
 		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,spk-gain-left",
-					 &max98512->spk_gain_left)) {
-			dev_warn(&i2c->dev, "set spk_gain_left by default.\n");
-			max98512->spk_gain = 0x05; /* +15db for PCM */
-		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,spk-gain-right",
-					 &max98512->spk_gain_right)) {
-			dev_warn(&i2c->dev, "set spk_gain_right by default.\n");
-			max98512->spk_gain = 0x05; /* +15db for PCM */
-		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,spk-gain-rcv",
-					 &max98512->spk_gain_rcv)) {
-			dev_warn(&i2c->dev, "set spk_gain-rcv by default.\n");
-			max98512->spk_gain_rcv = 0x01; /* +3db for RCV */
-		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
 					 "maxim,digital-gain",
 					 &max98512->digital_gain)) {
 			dev_warn(&i2c->dev, "set digital_gain by default.\n");
 			max98512->digital_gain = 0x40; /* 0db */
 		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,digital-gain-rcv",
-					 &max98512->digital_gain_rcv)) {
-			dev_warn(&i2c->dev, "set digital_gain-rcv by default.\n");
-			max98512->digital_gain_rcv = 0x34; /* -3db */
-		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,current-limit-left",
-					 &max98512->current_limit_left)) {
-			dev_warn(&i2c->dev, "set current_limit_left by default.\n");
-			max98512->current_limit_left = 0x16;
-		}
-
-		if (of_property_read_u32(i2c->dev.of_node,
-					 "maxim,current-limit-right",
-					 &max98512->current_limit_right)) {
-			dev_warn(&i2c->dev, "set current_limit_right by default.\n");
-			max98512->current_limit_right = 0x3E;
-		}
-
 
 		if (of_property_read_u32(i2c->dev.of_node,
 					 "maxim,sysclk", &max98512->sysclk)) {
@@ -2881,17 +1657,6 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 			class_name_log = DEFAULT_LOG_CLASS_NAME;
 		}
 #endif
-		if (of_property_read_u32_array(i2c->dev.of_node,
-			       "maxim,ppr_param_info",
-			       (u32 *)&pdata->ppr_info,
-			       sizeof(pdata->ppr_info) /
-			       sizeof(uint32_t))) {
-			dev_warn(&i2c->dev, "set ppr param by init default.\n");
-			pdata->ppr_info[PARAM_OFFSET_PPR_TARGET_TEMP] = 3400;
-			pdata->ppr_info[PARAM_OFFSET_PPR_TARGET_TEMP_R] = 3400;
-			pdata->ppr_info[PARAM_OFFSET_PPR_EXIT_TEMP] = 3250;
-			pdata->ppr_info[PARAM_OFFSET_PPR_EXIT_TEMP_R] = 3250;
-		}
 	} else {
 		/* If i2c->dev.of_node is not found */
 		max98512->sysclk = 12288000;
@@ -2908,7 +1673,7 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 	}
 
 	/* regmap init */
-	max98512->regmap_l = regmap_init_i2c(i2c,
+	max98512->regmap_l = devm_regmap_init_i2c(i2c,
 						  &max98512_regmap);
 	if (IS_ERR(max98512->regmap_l)) {
 		ret = PTR_ERR(max98512->regmap_l);
@@ -2943,87 +1708,6 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 		}
 	}
 
-	/* Check Revision ID */
-	rev_id = MAX98512_R0402_REV_ID;
-	ret = max98512_wrapper_read(max98512, MAX98512L,
-				    rev_id, &reg);
-	if (ret < 0) {
-		msg_maxim("Failed to read: 0x%02X\n", MAX98512_R0402_REV_ID);
-		return ret;
-	}
-	if (reg >= MAX98512_REV_ID_0) {
-		max98512->revID = ID_MAX98512_REV;
-	} else {
-		rev_id = MAX98512B_R0600_REV_ID;
-		ret = max98512_wrapper_read(max98512, MAX98512L,
-			rev_id, &reg);
-		if (ret < 0) {
-			msg_maxim("Failed to read: 0x%02X\n",
-				MAX98512B_R0600_REV_ID);
-			return ret;
-		}
-		if (reg >= MAX98512_REV_ID_0)
-			max98512->revID = ID_MAX98512_REV_B;
-	}
-	msg_maxim("MAX98512 revisionID L [%x] [%02x]\n",
-		rev_id, reg);
-
-	/* regmap re-initialization */
-	if (max98512->revID == ID_MAX98512_REV_B && max98512->regmap_l) {
-		regmap_exit(max98512->regmap_l);
-		max98512->regmap_l
-			= regmap_init_i2c(i2c, &max98512b_regmap);
-		if (IS_ERR(max98512->regmap_l)) {
-			ret = PTR_ERR(max98512->regmap_l);
-			dev_err(&i2c->dev, "Failed to allocate regmap_l: %d\n",
-				ret);
-			goto err_regmap;
-		} else {
-			regcache_cache_bypass(max98512->regmap_l, true);
-		}
-	}
-
-	if (max98512->mono_stereo) {
-		/* Check Revision ID */
-		rev_id = MAX98512_R0402_REV_ID;
-		ret = max98512_wrapper_read(max98512, MAX98512R,
-					    rev_id, &reg);
-		if (ret < 0) {
-			msg_maxim("Failed to read: 0x%02X\n", MAX98512_R0402_REV_ID);
-			return ret;
-		}
-		if (reg >= MAX98512_REV_ID_0) {
-			max98512->revID_r = ID_MAX98512_REV;
-		} else {
-			rev_id = MAX98512B_R0600_REV_ID;
-			ret = max98512_wrapper_read(max98512, MAX98512R,
-				rev_id, &reg);
-			if (ret < 0) {
-				msg_maxim("Failed to read: 0x%02X\n",
-					MAX98512B_R0600_REV_ID);
-				return ret;
-			}
-			if (reg >= MAX98512_REV_ID_0)
-				max98512->revID_r = ID_MAX98512_REV_B;
-		}
-		msg_maxim("MAX98512 revisionID_r R [%x] [%02x]\n",
-			rev_id, reg);
-		if (max98512->revID_r == ID_MAX98512_REV_B && max98512->regmap_r) {
-			regmap_exit(max98512->regmap_r);
-			max98512->regmap_r
-				= regmap_init_i2c(max98512->sub_i2c, &max98512b_regmap);
-		}
-		if (IS_ERR(max98512->regmap_r)) {
-			ret = PTR_ERR(max98512->regmap_r);
-			dev_err(&max98512->sub_i2c->dev,
-				"Failed to allocate regmap_r: %d\n",
-				ret);
-			goto err_regmap;
-		} else {
-			regcache_cache_bypass(max98512->regmap_r, true);
-		}
-	}
-
 	/* voltage/current slot configuration */
 	if (max98512->mono_stereo) {
 		if (max98512->regmap_r && max98512->regmap_l)
@@ -3037,7 +1721,6 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 	if (pdata->pinfo)
 		maxdsm_update_info(pdata->pinfo);
 	maxdsm_update_sub_reg(pdata->sub_reg);
-	maxdsm_update_ppr_info(pdata->ppr_info);
 #endif
 
 	/* codec registeration */
@@ -3050,13 +1733,7 @@ static int max98512_i2c_probe(struct i2c_client *i2c,
 		goto err_register_codec;
 	}
 
-	g_max98512 = max98512;
-
 	msg_maxim("End. driver_data %ld", id->driver_data);
-
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-	sec_audio_bootlog(6, &i2c->dev, "%s: done\n", __func__);
-#endif
 
 	return 0;
 
@@ -3074,9 +1751,6 @@ err_alloc_pdata:
 	devm_kfree(&i2c->dev, max98512);
 err_alloc_priv:
 	msg_maxim("Failed with %d. driver_data %ld", ret, id->driver_data);
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-	sec_audio_bootlog(3, &i2c->dev, "%s: Failed to register codec %d\n", __func__, ret);
-#endif
 
 	return ret;
 }
@@ -3094,6 +1768,8 @@ static int max98512_i2c_remove(struct i2c_client *client)
 		regmap_exit(max98512->regmap_l);
 	if (max98512->regmap_r)
 		regmap_exit(max98512->regmap_r);
+	if (pdata->sub_reg != 0)
+		i2c_unregister_device(max98512->sub_i2c);
 	devm_kfree(&client->dev, pdata);
 	devm_kfree(&client->dev, max98512);
 
@@ -3119,7 +1795,6 @@ static struct i2c_driver max98512_i2c_driver = {
 		.name = "max98512",
 		.of_match_table = of_match_ptr(max98512_of_match),
 		.pm = NULL,
-		.suppress_bind_attrs = true,
 	},
 	.probe  = max98512_i2c_probe,
 	.remove = max98512_i2c_remove,
@@ -3130,4 +1805,3 @@ module_i2c_driver(max98512_i2c_driver)
 MODULE_DESCRIPTION("ALSA SoC MAX98512 driver");
 MODULE_AUTHOR("Ryan Lee <ryans.lee@maximintegrated.com>");
 MODULE_LICENSE("GPL");
-

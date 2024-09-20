@@ -2018,6 +2018,8 @@ static int max98506_i2c_remove(struct i2c_client *client)
 		regmap_exit(max98506->regmap);
 	if (max98506->sub_regmap)
 		regmap_exit(max98506->sub_regmap);
+	if (pdata->sub_reg != 0)
+		i2c_unregister_device(max98506->sub_i2c);
 	devm_kfree(&client->dev, pdata);
 	devm_kfree(&client->dev, max98506);
 
@@ -2050,7 +2052,6 @@ static struct i2c_driver max98506_i2c_driver = {
 		.name = "max98506",
 		.owner = THIS_MODULE,
 		.of_match_table = max98506_dt_ids,
-		.suppress_bind_attrs = true,
 	},
 	.probe  = max98506_i2c_probe,
 	.remove = max98506_i2c_remove,

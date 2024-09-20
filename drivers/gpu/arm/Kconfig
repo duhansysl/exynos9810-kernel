@@ -35,6 +35,10 @@ choice
 	help
 	Select the gpu support version.
 
+config MALI_BIFROST_R16P0
+	depends on MALI_DDK_VERSION
+	bool "Bifrost r16p0 driver"
+
 config MALI_BIFROST_R19P0_Q
 	depends on MALI_DDK_VERSION
 	bool "Bifrost r19p0 driver for Android Q"
@@ -56,6 +60,9 @@ config MALI_BIFROST_OLD
 	bool "Bifrost old driver"
 endchoice
 
+if MALI_BIFROST_R16P0
+source "drivers/gpu/arm/b_r16p0/Kconfig"
+endif
 if MALI_BIFROST_R19P0_Q
 source "drivers/gpu/arm/b_r19p0/Kconfig"
 endif
@@ -71,4 +78,7 @@ if MALI_BIFROST_R38P1
 source "drivers/gpu/arm/bv_r38p1/Kconfig"
 endif
 
+if MALI_BIFROST_OLD
+source "drivers/gpu/arm/tHEx/Kconfig"
+endif
 endmenu

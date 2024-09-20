@@ -32,7 +32,7 @@
 #include <linux/of_gpio.h>
 #endif
 #include <linux/i2c/pcal6524.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 
 struct pcal6524_chip {
 	struct i2c_client *client;
@@ -513,7 +513,7 @@ static ssize_t show_pcal6524_gpio_state(struct device *dev,
 	int i, drv_str;
 	int quot = 0, rest = 0;
 	uint8_t read_input[3];
-	size_t size = 0;
+	char *bufp = buf;
 
 	for (i = 0; i < PCAL6524_PORT_CNT; i++) {
 		pcal6524_read_reg(chip, PCAL6524_INPUT + i, &read_input[i]);
@@ -529,26 +529,26 @@ static ssize_t show_pcal6524_gpio_state(struct device *dev,
 	}
 
 	for (i = 0; i <= PCAL6524_MAX_GPIO; i++) {
-		size += sprintf(&buf[size], "Expander[3%02d]", i);
+		bufp += sprintf(bufp, "Expander[3%02d]", i);
 		quot = i / 8;
 		rest = i % 8;
 
 		if ((chip_state.reg_config[quot] >> rest) & 0x1)
-			size += sprintf(&buf[size], " IN");
+			bufp += sprintf(bufp, " IN");
 		else {
 			if ((chip_state.reg_output[quot] >> rest) & 0x1)
-				size += sprintf(&buf[size], " OUT_HIGH");
+				bufp += sprintf(bufp, " OUT_HIGH");
 			else
-				size += sprintf(&buf[size], " OUT_LOW");
+				bufp += sprintf(bufp, " OUT_LOW");
 		}
 
 		if ((chip_state.reg_enpullupdown[quot] >> rest) & 0x1) {
 			if ((chip_state.reg_selpullupdown[quot] >> rest) & 0x1)
-				size += sprintf(&buf[size], " PULL_UP");
+				bufp += sprintf(bufp, " PULL_UP");
 			else
-				size += sprintf(&buf[size], " PULL_DOWN");
+				bufp += sprintf(bufp, " PULL_DOWN");
 		} else
-			size += sprintf(&buf[size], " PULL_NONE");
+			bufp += sprintf(bufp, " PULL_NONE");
 
 		if (quot == 2) {
 			if (rest > 3)
@@ -569,26 +569,26 @@ static ssize_t show_pcal6524_gpio_state(struct device *dev,
 
 		switch (drv_str) {
 		case GPIO_CFG_6_25MA:
-			size += sprintf(&buf[size], " DRV_6.25mA");
+			bufp += sprintf(bufp, " DRV_6.25mA");
 			break;
 		case GPIO_CFG_12_5MA:
-			size += sprintf(&buf[size], " DRV_12.5mA");
+			bufp += sprintf(bufp, " DRV_12.5mA");
 			break;
 		case GPIO_CFG_18_75MA:
-			size += sprintf(&buf[size], " DRV_18.75mA");
+			bufp += sprintf(bufp, " DRV_18.75mA");
 			break;
 		case GPIO_CFG_25MA:
-			size += sprintf(&buf[size], " DRV_25mA");
+			bufp += sprintf(bufp, " DRV_25mA");
 			break;
 		}
 
 		if ((read_input[quot] >> rest) & 0x1)
-			size += sprintf(&buf[size], " VAL_HIGH\n");
+			bufp += sprintf(bufp, " VAL_HIGH\n");
 		else
-			size += sprintf(&buf[size], " VAL_LOW\n");
+			bufp += sprintf(bufp, " VAL_LOW\n");
 	}
 
-	return size;
+	return strlen(buf);
 }
 
 static DEVICE_ATTR(expgpio, 0644,
@@ -956,7 +956,6 @@ static int pcal6524_gpio_remove(struct i2c_client *client)
 #ifdef CONFIG_OF
 static const struct of_device_id pcal6524_dt_ids[] = {
 	{ .compatible = "pcal6524,gpio-expander",},
-	{ /* sentinel */ },
 };
 #endif
 static const struct i2c_device_id pcal6524_gpio_id[] = {
@@ -982,7 +981,7 @@ static int __init pcal6524_gpio_init(void)
 	return i2c_add_driver(&pcal6524_gpio_driver);
 }
 
-subsys_initcall(pcal6524_gpio_init);
+subsys_initcall_sync(pcal6524_gpio_init);
 
 static void __exit pcal6524_gpio_exit(void)
 {

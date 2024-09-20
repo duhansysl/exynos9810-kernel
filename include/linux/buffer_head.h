@@ -4,6 +4,8 @@
  * Everything to do with buffer_heads.
  */
 
+/* @fs.sec -- c853aa20d912cceb3e932a91b6bc8aa3 -- */
+
 #ifndef _LINUX_BUFFER_HEAD_H
 #define _LINUX_BUFFER_HEAD_H
 
@@ -39,9 +41,6 @@ enum bh_state_bits {
 	BH_Sync_Flush,	/* Buffer should be submttted with REQ_SYNC_FLUSH */
 	BH_Defer_Completion, /* Defer AIO completion to workqueue */
 	BH_Bypass,	/* Do not encrypt this buffer */
-#ifdef CONFIG_JOURNAL_DATA_TAG
-	BH_Journal,     /* Buffer contains journal data */
-#endif
 
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
@@ -138,9 +137,6 @@ BUFFER_FNS(Sync_Flush, sync_flush)
 BUFFER_FNS(Defer_Completion, defer_completion)
 BUFFER_FNS(Bypass, bypass)
 TAS_BUFFER_FNS(Bypass, bypass)
-#ifdef CONFIG_JOURNAL_DATA_TAG
-BUFFER_FNS(Journal, journal)
-#endif
 
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
 

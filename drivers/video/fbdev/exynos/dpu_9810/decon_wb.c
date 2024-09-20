@@ -19,8 +19,9 @@ static irqreturn_t decon_wb_irq_handler(int irq, void *dev_data)
 	ext_irq = 0;
 
 	spin_lock(&decon->slock);
-	if (IS_DECON_OFF_STATE(decon))
+	if (decon->state == DECON_STATE_OFF) {
 		goto irq_end;
+	}
 
 	irq_sts_reg = decon_reg_get_interrupt_and_clear(decon->id, &ext_irq);
 

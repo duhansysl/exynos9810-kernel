@@ -876,7 +876,7 @@ static int max77865_hv_muic_write_reg(struct i2c_client *i2c, u8 reg, u8 value)
 int max77865_muic_hv_update_reg(struct i2c_client *i2c,
 	const u8 reg, const u8 val, const u8 mask, const bool debug_en)
 {
-	int before_val, new_val, after_val = 0;
+	u8 before_val, new_val, after_val =0;
 	int ret = 0;
 
 	before_val = muic_i2c_read_byte(i2c, reg);
@@ -1078,7 +1078,7 @@ static void max77865_hv_muic_qc_charger(struct hv_data *phv)
 {
 	struct i2c_client	*i2c = phv->i2c;
 	int ret1 = 0, ret2 = 0;
-	int bcstatus2 = 0, gpstatus = 0;
+	u8 bcstatus2 = 0, gpstatus = 0;
 
 	bcstatus2 = muic_i2c_read_byte(i2c, MAX77865_MUIC_REG_STATUS2_BC);
 	gpstatus = muic_i2c_read_byte(i2c, MAX77865_MUIC_REG_STATUS_GP);
@@ -2098,7 +2098,8 @@ static void max77865_hv_muic_detect_after_charger_init(struct work_struct *work)
 	struct afc_init_data_s *init_data =
 	    container_of(work, struct afc_init_data_s, muic_afc_init_work);
 	struct hv_data *phv = init_data->phv;
-	int bcstatus2 = 0, gpstatus = 0;
+	int ret;
+	u8 bcstatus2 = 0, gpstatus = 0;
 
 	pr_info("%s:%s\n", MUIC_DEV_NAME, __func__);
 
@@ -2108,8 +2109,8 @@ static void max77865_hv_muic_detect_after_charger_init(struct work_struct *work)
 	bcstatus2 = muic_i2c_read_byte(phv->i2c, MAX77865_MUIC_REG_STATUS2_BC);
 	gpstatus = muic_i2c_read_byte(phv->i2c, MAX77865_MUIC_REG_STATUS_GP);
 	if ((bcstatus2 < 0 ) || (gpstatus < 0)) {
-		pr_err("%s:%s fail to read muic reg\n", MUIC_HV_DEV_NAME,
-				__func__);
+		pr_err("%s:%s fail to read muic reg(%d)\n", MUIC_HV_DEV_NAME,
+				__func__, ret);
 		return;
 	}
 	pr_info("%s:%s BC STATUS2:0x%02x, GP STATUS:0x%02x\n",
@@ -2317,7 +2318,7 @@ out:
 
 static void max77865_hv_muic_init_check_dpdnvden(struct hv_data *phv)
 {
-	int bccontrol2 = 0;
+	u8 bccontrol2 = 0;
 	//int ret;
 
 	mutex_lock(phv->pmutex);

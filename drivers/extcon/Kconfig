@@ -58,11 +58,6 @@ config EXTCON_MADERA_INPUT_EVENT
 	  detection events through input key events on Cirrus Logic Madera
 	  class codecs.
 
-config EXTCON_PTT
-	tristate "PTT Headset support"
-	help
-	  Say Y here to enable support for PTT headset accessory detection.
-
 config EXTCON_MAX14577
 	tristate "Maxim MAX14577/77836 EXTCON Support"
 	depends on MFD_MAX14577

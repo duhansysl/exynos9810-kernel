@@ -79,10 +79,8 @@ static irqreturn_t cp_wdt_handler(int irq, void *arg)
 
 	mif_err("new_state = %s\n", cp_state_str(new_state));
 
-	list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-		if (iod && atomic_read(&iod->opened) > 0)
-			iod->modem_state_changed(iod, new_state);
-	}
+	list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+		iod->modem_state_changed(iod, new_state);
 
 	return IRQ_HANDLED;
 }
@@ -105,10 +103,8 @@ static irqreturn_t cp_fail_handler(int irq, void *arg)
 
 	mif_err("new_state = %s\n", cp_state_str(new_state));
 
-	list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-		if (iod && atomic_read(&iod->opened) > 0)
-			iod->modem_state_changed(iod, new_state);
-	}
+	list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+		iod->modem_state_changed(iod, new_state);
 
 	return IRQ_HANDLED;
 }
@@ -145,10 +141,8 @@ static void cp_active_handler(void *arg)
 		if (old_state == STATE_ONLINE)
 			modem_notify_event(MODEM_EVENT_EXIT);
 
-		list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-			if (iod && atomic_read(&iod->opened) > 0)
-				iod->modem_state_changed(iod, new_state);
-		}
+		list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+			iod->modem_state_changed(iod, new_state);
 	}
 }
 
@@ -203,44 +197,8 @@ static int get_ds_detect(struct device_node *np)
 }
 #else
 static int ds_detect = 1;
-module_param(ds_detect, int, S_IRUGO | S_IWUSR | S_IWGRP | S_IRGRP);
+module_param(ds_detect, int, S_IRUGO | S_IWUSR | S_IWGRP);
 MODULE_PARM_DESC(ds_detect, "Dual SIM detect");
-
-static ssize_t ds_detect_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", ds_detect);
-}
-
-static ssize_t ds_detect_store(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	int ret;
-	int value;
-
-	ret = sscanf(buf, "%d", &value);
-	if (ret != 1 || value > 2 || value < 0) {
-		mif_err("invalid value:%d with %d\n", value, ret);
-		return -EINVAL;
-	}
-
-	ds_detect = value;
-	mif_info("set ds_detect: %d\n", ds_detect);
-
-	return count;
-}
-static DEVICE_ATTR_RW(ds_detect);
-
-static struct attribute *sim_attrs[] = {
-	&dev_attr_ds_detect.attr,
-	NULL,
-};
-
-static const struct attribute_group sim_group = {	\
-	.attrs = sim_attrs,				\
-	.name = "sim",
-};
 
 static int get_ds_detect(struct device_node *np)
 {
@@ -316,6 +274,8 @@ static int ss310ap_on(struct modem_ctl *mc)
 
 	mif_err("+++\n");
 	mif_err("cp_active:%d cp_status:%d\n", cp_active, cp_status);
+
+	mc->receive_first_ipc = 0;
 
 #ifndef CONFIG_CP_SECURE_BOOT
 	exynos_cp_init();
@@ -419,10 +379,8 @@ static int ss310ap_shutdown(struct modem_ctl *mc)
 	if (remain == 0) {
 		mif_err("T-I-M-E-O-U-T\n");
 		mc->phone_state = STATE_OFFLINE;
-		list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-			if (iod && atomic_read(&iod->opened) > 0)
-				iod->modem_state_changed(iod, STATE_OFFLINE);
-		}
+		list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+			iod->modem_state_changed(iod, STATE_OFFLINE);
 	}
 
 exit:
@@ -442,6 +400,8 @@ static int ss310ap_reset(struct modem_ctl *mc)
 {
 	void __iomem *base = shm_get_ipc_region();
 	mif_err("+++\n");
+
+	mc->receive_first_ipc = 0;
 
 	/* mc->phone_state = STATE_OFFLINE; */
 	if (mc->phone_state == STATE_OFFLINE)
@@ -495,10 +455,8 @@ static int ss310ap_boot_on(struct modem_ctl *mc)
 	if (ld->boot_on)
 		ld->boot_on(ld, mc->bootd);
 
-	list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-		if (iod && atomic_read(&iod->opened) > 0)
-			iod->modem_state_changed(iod, STATE_BOOTING);
-	}
+	list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+		iod->modem_state_changed(iod, STATE_BOOTING);
 
 	while (mbox_extract_value(MCU_CP, mc->mbx_cp_status,
 				mc->sbi_cp_status_mask, mc->sbi_cp_status_pos) == 0) {
@@ -539,10 +497,8 @@ static int ss310ap_boot_off(struct modem_ctl *mc)
 
 	mif_enable_irq(&mc->irq_cp_wdt);
 
-	list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-		if (iod && atomic_read(&iod->opened) > 0)
-			iod->modem_state_changed(iod, STATE_ONLINE);
-	}
+	list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+		iod->modem_state_changed(iod, STATE_ONLINE);
 
 	mif_info("---\n");
 
@@ -827,10 +783,6 @@ int ss310ap_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	 */
 	mc->busmon_nfb.notifier_call = ss310ap_busmon_notifier;
 	busmon_notifier_chain_register(&mc->busmon_nfb);
-#endif
-#ifndef CONFIG_GPIO_DS_DETECT
-	if (sysfs_create_group(&pdev->dev.kobj, &sim_group))
-		mif_err("failed to create sysfs node related sim\n");
 #endif
 	mif_err("---\n");
 	return 0;

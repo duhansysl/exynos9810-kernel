@@ -24,6 +24,8 @@
 #include <linux/iio/types.h>
 #include "ssp.h"
 
+#define CAMERA_LUX_ENABLE		-1
+#define CAMERA_LUX_DISABLE		-2
 
 #define IIO_CHANNEL		-1
 #define IIO_SCAN_INDEX		3
@@ -41,5 +43,7 @@ void report_sensor_data(struct ssp_data *, int, struct sensor_value *);
 int initialize_indio_dev(struct ssp_data *data);
 void remove_indio_dev(struct ssp_data *data);
 short thermistor_rawToTemperature(struct ssp_data *data, int type, s16 raw);
-
+#if defined(CONFIG_SENSORS_SABC)
+void report_camera_lux_data(struct ssp_data *data, int lux);
+#endif
 #endif

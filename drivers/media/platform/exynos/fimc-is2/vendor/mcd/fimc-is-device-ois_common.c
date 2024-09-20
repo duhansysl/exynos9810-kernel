@@ -246,14 +246,6 @@ int fimc_is_ois_gpio_on(struct fimc_is_core *core)
 		goto p_err;
 	}
 
-#ifdef CAMERA_USE_OIS_EXT_CLK
-	ret = fimc_is_sensor_mclk_on(&core->sensor[i], SENSOR_SCENARIO_OIS_FACTORY, module->pdata->mclk_ch);
-	if (ret) {
-		err("fimc_is_sensor_mclk_on is fail(%d)", ret);
-		goto p_err;
-	}
-#endif
-
 	ret = module_pdata->gpio_cfg(module, SENSOR_SCENARIO_OIS_FACTORY, GPIO_SCENARIO_ON);
 	if (ret) {
 		err("gpio_cfg is fail(%d)", ret);
@@ -297,16 +289,28 @@ int fimc_is_ois_gpio_off(struct fimc_is_core *core)
 		goto p_err;
 	}
 
-#ifdef CAMERA_USE_OIS_EXT_CLK
-	ret = fimc_is_sensor_mclk_off(&core->sensor[i], SENSOR_SCENARIO_OIS_FACTORY, module->pdata->mclk_ch);
-	if (ret) {
-		err("fimc_is_sensor_mclk_off is fail(%d)", ret);
-		goto p_err;
-	}
-#endif
-
 p_err:
 	return ret;
+}
+
+struct fimc_is_device_ois *fimc_is_ois_get_device(struct i2c_client *client)
+{
+	struct fimc_is_device_ois *ois_device = NULL;
+	ois_device = i2c_get_clientdata(client);
+
+	return ois_device;
+}
+
+int fimc_is_sec_get_ois_minfo(struct fimc_is_ois_info **minfo)
+{
+	*minfo = &ois_minfo;
+	return 0;
+}
+
+int fimc_is_sec_get_ois_pinfo(struct fimc_is_ois_info **pinfo)
+{
+	*pinfo = &ois_pinfo;
+	return 0;
 }
 
 void fimc_is_ois_enable(struct fimc_is_core *core)
@@ -314,7 +318,7 @@ void fimc_is_ois_enable(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	CALL_OISOPS(ois_device, ois_enable, core);
 }
 
@@ -332,7 +336,7 @@ void fimc_is_ois_get_offset_data(struct fimc_is_core *core, long *raw_data_x, lo
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	CALL_OISOPS(ois_device, ois_get_offset_data, core, raw_data_x, raw_data_y);
 }
 
@@ -342,7 +346,7 @@ int fimc_is_ois_self_test(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	ret = CALL_OISOPS(ois_device, ois_self_test, core);
 
 	return ret;
@@ -354,7 +358,7 @@ bool fimc_is_ois_diff_test(struct fimc_is_core *core, int *x_diff, int *y_diff)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	result = CALL_OISOPS(ois_device, ois_diff_test, core, x_diff, y_diff);
 
 	return result;
@@ -367,14 +371,15 @@ bool fimc_is_ois_auto_test(struct fimc_is_core *core,
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
+
 	result = CALL_OISOPS(ois_device, ois_auto_test, core,
 			threshold, x_result, y_result, sin_x, sin_y);
 
 	return result;
 }
 
-#ifdef CAMERA_REAR2_OIS
+#ifdef CAMERA_2ND_OIS
 bool fimc_is_ois_auto_test_rear2(struct fimc_is_core *core,
 				int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y,
 				bool *x_result_2nd, bool *y_result_2nd, int *sin_x_2nd, int *sin_y_2nd)
@@ -383,7 +388,7 @@ bool fimc_is_ois_auto_test_rear2(struct fimc_is_core *core,
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	result = CALL_OISOPS(ois_device, ois_auto_test_rear2, core,
 			threshold, x_result, y_result, sin_x, sin_y,
 			x_result_2nd, y_result_2nd, sin_x_2nd, sin_y_2nd);
@@ -409,7 +414,7 @@ void fimc_is_ois_gyro_sleep(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	CALL_OISOPS(ois_device, ois_gyro_sleep, core);
 }
 
@@ -418,7 +423,7 @@ void fimc_is_ois_exif_data(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	CALL_OISOPS(ois_device, ois_exif_data, core);
 }
 
@@ -480,7 +485,7 @@ u8 fimc_is_ois_read_status(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	status = CALL_OISOPS(ois_device, ois_read_status, core);
 
 	return status;
@@ -492,7 +497,7 @@ u8 fimc_is_ois_read_cal_checksum(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	status = CALL_OISOPS(ois_device, ois_read_cal_checksum, core);
 
 	return status;
@@ -515,7 +520,7 @@ bool fimc_is_ois_crc_check(struct fimc_is_core *core, char *buf)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 
 	if (ois_device->not_crc_bin) {
 		err("ois binary does not conatin crc checksum.\n");
@@ -546,7 +551,7 @@ bool fimc_is_ois_check_fw(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	ret = CALL_OISOPS(ois_device, ois_check_fw, core);
 
 	return ret;
@@ -558,10 +563,36 @@ bool fimc_is_ois_read_fw_ver(struct fimc_is_core *core, char *name, char *ver)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	ois_device = fimc_is_ois_get_device(client);
 	ret = CALL_OISOPS(ois_device, ois_read_fw_ver, name, ver);
 
 	return ret;
+}
+
+void fimc_is_ois_fw_update_from_sensor(void *ois_core)
+{
+	struct fimc_is_device_ois *ois_device = NULL;
+	struct fimc_is_core *core = (struct fimc_is_core *)ois_core;
+	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
+	struct fimc_is_vender_specific *specific = core->vender.private_data;
+
+	if (client) {
+		ois_device = fimc_is_ois_get_device(client);
+	} else {
+		err("failed to get client");
+		return;
+	}
+
+	mutex_lock(&specific->hw_init_lock);
+
+	fimc_is_ois_gpio_on(core);
+	msleep(50);
+	CALL_OISOPS(ois_device, ois_fw_update, core);
+	fimc_is_ois_gpio_off(core);
+
+	mutex_unlock(&specific->hw_init_lock);
+
+	return;
 }
 
 void fimc_is_ois_fw_update(struct fimc_is_core *core)
@@ -569,7 +600,12 @@ void fimc_is_ois_fw_update(struct fimc_is_core *core)
 	struct fimc_is_device_ois *ois_device = NULL;
 	struct i2c_client *client = fimc_is_ois_i2c_get_client(core);
 
-	ois_device = i2c_get_clientdata(client);
+	if (client) {
+		ois_device = fimc_is_ois_get_device(client);
+	} else {
+		err("failed to get client");
+		return;
+	}
 
 	fimc_is_ois_gpio_on(core);
 	msleep(150);

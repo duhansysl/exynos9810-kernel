@@ -670,6 +670,7 @@ static int fimc_is_ssx_video_s_ctrl(struct file *file, void *priv,
 	case V4L2_CID_IS_INTENT:
 	case V4L2_CID_IS_CAPTURE_EXPOSURETIME:
 	case V4L2_CID_IS_TRANSIENT_ACTION:
+	case V4L2_CID_IS_FORCE_FLASH_MODE:
 	case V4L2_CID_IS_FACTORY_APERTURE_CONTROL:
 	case V4L2_CID_IS_OPENING_HINT:
 	case V4L2_CID_IS_CLOSING_HINT:
@@ -679,6 +680,20 @@ static int fimc_is_ssx_video_s_ctrl(struct file *file, void *priv,
 			goto p_err;
 		}
 		break;
+	case V4L2_CID_IS_SECURE_MODE:
+	{
+		u32 scenario;
+		struct fimc_is_core *core;
+
+		scenario = (ctrl->value & FIMC_IS_SCENARIO_MASK) >> FIMC_IS_SCENARIO_SHIFT;
+		core = (struct fimc_is_core *)dev_get_drvdata(fimc_is_dev);
+		if (core && scenario == FIMC_IS_SCENARIO_SECURE) {
+			mvinfo("[SCENE_MODE] SECURE scenario(%d) was detected\n",
+				device, GET_VIDEO(vctx), scenario);
+			device->ex_scenario = core->scenario = scenario;
+		}
+		break;
+	}
 	case V4L2_CID_SENSOR_SET_GAIN:
 		if (fimc_is_sensor_s_again(device, ctrl->value)) {
 			err("failed to set gain : %d\n - %d",
@@ -936,21 +951,6 @@ static int fimc_is_ssx_queue_setup(struct vb2_queue *vbq,
 	return ret;
 }
 
-static int fimc_is_ssx_buffer_prepare(struct vb2_buffer *vb)
-{
-	return fimc_is_queue_prepare(vb);
-}
-
-static inline void fimc_is_ssx_wait_prepare(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_prepare(vbq);
-}
-
-static inline void fimc_is_ssx_wait_finish(struct vb2_queue *vbq)
-{
-	fimc_is_queue_wait_finish(vbq);
-}
-
 static int fimc_is_ssx_start_streaming(struct vb2_queue *vbq,
 	unsigned int count)
 {
@@ -1052,12 +1052,12 @@ static void fimc_is_ssx_buffer_finish(struct vb2_buffer *vb)
 
 const struct vb2_ops fimc_is_ssx_qops = {
 	.queue_setup		= fimc_is_ssx_queue_setup,
-	.buf_init		= fimc_is_buffer_init,
-	.buf_prepare		= fimc_is_ssx_buffer_prepare,
+	.buf_init		= fimc_is_queue_buffer_init,
+	.buf_prepare		= fimc_is_queue_buffer_prepare,
 	.buf_queue		= fimc_is_ssx_buffer_queue,
 	.buf_finish		= fimc_is_ssx_buffer_finish,
-	.wait_prepare		= fimc_is_ssx_wait_prepare,
-	.wait_finish		= fimc_is_ssx_wait_finish,
+	.wait_prepare		= fimc_is_queue_wait_prepare,
+	.wait_finish		= fimc_is_queue_wait_finish,
 	.start_streaming	= fimc_is_ssx_start_streaming,
 	.stop_streaming		= fimc_is_ssx_stop_streaming,
 };

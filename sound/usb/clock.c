@@ -442,7 +442,8 @@ static int set_sample_rate_v2(struct snd_usb_audio *chip, int iface,
 		snd_usb_set_interface_quirk(dev);
 		usb_set_interface(dev, iface, fmt->altsetting);
 #ifdef CONFIG_SND_EXYNOS_USB_AUDIO
-		exynos_usb_audio_setintf(dev, fmt->iface, fmt->altsetting, direction);
+		exynos_usb_audio_setintf(dev, fmt->iface,
+					fmt->altsetting, direction);
 #endif
 		snd_usb_set_interface_quirk(dev);
 	}

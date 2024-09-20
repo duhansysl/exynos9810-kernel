@@ -68,15 +68,10 @@ config PCIE_IOMMU_HISTORY_LOG
 	depends on EXYNOS_PCIE_IOMMU
 	default n
 	help
-	  Say Y here if you want to see map/unmap information for
+	  Say Y here if you want to see map/unmap informations for
 	  debugging prupopse. It stores map/unmap requested address and
 	  size.
 	  If no problmes, say N.
-
-config SEC_PANIC_PCIE_ERR
-	depends on PCI_EXYNOS
-	default n
-	bool "Force PANIC on PCIe Main Errors"
 
 config PCI_IMX6
 	bool "Freescale i.MX6 PCIe controller"

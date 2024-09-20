@@ -45,6 +45,8 @@
 #define ACTUATOR_MAX_SOFT_LANDING_NUM	32 /* Actuator interface */
 #define ACTUATOR_MAX_FOCUS_POSITIONS	1024
 
+#define	INVALID_LASER_DISTANCE	0
+
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -69,10 +71,40 @@ enum {
 	ITF_CTRL_ID_RTA = 1,
 };
 
+enum itf_vc_sensor_mode {
+	VC_SENSOR_MODE_INVALID = -1,
+
+	/* 2PD */
+	VC_SENSOR_MODE_2PD_MODE1 = 100,
+	VC_SENSOR_MODE_2PD_MODE2,
+	VC_SENSOR_MODE_2PD_MODE3,
+	VC_SENSOR_MODE_2PD_MODE4,
+	VC_SENSOR_MODE_2PD_MODE1_HDR,
+	VC_SENSOR_MODE_2PD_MODE2_HDR,
+	VC_SENSOR_MODE_2PD_MODE3_HDR,
+	VC_SENSOR_MODE_2PD_MODE4_HDR,
+
+	/* MSPD */
+	VC_SENSOR_MODE_MSPD_NORMAL = 200,
+	VC_SENSOR_MODE_MSPD_TAIL,
+	VC_SENSOR_MODE_MSPD_GLOBAL_NORMAL,
+	VC_SENSOR_MODE_MSPD_GLOBAL_TAIL,
+
+	/* Ultra PD */
+	VC_SENSOR_MODE_ULTRA_PD_NORMAL = 300,
+	VC_SENSOR_MODE_ULTRA_PD_TAIL,
+
+	/* Super PD */
+	VC_SENSOR_MODE_SUPER_PD_NORMAL = 400,
+	VC_SENSOR_MODE_SUPER_PD_TAIL,
+
+	/* IMX PDAF */
+	VC_SENSOR_MODE_IMX_PDAF = 500,
+};
+
 /* DEVICE SENSOR INTERFACE */
 #define SENSOR_REGISTER_FUNC_ADDR	(DDK_LIB_ADDR + 0x40)
 #define SENSOR_REGISTER_FUNC_ADDR_RTA	(RTA_LIB_ADDR + 0x40)
-#define PREPROC_REGISTER_FUNC_ADDR	(RTA_LIB_ADDR + 0xC0)
 
 typedef int (*register_sensor_interface)(void *itf);
 
@@ -82,6 +114,7 @@ struct ae_param {
 		u32 long_val;
 	};
 	u32 short_val;
+	u32 middle_val;	
 };
 
 typedef struct {
@@ -142,6 +175,13 @@ typedef struct {
 	unsigned int factory_step;
 } ois_shared_data;
 
+struct wb_gains {
+	u32 gr;
+	u32 r;
+	u32 b;
+	u32 gb;
+};
+
 typedef struct {
 	/** The length of a frame is specified as a number of lines, frame_length_lines.
 	  @remarks
@@ -178,8 +218,13 @@ typedef struct {
 	unsigned int cur_coarse_integration_time_step;
 
 	unsigned int cur_frame_us_time;
+#ifdef USE_MS_PDAF_INTERFACE
+	unsigned int cur_pos_x;
+	unsigned int cur_pos_y;
+#endif /* USE_MS_PDAF_INTERFACE */
 	unsigned int cur_width;
 	unsigned int cur_height;
+	unsigned int cur_pattern_mode;
 	unsigned int pre_width;
 	unsigned int pre_height;
 
@@ -246,6 +291,8 @@ typedef struct {
 
 	bool binning; /* If binning is set, sensor should binning for size */
 
+	bool dual_slave;
+
 	u32 cis_rev;
 	u32 group_param_hold;
 
@@ -257,13 +304,14 @@ typedef struct {
 	u32				sensor_shifted_num;
 #endif
 
-	u32 			frame_length_lines_shifter;
+	u32				frame_length_lines_shifter;
 } cis_shared_data;
 
 struct v4l2_subdev;
 typedef int (*cis_func_type)(struct v4l2_subdev *subdev, cis_setting_info *info);
 struct fimc_is_cis_ops {
         int (*cis_init)(struct v4l2_subdev *subdev);
+        int (*cis_deinit)(struct v4l2_subdev *subdev);
         int (*cis_log_status)(struct v4l2_subdev *subdev);
         int (*cis_group_param_hold)(struct v4l2_subdev *subdev, bool hold);
         int (*cis_set_global_setting)(struct v4l2_subdev *subdev);
@@ -317,9 +365,26 @@ struct fimc_is_cis_ops {
 #ifdef CAMERA_REAR2_SENSOR_SHIFT_CROP
 	int (*cis_update_pdaf_tail_size)(struct v4l2_subdev *subdev, struct fimc_is_sensor_cfg *select);
 #endif
-	int (*cis_check_rev)(struct v4l2_subdev *subdev);
+	int (*cis_check_rev_on_init)(struct v4l2_subdev *subdev);
 	int (*cis_set_super_slow_motion_threshold)(struct v4l2_subdev *subdev, u32 threshold);
 	int (*cis_get_super_slow_motion_threshold)(struct v4l2_subdev *subdev, u32 *threshold);
+	int (*cis_set_initial_exposure)(struct v4l2_subdev *subdev);
+	int (*cis_get_super_slow_motion_gmc)(struct v4l2_subdev *subdev, u32 *gmc);
+	int (*cis_get_super_slow_motion_frame_id)(struct v4l2_subdev *subdev, u32 *frameid);
+	int (*cis_set_super_slow_motion_flicker)(struct v4l2_subdev *subdev, u32 flicker);
+	int (*cis_get_super_slow_motion_md_threshold)(struct v4l2_subdev *subdev, u32 *threshold);
+	int (*cis_set_super_slow_motion_gmc_table_idx)(struct v4l2_subdev *subdev, u32 idx);
+	int (*cis_set_super_slow_motion_gmc_block_with_md_low)(struct v4l2_subdev *subdev, u32 idx);
+	int (*cis_recover_stream_on)(struct v4l2_subdev *subdev);
+	int (*cis_set_laser_control)(struct v4l2_subdev *subdev, u32 onoff);
+	int (*cis_set_factory_control)(struct v4l2_subdev *subdev, u32 command);
+	int (*cis_set_laser_current)(struct v4l2_subdev *subdev, u32 value);
+	int (*cis_get_laser_photo_diode)(struct v4l2_subdev *subdev, u16 *value);
+	int (*cis_get_tof_tx_freq)(struct v4l2_subdev *subdev, u32 *value);
+	int (*cis_set_wb_gains)(struct v4l2_subdev *subdev, struct wb_gains wb_gains);
+	int (*cis_set_totalgain)(struct v4l2_subdev *subdev, struct ae_param *target_exposure, struct ae_param *again, struct ae_param *dgain);
+	int (*cis_set_test_pattern)(struct v4l2_subdev *subdev, camera2_sensor_ctl_t *sensor_ctl);
+	
 };
 
 struct fimc_is_sensor_ctl
@@ -367,6 +432,9 @@ struct fimc_is_sensor_ctl
 
 	// Frame number that indicating shot. Currntly, it is not used.
 	/* (14) */  bool shot_frame_number;
+
+	struct wb_gains wb_gains;
+	bool update_wb_gains;
 };
 
 typedef enum fimc_is_sensor_adjust_direction_ {
@@ -497,7 +565,7 @@ struct fimc_is_long_term_expo_mode {
 /* OIS */
 struct fimc_is_ois_ops {
 	int (*ois_init)(struct v4l2_subdev *subdev);
-#ifdef CONFIG_OIS_USE_RUMBA_S6
+#if defined (CONFIG_OIS_USE_RUMBA_S6)
 	int (*ois_deinit)(struct v4l2_subdev *subdev);
 #endif
 #ifdef USE_OIS_SLEEP_MODE
@@ -514,11 +582,11 @@ struct fimc_is_ois_ops {
 	int (*ois_self_test)(struct fimc_is_core *core);
 	bool (*ois_diff_test)(struct fimc_is_core *core, int *x_diff, int *y_diff);
 	bool (*ois_auto_test)(struct fimc_is_core *core,
-	int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y);
-#ifdef CAMERA_REAR2_OIS
+				int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y);
+#ifdef CAMERA_2ND_OIS
 	bool (*ois_auto_test_rear2)(struct fimc_is_core *core,
-	int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y,
-	bool *x_result_2nd, bool *y_result_2nd, int *sin_x_2nd, int *sin_y_2nd);
+				int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y,
+				bool *x_result_2nd, bool *y_result_2nd, int *sin_x_2nd, int *sin_y_2nd);
 	int (*ois_set_power_mode)(struct v4l2_subdev *subdev);
 #endif
 	bool (*ois_check_fw)(struct fimc_is_core *core);
@@ -636,9 +704,17 @@ struct fimc_is_cis_interface_ops {
 				u32 *frame_length_lines,
 				u32 *max_margin_cit);
 
+#ifdef USE_MS_PDAF_INTERFACE
+	int (*get_sensor_cur_size)(struct fimc_is_sensor_interface *itf,
+				u32 *cur_pos_x,
+				u32 *cur_pos_y,
+				u32 *cur_width,
+				u32 *cur_height);
+#else
 	int (*get_sensor_cur_size)(struct fimc_is_sensor_interface *itf,
 				u32 *cur_width,
 				u32 *cur_height);
+#endif
 
 	int (*get_sensor_max_fps)(struct fimc_is_sensor_interface *itf,
 				u32 *max_fps);
@@ -721,6 +797,13 @@ struct fimc_is_cis_interface_ops {
 	/* Set sensor 3a mode - OTF/M2M */
 	int (*set_sensor_3a_mode)(struct fimc_is_sensor_interface *itf,
 					u32 mode);
+	int (*get_initial_exposure_gain_of_sensor)(struct fimc_is_sensor_interface *itf,
+					u32 *long_expo,
+					u32 *long_again,
+					u32 *long_dgain,
+					u32 *short_expo,
+					u32 *short_again,
+					u32 *short_dgain);
 };
 
 struct fimc_is_cis_ext_interface_ops {
@@ -748,10 +831,16 @@ struct fimc_is_cis_ext2_interface_ops {
 	/* Get static memory address for DDK/RTA backup data */
 	int (*get_static_mem)(int ctrl_id, void **mem, int *size);
 	int (*get_open_close_hint)(int* opening, int* closing);
-	int (*get_sensor_line_readOut_time)(struct fimc_is_sensor_interface *itf,
-				u32 *line_readOut_time);
-	int(*set_previous_dm)(struct fimc_is_sensor_interface *itf);
-	void *reserved[14];
+	int (*set_mainflash_duration)(struct fimc_is_sensor_interface *itf,
+				u32 mainflash_duration);
+	int (*request_wb_gain)(struct fimc_is_sensor_interface *itf,
+				u32 gr_gain, u32 r_gain, u32 b_gain, u32 gb_gain);
+	int (*set_sensor_info_mfhdr_mode_change)(struct fimc_is_sensor_interface *itf,
+				u32 count, u32 *long_expo, u32 *long_again, u32 *long_dgain,
+				u32 *expo, u32 *again, u32 *dgain);
+	int (*set_previous_dm)(struct fimc_is_sensor_interface *itf);
+	int (*get_delayed_preflash_time)(struct fimc_is_sensor_interface *itf, u32 *delayedTime);
+	void *reserved[11];
 };
 
 struct fimc_is_cis_event_ops {
@@ -1136,7 +1225,13 @@ struct fimc_is_csi_interface_ops {
 				u32 *width,
 				u32 *height,
 				u32 *element_size);
+#ifdef CAMERA_REAR2_SENSOR_SHIFT_CROP
+	int (*get_sensor_shifted_num)(struct fimc_is_sensor_interface *itf,
+				u32 *sensor_shifted_num);
+	int (*reserved[3])(struct fimc_is_sensor_interface *itf);
+#else
 	int (*reserved[4])(struct fimc_is_sensor_interface *itf);
+#endif
 };
 
 struct fimc_is_dual_interface_ops {
@@ -1183,8 +1278,6 @@ struct fimc_is_sensor_interface {
 int init_sensor_interface(struct fimc_is_sensor_interface *itf);
 
 /* Sensor interface helper function */
-struct fimc_is_module_enum *get_subdev_module_enum(struct fimc_is_sensor_interface *itf);
-struct fimc_is_device_csi *get_subdev_csi(struct fimc_is_sensor_interface *itf);
 struct fimc_is_actuator *get_subdev_actuator(struct fimc_is_sensor_interface *itf);
 u32 get_frame_count(struct fimc_is_sensor_interface *itf);
 

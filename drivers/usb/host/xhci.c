@@ -111,7 +111,9 @@ int xhci_halt(struct xhci_hcd *xhci)
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "// Halt the HC");
 	xhci_quiesce(xhci);
 
+#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
 	pr_info("%s ++ \n", __func__);
+#endif
 	ret = xhci_handshake(&xhci->op_regs->status,
 			STS_HALT, STS_HALT, XHCI_MAX_HALT_USEC);
 	if (!ret) {
@@ -708,9 +710,6 @@ void xhci_stop(struct usb_hcd *hcd)
 	u32 temp;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 
-	if (!usb_hcd_is_primary_hcd(hcd))
-		return;
-
 	mutex_lock(&xhci->mutex);
 
 	if (!(xhci->xhc_state & XHCI_STATE_HALTED)) {
@@ -722,6 +721,11 @@ void xhci_stop(struct usb_hcd *hcd)
 		xhci_reset(xhci);
 
 		spin_unlock_irq(&xhci->lock);
+	}
+
+	if (!usb_hcd_is_primary_hcd(hcd)) {
+		mutex_unlock(&xhci->mutex);
+		return;
 	}
 
 	xhci_cleanup_msix(xhci);
@@ -4266,7 +4270,8 @@ int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 		return -EPERM;
 
 	/* some USB3.0 memory stick doesn't support L1 mode,
-	  * so we add XHCI_LPM_L1_DISABLE quirks for disabling L1 mode */
+	 * so we add XHCI_LPM_L1_DISABLE quirks for disabling L1 mode
+	 */
 	if (!(xhci->quirks & XHCI_LPM_L1_SUPPORT))
 		return -EPERM;
 

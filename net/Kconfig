@@ -83,13 +83,9 @@ config INET
 	  Short answer: say Y.
 
 if INET
-source "net/wireguard/Kconfig"
 source "net/ipv4/Kconfig"
 source "net/ipv6/Kconfig"
 source "net/netlabel/Kconfig"
-#ifdef CONFIG_MPTCP
-	source "net/mptcp/Kconfig"
-#endif
 
 endif # if INET
 
@@ -248,7 +244,9 @@ source "net/switchdev/Kconfig"
 source "net/l3mdev/Kconfig"
 source "net/qrtr/Kconfig"
 source "net/ncsi/Kconfig"
+# SEC_PRODUCT_FEATURE_KNOX_SUPPORT_NPA {
 source "net/ncm/Kconfig"
+# SEC_PRODUCT_FEATURE_KNOX_SUPPORT_NPA }
 
 config RPS
 	bool
@@ -443,9 +441,3 @@ config HAVE_CBPF_JIT
 # Extended BPF JIT (eBPF)
 config HAVE_EBPF_JIT
 	bool
-
-# Network Pacemaker
-config NETPM
-	bool "Network Pacemaker"
-	---help---
-	This feature implements Network Pacemaker (NETPM)

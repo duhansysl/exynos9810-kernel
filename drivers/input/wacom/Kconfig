@@ -26,12 +26,14 @@ config EPEN_WACOM_W9018
 	  To compile this driver as a module, choose M here: the
 	  module will be called wacom_W9018.
 
-config WACOM_LCD_FREQ_COMPENSATE
-	bool "Wacom LCD vsync/hsync frequency compensate rotuine"
+config EPEN_WACOM_W9019
+	tristate "Wacom W9019 penabled i2c touchscreen"
+	depends on I2C
 	help
-	  Say Y here if you have an Wacom lcd freq compensate config
+	  Say Y here if you have an Wacom G10PM penabled i2c touchscreen
+	  connected to your system.
 
 	  If unsure, say N.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called wacom.
+	  module will be called wacom_W9019.

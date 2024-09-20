@@ -173,7 +173,7 @@ static void abox_debug_string_update_workfunc(struct work_struct *wk)
 
 buff_done:
 	pr_info("%s: %s\n", __func__, p_debug_data->dbg_str_buf);
-	sec_debug_set_extra_info_rvd1(p_debug_data->dbg_str_buf);
+	sec_debug_set_extra_info_aud(p_debug_data->dbg_str_buf);
 
 	kfree(p_debug_data->dbg_str_buf);
 	p_debug_data->dbg_str_buf = NULL;
@@ -199,7 +199,7 @@ void adev_err(struct device *dev, const char *fmt, ...)
 	va_end(args);
 
 	dev_printk(KERN_ERR, dev, "%s", temp_buf);
-	sec_audio_log(3, dev, "%s", temp_buf);
+	sec_audio_log(3, "%s", temp_buf);
 }
 
 void adev_warn(struct device *dev, const char *fmt, ...)
@@ -212,7 +212,7 @@ void adev_warn(struct device *dev, const char *fmt, ...)
 	va_end(args);
 
 	dev_printk(KERN_WARNING, dev, "%s", temp_buf);
-	sec_audio_log(4, dev, "%s", temp_buf);
+	sec_audio_log(4, "%s", temp_buf);
 }
 
 void adev_info(struct device *dev, const char *fmt, ...)
@@ -225,7 +225,7 @@ void adev_info(struct device *dev, const char *fmt, ...)
 	va_end(args);
 
 	dev_printk(KERN_INFO, dev, "%s", temp_buf);
-	sec_audio_log(6, dev, "%s", temp_buf);
+	sec_audio_log(6, "%s", temp_buf);
 }
 
 void adev_dbg(struct device *dev, const char *fmt, ...)
@@ -238,7 +238,7 @@ void adev_dbg(struct device *dev, const char *fmt, ...)
 	va_end(args);
 
 	dev_printk(KERN_DEBUG, dev, "%s", temp_buf);
-	sec_audio_log(7, dev, "%s", temp_buf);
+	sec_audio_log(7, "%s", temp_buf);
 }
 
 static int get_debug_buffer_switch(struct snd_kcontrol *kcontrol,
@@ -404,7 +404,7 @@ static ssize_t log_enable_write_file(struct file *file,
 	u64 value;
 	struct sec_audio_log_data *p_dbg_log_data = file->private_data;
 
-	size = min(count, (sizeof(buf) - 1));
+	size = min(count, (sizeof(buf)-1));
 	if (copy_from_user(buf, user_buf, size)) {
 		pr_err("%s: copy_from_user err\n", __func__);
 		return -EFAULT;
@@ -432,15 +432,15 @@ static const struct file_operations log_enable_fops = {
 	.llseek = default_llseek,
 };
 
-static ssize_t make_prefix_msg(char *buff, int level, struct device *dev)
+static ssize_t make_prefix_msg(char *buff, int level)
 {
 	unsigned long long time = local_clock();
 	unsigned long nanosec_t = do_div(time, 1000000000);
 	ssize_t msg_size = 0;
 
-	msg_size = scnprintf(buff, LOG_MSG_BUFF_SZ, "<%d> [%5lu.%06lu] %s %s: ",
-						level, (unsigned long) time, nanosec_t / 1000,
-						(dev)? dev_driver_string(dev): "NULL", (dev)? dev_name(dev): "NULL");
+	msg_size = scnprintf(buff, LOG_MSG_BUFF_SZ, "<%d> [%5lu.%06lu] ",
+						level, (unsigned long) time, nanosec_t / 1000);
+
 	return msg_size;
 }
 
@@ -455,7 +455,7 @@ static void copy_msgs(char *buff, struct sec_audio_log_data *p_dbg_log_data)
 				(strlen(buff) + 1), "%s", buff);
 }
 
-void sec_audio_log(int level, struct device *dev, const char *fmt, ...)
+void sec_audio_log(int level, const char *fmt, ...)
 {
 	va_list args;
 	char temp_buf[LOG_MSG_BUFF_SZ];
@@ -466,7 +466,7 @@ void sec_audio_log(int level, struct device *dev, const char *fmt, ...)
 		return;
 	}
 
-	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
+	temp_buff_idx = make_prefix_msg(temp_buf, level);
 
 	va_start(args, fmt);
 	temp_buff_idx +=
@@ -478,7 +478,7 @@ void sec_audio_log(int level, struct device *dev, const char *fmt, ...)
 }
 EXPORT_SYMBOL_GPL(sec_audio_log);
 
-void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...)
+void sec_audio_bootlog(int level, const char *fmt, ...)
 {
 	va_list args;
 	char temp_buf[LOG_MSG_BUFF_SZ];
@@ -489,7 +489,7 @@ void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...)
 		return;
 	}
 
-	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
+	temp_buff_idx = make_prefix_msg(temp_buf, level);
 
 	va_start(args, fmt);
 	temp_buff_idx +=
@@ -501,7 +501,7 @@ void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...)
 }
 EXPORT_SYMBOL_GPL(sec_audio_bootlog);
 
-void sec_audio_pmlog(int level, struct device *dev, const char *fmt, ...)
+void sec_audio_pmlog(int level, const char *fmt, ...)
 {
 	va_list args;
 	char temp_buf[LOG_MSG_BUFF_SZ];
@@ -512,7 +512,7 @@ void sec_audio_pmlog(int level, struct device *dev, const char *fmt, ...)
 		return;
 	}
 
-	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
+	temp_buff_idx = make_prefix_msg(temp_buf, level);
 
 	va_start(args, fmt);
 	temp_buff_idx +=

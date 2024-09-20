@@ -364,14 +364,14 @@ def validate_instrumentation(objdump_uninstr, skip, skip_stp, skip_asm, skip_sav
             """)
 
             errmsg(missing_asm_annot_errors, """
-            Saw an assembly rountine(s) that hasn't been annotated with the number of
+            Saw an assembly routine(s) that hasn't been annotated with the number of
             general purpose registers it uses.
 
             Change ENTRY to FUNC_ENTRY for these assembly functions.
             """)
 
             errmsg(nop_spacer_errors, """
-            Saw an assembly rountine(s) that doesn't have 2 nop instruction immediately
+            Saw an assembly routine(s) that doesn't have 2 nop instruction immediately
             before the function label.
 
             We need these for any function that might be the target of a blr instruction!

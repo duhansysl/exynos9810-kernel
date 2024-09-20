@@ -141,4 +141,3 @@ int exynos_smc(unsigned long cmd, unsigned long arg1, unsigned long arg2, unsign
 #endif
 	return ret;
 }
-EXPORT_SYMBOL(exynos_smc);

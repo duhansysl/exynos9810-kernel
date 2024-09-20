@@ -163,7 +163,7 @@ static int fimc_is_ischain_dcxs_tag(struct fimc_is_subdev *subdev,
 
 	pixelformat = queue->framecfg.format->pixelformat;
 
-	target_addr = ldr_frame->shot->uctl.scalerUd.sourceAddress; /* TODO */
+	target_addr = ldr_frame->sourceAddress; /* TODO */
 
 	if (node->request) {
 		incrop = (struct fimc_is_crop *)node->input.cropRegion;

@@ -56,9 +56,6 @@ tmp3		.req	x9
 
 	.weak memset
 ENTRY(__memset)
-#ifdef CONFIG_RKP_CFP_JOPP
-FALLTHROUGH(memset)
-#endif
 ENTRY(memset)
 	mov	dst, dstin	/* Preserve return value.  */
 	and	A_lw, val, #255

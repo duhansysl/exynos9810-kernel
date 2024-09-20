@@ -25,6 +25,10 @@
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
+#ifdef CONFIG_SEC_DEBUG_INFINITY_BACKTRACE
+#include <linux/sec_debug.h>
+#endif
+
 /*
  * AArch64 PCS assigns the frame pointer to x29.
  *
@@ -70,6 +74,12 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
 
+#ifdef CONFIG_SEC_DEBUG_LIMIT_BACKTRACE
+	if (fp == frame->fp) {
+		return -EINVAL;
+	}
+#endif
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
 			(frame->pc == (unsigned long)return_to_handler)) {
@@ -88,9 +98,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
-#ifdef CONFIG_SEC_DEBUG_BRANCH_VERIFIER
-	frame->pc_from_irq = 0;
-#endif
 	/*
 	 * Check whether we are going to walk through from interrupt stack
 	 * to task stack.
@@ -111,9 +118,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 			/* orig_sp is the saved pt_regs, find the elr */
 			irq_args = (struct pt_regs *)orig_sp;
 			frame->pc = irq_args->pc;
-#ifdef CONFIG_SEC_DEBUG_BRANCH_VERIFIER
-			frame->pc_from_irq = 1;
-#endif
 		} else {
 			/*
 			 * This frame has a non-standard format, and we

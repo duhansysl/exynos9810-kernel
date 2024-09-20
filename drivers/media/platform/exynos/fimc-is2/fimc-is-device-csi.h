@@ -7,6 +7,7 @@
 #include "fimc-is-type.h"
 #include "fimc-is-framemgr.h"
 #include "fimc-is-subdev-ctrl.h"
+#include "fimc-is-work.h"
 
 #ifndef ENABLE_IS_CORE
 #define CSI_NOTIFY_VSYNC	10
@@ -63,6 +64,7 @@ enum itf_vc_stat_type {
 	VC_STAT_TAIL_MSPD,
 	VC_STAT_MIPI_STAT,
 	VC_STAT_PDP_PDAF,
+	VC_STAT_MSPD_PD_PACKER
 };
 
 struct fimc_is_device_csi {
@@ -98,8 +100,9 @@ struct fimc_is_device_csi {
 	struct tasklet_struct		tasklet_csis_str;
 	struct tasklet_struct		tasklet_csis_end;
 	struct tasklet_struct		tasklet_csis_line;
-	struct work_struct		wq_csis_dma[CSI_VIRTUAL_CH_MAX];
 	struct workqueue_struct		*workqueue;
+	struct work_struct		wq_csis_dma[CSI_VIRTUAL_CH_MAX];
+	struct fimc_is_work_list	work_list[CSI_VIRTUAL_CH_MAX];
 	int				pre_dma_enable[CSI_VIRTUAL_CH_MAX];
 
 	/* subdev slots for dma */
@@ -108,10 +111,6 @@ struct fimc_is_device_csi {
 	/* pointer address from device sensor */
 	struct v4l2_subdev		**subdev;
 	struct phy			*phy;
-#if defined(CONFIG_SECURE_CAMERA_USE)
-	struct phy      *extra_phy;
-	int		extra_phy_off;
-#endif
 
 	u32 error_id[CSI_VIRTUAL_CH_MAX];
 	u32 error_count;
@@ -121,7 +120,8 @@ struct fimc_is_device_csi {
 
 	atomic_t			vvalid; /* set 1 while vvalid period */
 #endif
-	wait_queue_head_t		wait_queue;
+	wait_queue_head_t               wait_queue;
+	char				name[FIMC_IS_STR_LEN];
 };
 
 struct fimc_is_device_csi_dma {
@@ -135,6 +135,7 @@ struct fimc_is_device_csi_dma {
 	spinlock_t			barrier;
 };
 
+void csi_frame_start_inline(struct fimc_is_device_csi *csi);
 int __must_check fimc_is_csi_dma_probe(struct fimc_is_device_csi_dma *csi_dma, struct platform_device *pdev);
 
 int __must_check fimc_is_csi_probe(void *parent, u32 instance);

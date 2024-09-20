@@ -1572,7 +1572,7 @@ static int tsu6721_muic_probe(struct i2c_client *i2c,
 	muic_data->attached_dev = ATTACHED_DEV_UNKNOWN_MUIC;
 	muic_data->is_usb_ready = false;
 
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	/* create sysfs group */
 	ret = sysfs_create_group(&switch_device->kobj, &tsu6721_muic_group);
 	if (ret) {
@@ -1613,7 +1613,7 @@ static int tsu6721_muic_probe(struct i2c_client *i2c,
 	return 0;
 
 fail:
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	sysfs_remove_group(&switch_device->kobj, &tsu6721_muic_group);
 #endif
 	mutex_destroy(&muic_data->muic_mutex);
@@ -1628,7 +1628,7 @@ static int tsu6721_muic_remove(struct i2c_client *i2c)
 {
 	struct tsu6721_muic_data *muic_data = i2c_get_clientdata(i2c);
 
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	sysfs_remove_group(&switch_device->kobj, &tsu6721_muic_group);
 #endif
 
@@ -1657,7 +1657,7 @@ static void tsu6721_muic_shutdown(struct i2c_client *i2c)
 
 	pr_info("%s:%s\n", MUIC_DEV_NAME, __func__);
 
-#ifdef CONFIG_SEC_SYSFS
+#ifdef CONFIG_DRV_SAMSUNG
 	sysfs_remove_group(&switch_device->kobj, &tsu6721_muic_group);
 #endif
 

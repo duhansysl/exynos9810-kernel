@@ -12,14 +12,6 @@ CFLAGS_REMOVE_return_address.o = -pg
 
 CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
 
-ifeq ($(SEC_BUILD_CONF_DMV_ALTA),true)
-CFLAGS_uh_inform.o += -DDMV_ALTA
-endif
-
-ifeq ($(SEC_BUILD_CONF_QUICK_DMVERITY),true)
-CFLAGS_uh_inform.o += -DDMV_LITE
-endif
-
 # Object file lists.
 arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\

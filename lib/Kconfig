@@ -406,6 +406,10 @@ config HAS_DMA
 	depends on !NO_DMA
 	default y
 
+config SGL_ALLOC
+	bool
+	default n
+
 config CHECK_SIGNATURE
 	bool
 

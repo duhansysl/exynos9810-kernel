@@ -214,6 +214,32 @@ p_err:
 	return ret;
 }
 
+int sensor_cis_check_rev_on_init(struct v4l2_subdev *subdev)
+{
+	int ret = 0;
+	struct i2c_client *client;
+	struct fimc_is_cis *cis = NULL;
+
+	FIMC_BUG(!subdev);
+
+	cis = (struct fimc_is_cis *)v4l2_get_subdevdata(subdev);
+	FIMC_BUG(!cis);
+	FIMC_BUG(!cis->cis_data);
+
+	client = cis->client;
+	if (unlikely(!client)) {
+		err("client is NULL");
+		ret = -EINVAL;
+		return ret;
+	}
+
+	memset(cis->cis_data, 0, sizeof(cis_shared_data));
+
+	ret = sensor_cis_check_rev(cis);
+
+	return ret;
+}
+
 int sensor_cis_check_rev(struct fimc_is_cis *cis)
 {
 	int ret = 0;
@@ -433,6 +459,7 @@ int sensor_cis_wait_streamoff(struct v4l2_subdev *subdev)
 	/* retention mode CRC wait calculation */
 	usleep_range(5000, 5000);
 #endif
+	cis->cis_data->cur_pattern_mode = SENSOR_TEST_PATTERN_MODE_OFF;
 p_err:
 	return ret;
 }
@@ -469,9 +496,14 @@ int sensor_cis_wait_streamon(struct v4l2_subdev *subdev)
 	    goto p_err;
 	}
 
+	I2C_MUTEX_LOCK(cis->i2c_lock);
 	ret = fimc_is_sensor_read8(client, 0x0005, &sensor_fcount);
+	I2C_MUTEX_UNLOCK(cis->i2c_lock);
 	if (ret < 0)
 	    err("i2c transfer fail addr(%x), val(%x), ret = %d\n", 0x0005, sensor_fcount, ret);
+
+	if (cis_data->dual_slave == true)
+		time_out_cnt = time_out_cnt * 2;
 
 	/*
 	 * Read sensor frame counter (sensor_fcount address = 0x0005)
@@ -481,7 +513,9 @@ int sensor_cis_wait_streamon(struct v4l2_subdev *subdev)
 		usleep_range(CIS_STREAM_ON_WAIT_TIME, CIS_STREAM_ON_WAIT_TIME);
 		wait_cnt++;
 
+		I2C_MUTEX_LOCK(cis->i2c_lock);
 		ret = fimc_is_sensor_read8(client, 0x0005, &sensor_fcount);
+		I2C_MUTEX_UNLOCK(cis->i2c_lock);
 		if (ret < 0)
 		    err("i2c transfer fail addr(%x), val(%x), ret = %d\n", 0x0005, sensor_fcount, ret);
 
@@ -503,3 +537,78 @@ int sensor_cis_wait_streamon(struct v4l2_subdev *subdev)
 p_err:
 	return ret;
 }
+
+int sensor_cis_set_initial_exposure(struct v4l2_subdev *subdev)
+{
+	struct fimc_is_cis *cis;
+
+	cis = (struct fimc_is_cis *)v4l2_get_subdevdata(subdev);
+	if (unlikely(!cis)) {
+		err("cis is NULL");
+		return -EINVAL;
+	}
+
+	if (cis->use_initial_ae) {
+		cis->init_ae_setting = cis->last_ae_setting;
+
+		dbg_sensor(1, "[MOD:D:%d] %s short(exp:%d/again:%d/dgain:%d), long(exp:%d/again:%d/dgain:%d)\n",
+			cis->id, __func__, cis->init_ae_setting.exposure, cis->init_ae_setting.analog_gain,
+			cis->init_ae_setting.digital_gain, cis->init_ae_setting.long_exposure,
+			cis->init_ae_setting.long_analog_gain, cis->init_ae_setting.long_digital_gain);
+	}
+
+	return 0;
+}
+
+int sensor_cis_set_test_pattern(struct v4l2_subdev *subdev, camera2_sensor_ctl_t *sensor_ctl)
+{
+	int ret = 0;
+	struct fimc_is_cis *cis;
+	struct i2c_client *client;
+
+	cis = (struct fimc_is_cis *)v4l2_get_subdevdata(subdev);
+
+	WARN_ON(!cis);
+	WARN_ON(!cis->cis_data);
+
+	client = cis->client;
+	if (unlikely(!client)) {
+		err("client is NULL");
+		ret = -EINVAL;
+		goto p_err;
+	}
+
+	dbg_sensor(1, "[MOD:D:%d] %s, cur_pattern_mode(%d), testPatternMode(%d)\n", cis->id, __func__,
+			cis->cis_data->cur_pattern_mode, sensor_ctl->testPatternMode);
+
+	if (cis->cis_data->cur_pattern_mode != sensor_ctl->testPatternMode) {
+		cis->cis_data->cur_pattern_mode = sensor_ctl->testPatternMode;
+		if (sensor_ctl->testPatternMode == SENSOR_TEST_PATTERN_MODE_OFF) {
+			info("%s: set DEFAULT pattern! (testpatternmode : %d)\n", __func__, sensor_ctl->testPatternMode);
+
+			I2C_MUTEX_LOCK(cis->i2c_lock);
+			fimc_is_sensor_write16(client, 0x0600, 0x0000);
+			I2C_MUTEX_UNLOCK(cis->i2c_lock);
+		} else if (sensor_ctl->testPatternMode == SENSOR_TEST_PATTERN_MODE_BLACK) {
+			info("%s: set BLACK pattern! (testpatternmode :%d), Data : 0x(%x, %x, %x, %x)\n",
+				__func__, sensor_ctl->testPatternMode,
+				(unsigned short)sensor_ctl->testPatternData[0],
+				(unsigned short)sensor_ctl->testPatternData[1],
+				(unsigned short)sensor_ctl->testPatternData[2],
+				(unsigned short)sensor_ctl->testPatternData[3]);
+
+			I2C_MUTEX_LOCK(cis->i2c_lock);
+			fimc_is_sensor_write16(client, 0x0600, 0x0001);
+			fimc_is_sensor_write16(client, 0x0602, 0x0040);
+			fimc_is_sensor_write16(client, 0x0604, 0x0040);
+			fimc_is_sensor_write16(client, 0x0606, 0x0040);
+			fimc_is_sensor_write16(client, 0x0608, 0x0040);
+
+			I2C_MUTEX_UNLOCK(cis->i2c_lock);
+		}
+	}
+
+p_err:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sensor_cis_set_test_pattern);

@@ -1644,16 +1644,6 @@ static int allocate_cmdlines_buffer(unsigned int val,
 		kfree(s->map_cmdline_to_pid);
 		return -ENOMEM;
 	}
-	
-
-	s->map_cmdline_to_tgid = kmalloc_array(val,
-					       sizeof(*s->map_cmdline_to_tgid),
-					       GFP_KERNEL);
-	if (!s->map_cmdline_to_tgid) {
-		kfree(s->map_cmdline_to_pid);
-		kfree(s->saved_cmdlines);
-		return -ENOMEM;
-	}
 
 	s->map_cmdline_to_tgid = kmalloc_array(val,
 					       sizeof(*s->map_cmdline_to_tgid),

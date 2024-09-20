@@ -905,10 +905,6 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 	kfree_rcu(ifp, rcu);
 }
 
-#ifdef CONFIG_MPTCP
-	EXPORT_SYMBOL(inet6_ifa_finish_destroy);
-#endif
-
 static void
 ipv6_link_dev_addr(struct inet6_dev *idev, struct inet6_ifaddr *ifp)
 {
@@ -1046,41 +1042,6 @@ out:
 	spin_unlock(&addrconf_hash_lock);
 	goto out2;
 }
-
-#ifdef CONFIG_NETPM
-struct net_device *ip6_dev_find(struct net *net, const struct in6_addr *addr)
-{
-	struct net_device *result = NULL;
-	struct inet6_ifaddr *ifp;
-	unsigned int hash = inet6_addr_hash(addr);
-
-	rcu_read_lock();
-	hlist_for_each_entry_rcu(ifp, &inet6_addr_lst[hash], addr_lst) {
-		if (ipv6_addr_equal(&ifp->addr, addr)) {
-			struct net_device *dev = ifp->idev->dev;
-
-			pr_err("netpm: (v6) %s, 1: dev=%s\n", __func__, dev->name);
-
-			if (!net_eq(dev_net(dev), net))
-				continue;
-			result = dev;
-			break;
-		}
-	}
-	if (!result) {
-		struct rt6_info *rt = rt6_lookup(net, addr, NULL, 0, 0);
-
-		if (rt) {
-			result = rt->dst.dev;
-			pr_err("netpm: (v6) %s, 2: dev=%s\n", __func__, result->name);
-			ip6_rt_put(rt);
-		}
-	}
-
-	rcu_read_unlock();
-	return result;
-}
-#endif
 
 enum cleanup_prefix_rt_t {
 	CLEANUP_PREFIX_RT_NOP,    /* no cleanup action for prefix route */
@@ -2190,16 +2151,6 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		return addrconf_ifid_ieee1394(eui, dev);
 	case ARPHRD_TUNNEL6:
 		return addrconf_ifid_ip6tnl(eui, dev);
-	case ARPHRD_PPP: {
-		struct in6_addr lladdr;
-
-		if (ipv6_get_lladdr(dev, &lladdr, IFA_F_TENTATIVE))
-			get_random_bytes(eui, 8);
-		else
-			memcpy(eui, lladdr.s6_addr + 8, 8);
-
-		return 0;
-	}
 	}
 	return -1;
 }
@@ -3266,7 +3217,6 @@ static void addrconf_dev_config(struct net_device *dev)
 	    (dev->type != ARPHRD_INFINIBAND) &&
 	    (dev->type != ARPHRD_IEEE1394) &&
 	    (dev->type != ARPHRD_TUNNEL6) &&
-		(dev->type != ARPHRD_PPP) &&
 	    (dev->type != ARPHRD_6LOWPAN) &&
 	    (dev->type != ARPHRD_NONE)) {
 		/* Alas, we support only Ethernet autoconfiguration. */

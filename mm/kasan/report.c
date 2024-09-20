@@ -325,51 +325,6 @@ static void print_shadow_for_address(const void *addr)
 		shadow_row += SHADOW_BYTES_PER_ROW;
 	}
 }
-#if defined(CONFIG_SEC_DEBUG_KASAN)
-
-struct kasandebug kasan_get_bug_type(struct kasan_access_info *info)
-{
-	struct kasandebug kasaninfo;
-	u8 *shadow_addr;
-
-	info->first_bad_addr = find_first_bad_addr(info->access_addr,
-						info->access_size);
-
-	shadow_addr = (u8 *)kasan_mem_to_shadow(info->first_bad_addr);
-
-	if (*shadow_addr > 0 && *shadow_addr <= KASAN_SHADOW_SCALE_SIZE - 1)
-		shadow_addr++;
-
-	switch (*shadow_addr) {
-	case 0 ... KASAN_SHADOW_SCALE_SIZE - 1:
-		kasaninfo.rType = KASAN_RTYPE_OUT_OF_BOUND;
-		break;
-	case KASAN_PAGE_REDZONE:
-	case KASAN_KMALLOC_REDZONE:
-		kasaninfo.rType = KASAN_RTYPE_SLAB_OUT_OF_BOUND;
-		break;
-	case KASAN_GLOBAL_REDZONE:
-		kasaninfo.rType = KASAN_RTYPE_GLOBAL_OUT_OF_BOUND;
-		break;
-	case KASAN_STACK_LEFT:
-	case KASAN_STACK_MID:
-	case KASAN_STACK_RIGHT:
-	case KASAN_STACK_PARTIAL:
-		kasaninfo.rType = KASAN_RTYPE_STACK_OUT_OF_BOUND;
-		break;
-	case KASAN_FREE_PAGE:
-	case KASAN_KMALLOC_FREE:
-		kasaninfo.rType = KASAN_RTYPE_USE_AFTER_FREE;
-		break;
-	case KASAN_USE_AFTER_SCOPE:
-		kasaninfo.rType = KASAN_RTYPE_USE_AFTER_SCOPE;
-		break;
-	}
-	snprintf(kasaninfo.ap,FILESIZE , "%pS\n",(void*)info->ip);
-
-	return kasaninfo;
-}
-#endif
 
 void kasan_report_double_free(struct kmem_cache *cache, void *object,
 				void *ip)
@@ -389,10 +344,6 @@ static void kasan_report_error(struct kasan_access_info *info)
 {
 	unsigned long flags;
 
-#if defined(CONFIG_SEC_DEBUG_KASAN)
-	struct kasandebug kasandebuginfo;
-#endif
-
 	kasan_start_report(&flags);
 
 	print_error_description(info);
@@ -407,10 +358,6 @@ static void kasan_report_error(struct kasan_access_info *info)
 	}
 
 	kasan_end_report(&flags);
-#if defined(CONFIG_SEC_DEBUG_KASAN)
-	kasandebuginfo = kasan_get_bug_type(info);
-	sec_debug_kasan_handler(&kasandebuginfo);
-#endif
 }
 
 static unsigned long kasan_flags;

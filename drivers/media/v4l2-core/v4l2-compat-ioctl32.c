@@ -1222,6 +1222,7 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		break;
 
 	case VIDIOC_G_EDID:
+	case VIDIOC_S_EDID:
 		err = put_v4l2_edid32(up_native, up);
 		break;
 

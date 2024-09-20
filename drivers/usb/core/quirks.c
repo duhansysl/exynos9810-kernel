@@ -291,6 +291,20 @@ static const struct usb_device_id usb_quirk_list[] = {
 	/* INTEL VALUE SSD */
 	{ USB_DEVICE(0x8086, 0xf1a5), .driver_info = USB_QUIRK_RESET_RESUME },
 
+	/* VIA 3.0 HUB (MPA HUB) */
+	{ USB_DEVICE(0x2109, 0x0817),
+		.driver_info = USB_QUIRK_NO_LPM | USB_QUIRK_HUB_NO_SUSPEND },
+
+	/* VIA 2.0 HUB (MPA HUB) */
+	{ USB_DEVICE(0x2109, 0x2817),
+		.driver_info = USB_QUIRK_NO_LPM | USB_QUIRK_HUB_NO_SUSPEND },
+
+	/* Realtek r8153 Lan dongle */
+	{ USB_DEVICE(0x0bda, 0x8153), .driver_info = USB_QUIRK_NO_LPM },
+#if defined(CONFIG_USB_HOST_RELOAD_FTDI)
+	/* FTDI USB2Serial device */
+	{ USB_DEVICE(0x0403, 0x6015), .driver_info = USB_FTDI_DEVICE_RECOVERY },
+#endif
 	{ }  /* terminating entry must be last */
 };
 
@@ -416,3 +430,30 @@ void usb_detect_interface_quirks(struct usb_device *udev)
 		quirks);
 	udev->quirks |= quirks;
 }
+
+#ifdef CONFIG_USB_INTERFACE_LPM_LIST
+static const struct usb_device_id usb_interface_list_lpm[] = {
+	{ .match_flags = USB_DEVICE_ID_MATCH_INT_CLASS,
+		.bInterfaceClass = USB_CLASS_AUDIO},
+	{ }						/* Terminating entry */
+};
+
+int usb_detect_interface_lpm(struct usb_device *udev)
+{
+	const struct usb_device_id *id = usb_interface_list_lpm;
+	int l1_enable = 0;
+	
+	for (; id->match_flags; id++) {
+		if (!usb_match_device(udev, id))
+			continue;
+		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_INFO) &&
+		    !usb_match_any_interface(udev, id))
+			continue;
+		l1_enable = 1;
+		break;
+	}
+
+	return l1_enable;
+}
+#endif
+

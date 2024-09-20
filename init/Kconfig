@@ -1843,7 +1843,7 @@ config SHMEM
 
 config AIO
 	bool "Enable AIO support" if EXPERT
-	default y if ANDROID_VERSION >= "90000"
+	default y
 	help
 	  This option enables POSIX asynchronous I/O which may by used
 	  by some high performance threaded applications. Disabling
@@ -2096,9 +2096,9 @@ config DEFERRED_INITCALLS
 	bool "Deferred initcalls support"
 	default n
 	help
-	  Say 'y' here to include support for deferred initcalls.
-	  If some module init functions set as deferred initcall, they aren't
-	  called until /proc/deferred_initcalls is read.
+		Say 'y' here to include support for deferred initcalls.
+		If some module init functions set as deferred initcall, they aren't
+		alled until /proc/deferred_initcalls is read.
 
 config PROFILING
 	bool "Profiling support"

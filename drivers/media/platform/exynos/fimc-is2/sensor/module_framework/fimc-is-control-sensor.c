@@ -599,6 +599,17 @@ void fimc_is_sensor_ctl_frame_evt(struct fimc_is_device_sensor *device)
 			err("[%s] frame number(%d) update gains fail\n", __func__, applied_frame_number);
 		}
 
+		if (module_ctl->update_wb_gains) {
+			ret = fimc_is_sensor_peri_s_wb_gains(device, module_ctl->wb_gains);
+			if (ret < 0)
+				err("[%s] frame number(%d) set exposure fail\n", __func__, applied_frame_number);
+
+			module_ctl->update_wb_gains = false;
+		}
+		ret = fimc_is_sensor_set_test_pattern(device, sensor_ctrl);
+		if (ret < 0)
+			err("[%s] frame number(%d) set test pattern fail\n", __func__, applied_frame_number);
+
 #ifdef CONFIG_COMPANION_USE
 		/* update cis_data about preproc */
 		fimc_is_sensor_ctl_update_preproc_ae_gains(sensor_peri);

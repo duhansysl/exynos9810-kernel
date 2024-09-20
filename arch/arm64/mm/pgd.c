@@ -32,7 +32,6 @@
 #include <linux/rkp.h>
 #endif
 #endif
-
 static struct kmem_cache *pgd_cache;
 
 pgd_t *pgd_alloc(struct mm_struct *mm)

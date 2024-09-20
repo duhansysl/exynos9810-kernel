@@ -348,9 +348,9 @@ struct printk_log {
 	u8 cpu;			/* cpu id */
 	u8 in_interrupt;	/* interrupt context */
 #endif
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
-	u8 for_auto_summary;
-	u8 type_auto_summary;
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
+	u8 for_auto_comment;
+	u8 type_auto_comment;
 #endif
 }
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
@@ -563,7 +563,7 @@ static size_t print_process(const struct printk_log *msg, char *buf)
 #endif
 module_param_named(process, printk_process, bool, S_IRUGO | S_IWUSR);
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 static void (*func_hook_auto_comm)(int type, const char *buf, size_t size);
 void register_set_auto_comm_buf(void (*func)(int type, const char *buf, size_t size))
 {
@@ -615,6 +615,37 @@ void register_hook_logbuf(void (*func)(const char *buf, size_t size))
 EXPORT_SYMBOL(register_hook_logbuf);
 #endif
 
+#if CONFIG_SEC_DEBUG_FIRST_KMSG
+static void (*func_hook_first_kmsg)(const char *buf, size_t size);
+void register_first_kmsg_hook_func(void (*func)(const char *buf, size_t size))
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&logbuf_lock, flags);
+	/*
+	 * In register hooking function,  we should check messages already
+	 * printed on log_buf. If so, they will be copyied to backup
+	 * first_kmsg buffer
+	 * */
+	if (log_first_seq != log_next_seq) {
+		unsigned int step_seq, step_idx, start, end;
+		struct printk_log *msg;
+		start = log_first_seq;
+		end = log_next_seq;
+		step_idx = log_first_idx;
+		for (step_seq = start; step_seq < end; step_seq++) {
+			msg = (struct printk_log *)(log_buf + step_idx);
+			hook_size = msg_print_text(msg, msg->flags,
+					true, hook_text, LOG_LINE_MAX + PREFIX_MAX);
+			func(hook_text, hook_size);
+			step_idx = log_next(step_idx);
+		}
+	}
+	func_hook_first_kmsg = func;
+	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+
+}
+#endif
 
 /*
  * Define how much of the log buffer we could take at maximum. The value
@@ -686,10 +717,10 @@ static int log_store(int facility, int level,
 	msg->dict_len = dict_len;
 	msg->facility = facility;
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
-	msg->for_auto_summary = (level / 10 == 9) ? 1 : 0;
-	msg->type_auto_summary = (level / 10 == 9) ? level - LOGLEVEL_PR_AUTO_BASE : 0;
-	level = (msg->for_auto_summary) ? 0 : level;
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
+	msg->for_auto_comment = (level / 10 == 9) ? 1 : 0;
+	msg->type_auto_comment = (level / 10 == 9) ? level - LOGLEVEL_PR_AUTO_BASE : 0;
+	level = (msg->for_auto_comment) ? 0 : level;
 #endif
 
 	msg->level = level & 7;
@@ -716,15 +747,20 @@ static int log_store(int facility, int level,
 				true, hook_text, LOG_LINE_MAX + PREFIX_MAX);
 		func_hook_logbuf(hook_text, hook_size);
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
-		if (msg->for_auto_summary && func_hook_auto_comm)
-			func_hook_auto_comm(msg->type_auto_summary, hook_text, hook_size);
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
+		if (msg->for_auto_comment && func_hook_auto_comm)
+			func_hook_auto_comm(msg->type_auto_comment, hook_text, hook_size);
 #endif
 
 #ifdef CONFIG_SEC_DEBUG_INIT_LOG
 		if (task_pid_nr(current) == 1 && func_hook_init_log) {
 			func_hook_init_log(hook_text, hook_size);
 		}
+#endif
+
+#if CONFIG_SEC_DEBUG_FIRST_KMSG
+		if (func_hook_first_kmsg)
+			func_hook_first_kmsg(hook_text, hook_size);
 #endif
 	}
 #endif
@@ -923,11 +959,6 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 			len -= endp - line;
 			line = endp;
 		}
-	}
-
-	if (unlikely(strncmp("healthd", line, 7) == 0 || strncmp("Trustonic TEE", line, 13) == 0))
-	{
-		return len;
 	}
 
 	printk_emit(facility, level, NULL, 0, "%s", line);
@@ -1599,7 +1630,6 @@ static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
 		}
 	}
 	/* } SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM */
-
 	raw_spin_unlock_irq(&logbuf_lock);
 
 	kfree(text);
@@ -2060,7 +2090,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 				if (level == LOGLEVEL_DEFAULT)
 					level = kern_level - '0';
 				/* fallthrough */
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 			case 'B' ... 'J':
 				if (level == LOGLEVEL_DEFAULT)
 					level = LOGLEVEL_PR_AUTO_BASE + (kern_level - 'A'); /* 91 ~ 99 */
@@ -2961,7 +2991,7 @@ void register_console(struct console *newcon)
 	 * went to the bootconsole (that they do not see on the real console)
 	 */
 	pr_info("%sconsole [%s%d] enabled\n",
-		(newcon->flags & CON_BOOT) ? "boot" : "",
+		(newcon->flags & CON_BOOT) ? "boot" : "" ,
 		newcon->name, newcon->index);
 	if (bcon &&
 	    ((newcon->flags & (CON_CONSDEV | CON_BOOT)) == CON_CONSDEV) &&
@@ -2978,11 +3008,11 @@ EXPORT_SYMBOL(register_console);
 
 int unregister_console(struct console *console)
 {
-	struct console *a, *b;
+        struct console *a, *b;
 	int res;
 
 	pr_info("%sconsole [%s%d] disabled\n",
-		(console->flags & CON_BOOT) ? "boot" : "",
+		(console->flags & CON_BOOT) ? "boot" : "" ,
 		console->name, console->index);
 
 	res = _braille_unregister_console(console);
@@ -2992,11 +3022,11 @@ int unregister_console(struct console *console)
 	res = 1;
 	console_lock();
 	if (console_drivers == console) {
-		console_drivers = console->next;
+		console_drivers=console->next;
 		res = 0;
 	} else if (console_drivers) {
-		for (a = console_drivers->next, b = console_drivers;
-		     a; b = a, a = b->next) {
+		for (a=console_drivers->next, b=console_drivers ;
+		     a; b=a, a=b->next) {
 			if (a == console) {
 				b->next = a->next;
 				res = 0;

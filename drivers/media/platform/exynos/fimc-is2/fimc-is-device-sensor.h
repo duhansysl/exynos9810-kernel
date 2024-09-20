@@ -164,15 +164,11 @@ struct fimc_is_device_ischain;
 
 enum fimc_is_sensor_subdev_ioctl {
 	SENSOR_IOCTL_DMA_CANCEL,
+	SENSOR_IOCTL_PATTERN_ENABLE,
+	SENSOR_IOCTL_PATTERN_DISABLE,
 };
 
-#if defined(CONFIG_SECURE_CAMERA_USE)
-#define MC_SECURE_CAMERA_SYSREG_PROT    ((uint32_t)(0x82002132))
-#define MC_SECURE_CAMERA_INIT           ((uint32_t)(0x83000041))
-#define MC_SECURE_CAMERA_CFW_ENABLE     ((uint32_t)(0x83000042))
-#define MC_SECURE_CAMERA_PREPARE        ((uint32_t)(0x83000043))
-#define MC_SECURE_CAMERA_UNPREPARE      ((uint32_t)(0x83000044))
-
+#if defined(SECURE_CAMERA_IRIS)
 enum fimc_is_sensor_smc_state {
         FIMC_IS_SENSOR_SMC_INIT = 0,
         FIMC_IS_SENSOR_SMC_CFW_ENABLE,
@@ -231,6 +227,8 @@ struct fimc_is_sensor_cfg {
 
 
 struct fimc_is_sensor_vc_max_size {
+	int stat_type;
+	int sensor_mode;
 	u32 width;
 	u32 height;
 	u32 element_size;
@@ -303,13 +301,13 @@ enum fimc_is_sensor_state {
 	FIMC_IS_SENSOR_GPIO_ON,
 	FIMC_IS_SENSOR_S_INPUT,
 	FIMC_IS_SENSOR_S_CONFIG,
-	FIMC_IS_SENSOR_DRIVING,		/* DEPRECATED: Not used form device-sensor_v3 */
+	FIMC_IS_SENSOR_DRIVING,		/* Deprecated: from device-sensor_v2 */
 	FIMC_IS_SENSOR_STAND_ALONE,	/* SOC sensor, Iris sensor, Vision mode without IS chain */
 	FIMC_IS_SENSOR_FRONT_START,
 	FIMC_IS_SENSOR_FRONT_DTP_STOP,
 	FIMC_IS_SENSOR_BACK_START,
-	FIMC_IS_SENSOR_BACK_NOWAIT_STOP,
-	FIMC_IS_SENSOR_SUBDEV_MODULE_INIT,
+	FIMC_IS_SENSOR_BACK_NOWAIT_STOP,	/* Deprecated: There is no special meaning from device-sensor_v2 */
+	FIMC_IS_SENSOR_SUBDEV_MODULE_INIT,	/* Deprecated: from device-sensor_v2 */
 	FIMC_IS_SENSOR_OTF_OUTPUT,
 	FIMC_IS_SENSOR_ITF_REGISTER,	/* to check whether sensor interfaces are registered */
 	FIMC_IS_SENSOR_WAIT_STREAMING
@@ -359,7 +357,7 @@ struct fimc_is_device_sensor {
 	spinlock_t					slock_state;
 	struct mutex					mlock_state;
 	atomic_t					group_open_cnt;
-#if defined(CONFIG_SECURE_CAMERA_USE)
+#if defined(SECURE_CAMERA_IRIS)
 	enum fimc_is_sensor_smc_state			smc_state;
 #endif
 
@@ -424,6 +422,11 @@ struct fimc_is_device_sensor {
 	u32						use_standby;
 	u32						sstream;
 	u32						ex_mode;
+	u32						ex_scenario;
+
+#ifdef ENABLE_REMOSAIC_CAPTURE_WITH_ROTATION
+	struct fimc_is_frame				*mode_chg_frame;
+#endif
 };
 
 int fimc_is_sensor_open(struct fimc_is_device_sensor *device,

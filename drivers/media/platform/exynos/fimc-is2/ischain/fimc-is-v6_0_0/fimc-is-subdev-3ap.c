@@ -197,14 +197,11 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 	int ret = 0;
 	struct fimc_is_subdev *leader;
 	struct fimc_is_queue *queue;
-	struct camera2_scaler_uctl *scalerUd;
 	struct taa_param *taa_param;
 	struct fimc_is_crop *otcrop, otparm;
 	struct fimc_is_device_ischain *device;
 	u32 lindex, hindex, indexes;
 	u32 pixelformat = 0;
-	int scenario_id;
-
 	device = (struct fimc_is_device_ischain *)device_data;
 
 	FIMC_BUG(!device);
@@ -220,7 +217,6 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 	lindex = hindex = indexes = 0;
 	leader = subdev->leader;
 	taa_param = &device->is_region->parameter.taa;
-	scalerUd = &ldr_frame->shot->uctl.scalerUd;
 	queue = GET_SUBDEV_QUEUE(subdev);
 	if (!queue) {
 		merr("queue is NULL", device);
@@ -233,9 +229,6 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 		ret = -EINVAL;
 		goto p_err;
 	}
-
-	scenario_id = device->resourcemgr->dvfs_ctrl.static_ctrl->cur_scenario_id;
-
 	pixelformat = queue->framecfg.format->pixelformat;
 	otcrop = (struct fimc_is_crop *)node->output.cropRegion;
 
@@ -264,11 +257,6 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 				merr("fimc_is_ischain_3ap_start is fail(%d)", device, ret);
 				goto p_err;
 			}
-
-			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
-				mdbg_pframe("ot_crop[%d, %d, %d, %d] on\n", device, subdev, ldr_frame,
-					otcrop->x, otcrop->y, otcrop->w, otcrop->h);
-			}
 		}
 
 		ret = fimc_is_ischain_buf_tag(device,
@@ -277,7 +265,7 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 			pixelformat,
 			otcrop->w,
 			otcrop->h,
-			scalerUd->txpTargetAddress);
+			ldr_frame->txpTargetAddress);
 		if (ret) {
 			mswarn("%d frame is drop", device, subdev, ldr_frame->fcount);
 			node->request = 0;
@@ -298,16 +286,11 @@ static int fimc_is_ischain_3ap_tag(struct fimc_is_subdev *subdev,
 				merr("fimc_is_ischain_3ap_stop is fail(%d)", device, ret);
 				goto p_err;
 			}
-
-			if (scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_120FPS && scenario_id != FIMC_IS_SN_VIDEO_HIGH_SPEED_240FPS) {
-				mdbg_pframe("ot_crop[%d, %d, %d, %d] off\n", device, subdev, ldr_frame,
-					otcrop->x, otcrop->y, otcrop->w, otcrop->h);
-			}
 		}
 
-		scalerUd->txpTargetAddress[0] = 0;
-		scalerUd->txpTargetAddress[1] = 0;
-		scalerUd->txpTargetAddress[2] = 0;
+		ldr_frame->txpTargetAddress[0] = 0;
+		ldr_frame->txpTargetAddress[1] = 0;
+		ldr_frame->txpTargetAddress[2] = 0;
 		node->request = 0;
 	}
 

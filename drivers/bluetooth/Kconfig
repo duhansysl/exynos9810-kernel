@@ -348,7 +348,7 @@ config BT_BCM43XX
 	help
 	  Adds BCM43XX RFKILL driver for Broadcom BCM4359 chipset for exynos.
 	  default is n.
-
+	  
 config BT_QCOMSMD
 	tristate "Qualcomm SMD based HCI support"
 	depends on QCOM_SMD && QCOM_WCNSS_CTRL

@@ -156,7 +156,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	struct tcf_mirred *m = to_mirred(a);
 	struct net_device *dev;
 	struct sk_buff *skb2;
-	int retval, err;
+	int retval, err = 1;
 	u32 at;
 
 	tcf_lastuse_update(&m->tcf_tm);
@@ -176,23 +176,16 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 		goto out;
 	}
 
+	at = G_TC_AT(skb->tc_verd);
 	skb2 = skb_clone(skb, GFP_ATOMIC);
 	if (!skb2)
 		goto out;
 
 	if (m->tcfm_eaction == TCA_INGRESS_REDIR) {
-		/* Let's _hope_ the devices are of similar type.
-		 * This is rather dangerous; with changed skb_iif, we
-		 * will not know the real input device, but perhaps
-		 * that's the whole point of doing the ingress
-		 * redirect/mirror in the first place?  (Note: This
-		 * can lead to bad things if two devices ingress
-		 * redirect at each other. Don't do that.)
-		 */
-		skb2->dev = dev;
-		skb2->skb_iif = skb2->dev->ifindex;
-		skb2->pkt_type = PACKET_HOST;
-		netif_rx(skb2);
+			skb2->dev = dev;
+			skb2->skb_iif = skb2->dev->ifindex;
+			skb2->pkt_type = PACKET_HOST;
+			netif_rx(skb2);
 	} else {
 		at = G_TC_AT(skb->tc_verd);
 		if (!(at & AT_EGRESS)) {
@@ -208,6 +201,7 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 		skb2->dev = dev;
 		err = dev_queue_xmit(skb2);
 	}
+
 	if (err) {
 out:
 		qstats_overlimit_inc(this_cpu_ptr(m->common.cpu_qstats));

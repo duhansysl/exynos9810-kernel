@@ -1,6 +1,4 @@
 ifdef CONFIG_UBSAN
-      CC = $(srctree)/../../prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.2.1/bin/aarch64-linux-gnu-gcc
-
       CFLAGS_UBSAN += $(call cc-option, -fsanitize=shift)
       CFLAGS_UBSAN += $(call cc-option, -fsanitize=integer-divide-by-zero)
       CFLAGS_UBSAN += $(call cc-option, -fsanitize=unreachable)
@@ -23,5 +21,4 @@ endif
       # -fsanitize=* options makes GCC less smart than usual and
       # increase number of 'maybe-uninitialized false-positives
       CFLAGS_UBSAN += $(call cc-option, -Wno-maybe-uninitialized)
-      CFLAGS_UBSAN += $(call cc-option, -D__ANDROID__ -Wno-error)
 endif

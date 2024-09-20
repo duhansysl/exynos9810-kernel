@@ -35,7 +35,12 @@
 #include "tlcTui.h"
 #include "tui-hal.h"
 #ifdef CONFIG_TRUSTED_UI_TOUCH_ENABLE
+#if defined(CONFIG_TOUCHSCREEN_SEC_TS) || defined(CONFIG_TOUCHSCREEN_SEC_TS_Y771)
 #include "../../../../../input/touchscreen/sec_ts/sec_ts.h"
+#endif
+#if defined(CONFIG_TOUCHSCREEN_MELFAS_MSS100)
+#include "../../../../../input/touchscreen/melfas/mss100/melfas_mss100.h"
+#endif
 #endif
 
 /* I2C register for reset */
@@ -61,9 +66,9 @@ bool tui_cover_mode_on;
 extern phys_addr_t hal_tui_video_space_alloc(void);
 extern int decon_lpd_block_exit(struct decon_device *decon);
 
-#ifdef CONFIG_TRUSTED_UI_TOUCH_ENABLE
 static int tsp_irq_num = 718;	// default value
-#if defined(CONFIG_TOUCHSCREEN_SEC_TS) || defined(CONFIG_TOUCHSCREEN_SEC_TS_Y771)
+
+#ifdef CONFIG_TRUSTED_UI_TOUCH_ENABLE
 static void tui_delay(unsigned int ms)
 {
 	if (ms < 20)
@@ -71,7 +76,7 @@ static void tui_delay(unsigned int ms)
 	else
 		msleep(ms);
 }
-#endif
+
 void trustedui_set_tsp_irq(int irq_num)
 {
 	tsp_irq_num = irq_num;
@@ -381,7 +386,13 @@ uint32_t hal_tui_deactivate(void)
 	tui_delay(5);
 	trustedui_mode_on();
 	tui_delay(5);
-	trustedui_set_mask(TRUSTEDUI_MODE_INPUT_SECURED);	
+	trustedui_set_mask(TRUSTEDUI_MODE_INPUT_SECURED);
+	tui_delay(90);
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_MSS100)
+	tui_delay(5);
+	mms_trustedui_mode_on();
+	tui_delay(5);
+	trustedui_set_mask(TRUSTEDUI_MODE_INPUT_SECURED);
 	tui_delay(90);
 #else
 	trustedui_set_mask(TRUSTEDUI_MODE_INPUT_SECURED);

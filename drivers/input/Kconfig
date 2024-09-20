@@ -193,22 +193,6 @@ config INPUT_KEYRESET
 	---help---
 	  Say Y here if you want to reboot when some keys are pressed;
 
-config INPUT_TOUCHSCREEN_TCLM
-	bool "touchscreen tclm"
-	depends on I2C
-	help
-	  Say Y here if you need to use tclm.
-
-	  If unsure, say N.
-
-config INPUT_TOUCHSCREEN_TCLMV2
-	bool "touchscreen tclmv2"
-	depends on I2C
-	help
-	  Say Y here if you need to use tclm.
-
-	  If unsure, say N.
-
 config INPUT_KEYCOMBO
 	bool "Key combo"
 	depends on INPUT
@@ -225,27 +209,6 @@ config HALL
 
 	  If unsure, say N.
 
-config HALL_EVENT_REVERSE
-	tristate "Adjusting the status value of HALL IC"
-	default y
-	depends on HALL
-	depends on ANDROID_MAJOR_VERSION >= "q"
-	help
-	  Adjusting the status value of HALL IC.
-	  This was required from input FW.
-
-	  If unsure, say N.
-
-config HALL_NEW_NODE
-	bool "Chang the node location of HALL IC"
-	default y
-	depends on HALL
-	help
-	  Say Y here if you want to change the location of hall ic node.
-	  it was decided with the framework to be changed from R OS
-	  The previous versions of R OS are created before the change.
-	  If unsure, say N.
-
 config CERTIFY_HALL
 	tristate "Enable CERTIFY HALL IC"
 	default n
@@ -256,31 +219,28 @@ config CERTIFY_HALL
 
 	  If unsure, say N.
 
-config GLOVE_TOUCH
-	tristate "Glove touch"
-	help
-	  Say Y here if you want glove touch.
-
-config SEC_AUTO_INPUT
-	tristate "Samsung auto input"
-	depends on !SAMSUNG_PRODUCT_SHIP
+config HALL_NEW_NODE
+	bool "Chang the node location of HALL IC"
 	default y
+	depends on HALL
+	depends on PLATFORM_VERSION >= 11
 	help
-	  Say Y here if you use auto input function.
-
+	  Say Y here if you want to change the location of hall ic node.
+	  it was decided with the framework to be changed from R OS
+	  The previous versions of R OS are created before the change.
 	  If unsure, say N.
 
-	  To compile this driver as a module, choose M here: the
-	  module will be called autoinput.
+config SEC_DEBUG_TSP_LOG
+	tristate "Support for tsp_msg"
+	default n
 
-config SEC_INPUT_BOOSTER
-	bool "SEC INPUT BOOSTER"
-	depends on INPUT_EVDEV
-	default y
+config TOUCHSCREEN_DUMP_MODE
+	bool "touchscreen dump mode"
+	depends on INPUT_TOUCHSCREEN
 	help
-	  Say Y here if you need to enable Input Booster.
+	  Say Y here if you need to get raw data.
 
-	  It's triggered in evdev module.
+	  If unsure, say N.
 
 comment "Input Device Drivers"
 

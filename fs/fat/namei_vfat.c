@@ -79,14 +79,13 @@ static int vfat_revalidate_ci(struct dentry *dentry, unsigned int flags)
 	if (d_really_is_positive(dentry))
 		return 1;
 
-#if 0   /* Blocked below code for lookup_one_len() called by stackable FS */
 	/*
 	 * This may be nfsd (or something), anyway, we can't see the
 	 * intent of this. So, since this can be for creation, drop it.
 	 */
 	if (!flags)
 		return 0;
-#endif
+
 	/*
 	 * Drop the negative dentry, in order to make sure to use the
 	 * case sensitive name which is specified by user if this is
@@ -752,7 +751,6 @@ static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 	 */
 	if (alias && alias->d_parent == dentry->d_parent &&
 	    !vfat_d_anon_disconn(alias)) {
-
 		/*
 		 * Unhashed alias is able to exist because of revalidate()
 		 * called by lookup_fast. You can easily make this status

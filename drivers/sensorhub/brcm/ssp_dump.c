@@ -18,7 +18,7 @@
 int get_size_dumpregister(int sensor_type)
 {
 	int size = 0;
-
+ 
 	switch (sensor_type) {
 	case ACCELEROMETER_SENSOR:
 	case GYROSCOPE_SENSOR:

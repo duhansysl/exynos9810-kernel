@@ -95,9 +95,12 @@
 
 #ifdef CONFIG_UH
 #include <linux/uh.h>
-#endif
 #ifdef CONFIG_UH_RKP
 #include <linux/rkp.h>
+#ifdef CONFIG_RKP_KDP
+#include <linux/kdp.h>
+#endif
+#endif
 #endif
 
 #ifdef CONFIG_SECURITY_DEFEX
@@ -111,15 +114,10 @@ extern void init_IRQ(void);
 extern void fork_init(void);
 extern void radix_tree_init(void);
 
+#ifdef CONFIG_UH_RKP
 int rkp_support_large_memory;
 EXPORT_SYMBOL(rkp_support_large_memory);
-
-#ifdef CONFIG_UH_RKP
 extern struct vm_struct *vmlist;
-#endif
-
-#ifdef CONFIG_PTRACK_DEBUG
-extern void ptrack_init(void);
 #endif
 
 #ifdef CONFIG_DEFERRED_INITCALLS
@@ -145,6 +143,10 @@ static void __ref do_deferred_initcalls(struct work_struct *work)
 		do_one_initcall(*call);
 
 	free_initmem();
+#ifdef CONFIG_UH_RKP
+	uh_call(UH_APP_RKP, RKP_DEFERRED_START, 0, 0, 0, 0);
+#endif
+
 }
 
 static DECLARE_WORK(deferred_initcall_work, do_deferred_initcalls);
@@ -176,6 +178,11 @@ void (*__initdata late_time_init)(void);
 char __initdata boot_command_line[COMMAND_LINE_SIZE];
 /* Untouched saved command line (eg. for /proc) */
 char *saved_command_line;
+
+#if defined(CONFIG_SEC_DEBUG_HIDING)
+char *erased_command_line;
+#endif
+
 /* Command line for parameter parsing */
 static char *static_command_line;
 /* Command line for per-initcall parameter parsing */
@@ -426,10 +433,17 @@ static void __init setup_command_line(char *command_line)
 {
 	saved_command_line =
 		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
+#if defined(CONFIG_SEC_DEBUG_HIDING)
+	erased_command_line =
+		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
+#endif
 	initcall_command_line =
 		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
 	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
 	strcpy(saved_command_line, boot_command_line);
+#if defined(CONFIG_SEC_DEBUG_HIDING)
+	strcpy(erased_command_line, boot_command_line);
+#endif
 	strcpy(static_command_line, command_line);
 }
 
@@ -473,7 +487,7 @@ static noinline void __ref rest_init(void)
 }
 
 #ifdef CONFIG_RKP_KDP
-RKP_RO_AREA int is_recovery = 0;
+RKP_RO_AREA int __is_kdp_recovery = 0;
 #endif
 /* Check for early params. */
 static int __init do_early_param(char *param, char *val,
@@ -496,7 +510,7 @@ static int __init do_early_param(char *param, char *val,
 	if ((strncmp(param, "bootmode", 9) == 0)) {
 			//printk("\n RKP22 In Recovery Mode= %d\n",*val);
 			if ((strncmp(val, "2", 2) == 0)) {
-				is_recovery = 1;
+				__is_kdp_recovery = 1;
 			}
 	}
 #endif
@@ -555,10 +569,53 @@ static void __init mm_init(void)
 	vmalloc_init();
 	ioremap_huge_init();
 	kaiser_init();
-#ifdef CONFIG_PTRACK_DEBUG
-	ptrack_init();
-#endif
 }
+
+#ifdef CONFIG_RKP_KDP
+#define VERITY_PARAM_LENGTH 20
+static char verifiedbootstate[VERITY_PARAM_LENGTH];
+RKP_RO_AREA int __check_verifiedboot = 0;
+static int __init verifiedboot_state_setup(char *str)
+{
+	strlcpy(verifiedbootstate, str, sizeof(verifiedbootstate));
+
+	if(!strncmp(verifiedbootstate, "orange", sizeof("orange")))
+		__check_verifiedboot = 1;
+
+	return 0;
+}
+__setup("androidboot.verifiedbootstate=", verifiedboot_state_setup);
+
+void kdp_init(void)
+{
+	kdp_init_t cred;
+
+	cred.credSize 	= sizeof(struct cred);
+	cred.sp_size	= rkp_get_task_sec_size();
+	cred.pgd_mm 	= offsetof(struct mm_struct,pgd);
+	cred.uid_cred	= offsetof(struct cred,uid);
+	cred.euid_cred	= offsetof(struct cred,euid);
+	cred.gid_cred	= offsetof(struct cred,gid);
+	cred.egid_cred	= offsetof(struct cred,egid);
+
+	cred.bp_pgd_cred 	= offsetof(struct cred,bp_pgd);
+	cred.bp_task_cred 	= offsetof(struct cred,bp_task);
+	cred.type_cred 		= offsetof(struct cred,type);
+	cred.security_cred 	= offsetof(struct cred,security);
+	cred.usage_cred 	= offsetof(struct cred,use_cnt);
+
+	cred.cred_task  	= offsetof(struct task_struct,cred);
+	cred.mm_task 		= offsetof(struct task_struct,mm);
+	cred.pid_task		= offsetof(struct task_struct,pid);
+	cred.rp_task		= offsetof(struct task_struct,real_parent);
+	cred.comm_task 		= offsetof(struct task_struct,comm);
+
+	cred.bp_cred_secptr 	= rkp_get_offset_bp_cred();
+
+	cred.verifiedbootstate = (u64)verifiedbootstate;
+	uh_call(UH_APP_RKP, 0x40, (u64)&cred, 0, 0, 0);
+}
+#endif /*CONFIG_RKP_KDP*/
 
 #ifdef CONFIG_UH_RKP
 #ifdef CONFIG_UH_RKP_8G
@@ -612,58 +669,24 @@ static void __init rkp_init(void)
 	init.extra_memory_size = RKP_EXTRA_MEM_SIZE;
 	//init.physmap_addr
 	init._srodata = (u64)__start_rodata;
-	init._erodata = (u64)__end_rodata;
+	init._erodata = (u64)__init_begin;
 	init.large_memory = rkp_support_large_memory;
 
 	uh_call(UH_APP_RKP, RKP_START, (u64)&init, (u64)kimage_voffset, 0, 0);
 	rkp_started = 1;
 }
 #endif
-#ifdef CONFIG_RKP_KDP
-#define VERITY_PARAM_LENGTH 20
-static char verifiedbootstate[VERITY_PARAM_LENGTH];
-static int __init verifiedboot_state_setup(char *str)
-{
-	strlcpy(verifiedbootstate, str, sizeof(verifiedbootstate));
-	return 1;
-}
-__setup("androidboot.verifiedbootstate=", verifiedboot_state_setup);
-
-void kdp_init(void)
-{
-	kdp_init_t cred;
-
-	cred.credSize 	= sizeof(struct cred);
-	cred.sp_size	= rkp_get_task_sec_size();
-	cred.pgd_mm 	= offsetof(struct mm_struct,pgd);
-	cred.uid_cred	= offsetof(struct cred,uid);
-	cred.euid_cred	= offsetof(struct cred,euid);
-	cred.gid_cred	= offsetof(struct cred,gid);
-	cred.egid_cred	= offsetof(struct cred,egid);
-
-	cred.bp_pgd_cred 	= offsetof(struct cred,bp_pgd);
-	cred.bp_task_cred 	= offsetof(struct cred,bp_task);
-	cred.type_cred 		= offsetof(struct cred,type);
-	cred.security_cred 	= offsetof(struct cred,security);
-	cred.usage_cred 	= offsetof(struct cred,use_cnt);
-
-	cred.cred_task  	= offsetof(struct task_struct,cred);
-	cred.mm_task 		= offsetof(struct task_struct,mm);
-	cred.pid_task		= offsetof(struct task_struct,pid);
-	cred.rp_task		= offsetof(struct task_struct,real_parent);
-	cred.comm_task 		= offsetof(struct task_struct,comm);
-
-	cred.bp_cred_secptr 	= rkp_get_offset_bp_cred();
-
-	cred.verifiedbootstate = (u64)verifiedbootstate;
-	uh_call(UH_APP_RKP, 0x40, (u64)&cred, 0, 0, 0);
-}
-#endif /*CONFIG_RKP_KDP*/
-
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
 	char *after_dashes;
+
+#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP) && defined(CONFIG_SEC_DEBUG_HIDING)
+	char *erase_cmd_start, *erase_cmd_end;
+	char *erase_string[] = {"ap_serial=0x", "serialno=", "androidboot.em.did="};
+	size_t len, value_len;
+	unsigned int i, j;
+#endif
 
 	set_memsize_kernel_type(MEMSIZE_KERNEL_OTHERS);
 	set_task_stack_end_magic(&init_task);
@@ -700,7 +723,25 @@ asmlinkage __visible void __init start_kernel(void)
 	build_all_zonelists(NULL, NULL);
 	page_alloc_init();
 
+#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP) && defined(CONFIG_SEC_DEBUG_HIDING)
+	for (i = 0; i < ARRAY_SIZE(erase_string); i++) {
+		len = strlen(erase_string[i]);
+		erase_cmd_start = strstr(erased_command_line, erase_string[i]);
+		erase_cmd_end = strstr(erase_cmd_start, " ");
+
+		if ((erase_cmd_end != NULL) &&
+				(erase_cmd_start != NULL) &&
+				(erase_cmd_end > erase_cmd_start)) {
+			value_len = (size_t)(erase_cmd_end - erase_cmd_start) - len;
+
+			for (j = 0; j < value_len; j++)
+				erase_cmd_start[len + j] = '0';
+		}
+	}
+	pr_notice("Kernel command line: %s\n", erased_command_line);
+#else
 	pr_notice("Kernel command line: %s\n", boot_command_line);
+#endif
 	/* parameters may set static keys */
 	jump_label_init();
 	parse_early_param();
@@ -731,7 +772,6 @@ asmlinkage __visible void __init start_kernel(void)
 #endif /*CONFIG_RKP_KDP*/
 #endif
 #endif
-
 	/*
 	 * Set up the scheduler prior starting any interrupts (such as the
 	 * timer interrupt). Full topology setup happens at smp_init()
@@ -1053,7 +1093,6 @@ static void __init do_initcall_level(int level)
 #ifdef CONFIG_SEC_BOOTSTAT
 	sec_bootstat_add_initcall(initcall_level_names[level]);
 #endif
-
 }
 
 static void __init do_initcalls(void)
@@ -1158,6 +1197,7 @@ static int __ref kernel_init(void *unused)
 	int ret;
 
 	kernel_init_freeable();
+
 #ifdef CONFIG_SEC_GPIO_DVS
 	/************************ Caution !!! ****************************/
 	/* This function must be located in appropriate INIT position
@@ -1167,6 +1207,7 @@ static int __ref kernel_init(void *unused)
 	pr_info("%s: GPIO DVS: check init gpio\n", __func__);
 	gpio_dvs_check_initgpio();
 #endif /* CONFIG_SEC_GPIO_DVS */
+
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 #ifndef CONFIG_DEFERRED_INITCALLS
@@ -1180,7 +1221,7 @@ static int __ref kernel_init(void *unused)
 
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
-		if (!ret) {
+		if (!ret){
 #ifdef CONFIG_DEFERRED_INITCALLS
 			schedule_work(&deferred_initcall_work);
 #endif
@@ -1198,11 +1239,12 @@ static int __ref kernel_init(void *unused)
 	 */
 	if (execute_command) {
 		ret = run_init_process(execute_command);
-		if (!ret)
+		if (!ret) {
 #ifdef CONFIG_DEFERRED_INITCALLS
 			schedule_work(&deferred_initcall_work);
 #endif
 			return 0;
+		}
 		panic("Requested init %s failed (error %d).",
 		      execute_command, ret);
 	}
@@ -1214,7 +1256,6 @@ static int __ref kernel_init(void *unused)
 
 	panic("No working init found.  Try passing init= option to kernel. "
 	      "See Linux Documentation/init.txt for guidance.");
-	return 0;
 }
 
 static noinline void __init kernel_init_freeable(void)

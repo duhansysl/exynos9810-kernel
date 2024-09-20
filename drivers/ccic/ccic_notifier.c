@@ -3,7 +3,7 @@
 
 #include <linux/notifier.h>
 #include <linux/ccic/ccic_notifier.h>
-#include <linux/sec_sysfs.h>
+#include <linux/sec_class.h>
 #include <linux/ccic/ccic_sysfs.h>
 #ifdef CONFIG_USB_TYPEC_MANAGER_NOTIFIER
 #include <linux/battery/battery_notifier.h>
@@ -22,9 +22,73 @@
 
 static struct ccic_notifier_struct ccic_notifier;
 
-extern struct device *ccic_device;
+struct device *ccic_device;
 static int ccic_notifier_init_done;
 int ccic_notifier_init(void);
+
+char CCIC_NOTI_DEST_Print[CCIC_NOTI_DEST_NUM][10] = {
+    {"INITIAL"},
+    {"USB"},
+    {"BATTERY"},
+    {"PDIC"},
+    {"MUIC"},
+    {"CCIC"},
+    {"MANAGER"},
+    {"DP"},
+    {"DPUSB"},
+    {"ALL"},
+};
+
+char CCIC_NOTI_ID_Print[CCIC_NOTI_ID_NUM][20] = {
+    {"ID_INITIAL"},
+    {"ID_ATTACH"},
+    {"ID_RID"},
+    {"ID_USB"},
+    {"ID_POWER_STATUS"},
+    {"ID_WATER"},
+    {"ID_VCONN"},
+    {"ID_OTG"},
+    {"ID_TA"},
+    {"ID_DP_CONNECT"},
+    {"ID_DP_HPD"},
+    {"ID_DP_LINK_CONF"},
+    {"ID_DP_USB"},
+    {"ID_ROLE_SWAP"},
+    {"ID_FAC"},
+    {"ID_PIN_STATUS"},
+    {"ID_WATER_CABLE"},
+    {"ID_POGO"},
+};
+
+char CCIC_NOTI_RID_Print[CCIC_NOTI_RID_NUM][15] = {
+    {"RID_UNDEFINED"},
+    {"RID_000K"},
+    {"RID_001K"},
+    {"RID_255K"},
+    {"RID_301K"},
+    {"RID_523K"},
+    {"RID_619K"},
+    {"RID_OPEN"},
+};
+
+char CCIC_NOTI_USB_STATUS_Print[CCIC_NOTI_USB_STATUS_NUM][20] = {
+    {"USB_DETACH"},
+    {"USB_ATTACH_DFP"},
+    {"USB_ATTACH_UFP"},
+    {"USB_ATTACH_DRP"},
+    {"USB_ATTACH_NO_USB"},
+};
+
+char CCIC_NOTI_PIN_STATUS_Print[CCIC_NOTI_PIN_STATUS_NUM][20] = {
+    {"NO_DETERMINATION"},
+    {"CC1_ACTIVE"},
+    {"CC2_ACTIVE"},
+    {"AUDIO_ACCESSORY"},
+    {"DEBUG_ACCESSORY"},
+    {"ERROR"},
+    {"DISABLED"},
+    {"RFU"},
+};
 
 int ccic_notifier_register(struct notifier_block *nb, notifier_fn_t notifier,
 			ccic_notifier_device_t listener)
@@ -249,7 +313,22 @@ int ccic_notifier_init(void)
 		goto out;
 	}
 	ccic_notifier_init_done = 1;
+	ccic_device = sec_device_create(NULL, "ccic");
+	if (IS_ERR(ccic_device)) {
+		pr_err("%s Failed to create device(switch)!\n", __func__);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	/* create sysfs group */
+	ret = sysfs_create_group(&ccic_device->kobj, &ccic_sysfs_group);
+	if (ret) {
+		pr_err("%s: ccic sysfs fail, ret %d", __func__, ret);
+		goto out;
+	}
+#if !defined(CONFIG_USE_CCIC)
 	ccic_core_init();
+#endif
 	BLOCKING_INIT_NOTIFIER_HEAD(&(ccic_notifier.notifier_call_chain));
 
 out:

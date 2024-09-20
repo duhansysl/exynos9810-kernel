@@ -578,19 +578,10 @@ exit:
 }
 EXPORT_SYMBOL_GPL(thermal_zone_set_trips);
 
-#ifdef CONFIG_SEC_PM_DEBUG
-#define TEMP_NORMAL_COUNT 500
-#define TEMP_HOT_COUNT 100
-#define TEMP_THRESHOLD 76000
-#endif
-
 static void update_temperature(struct thermal_zone_device *tz)
 {
 	int temp, ret;
-#ifdef CONFIG_SEC_PM_DEBUG
-	static int count = 1;
-	int count_limit;
-#endif
+
 	ret = thermal_zone_get_temp(tz, &temp);
 	if (ret) {
 		if (ret != -EAGAIN)
@@ -612,19 +603,6 @@ static void update_temperature(struct thermal_zone_device *tz)
 	else
 		dev_dbg(&tz->device, "last_temperature=%d, current_temperature=%d\n",
 			tz->last_temperature, tz->temperature);
-
-#ifdef CONFIG_SEC_PM_DEBUG
-	if (tz->temperature >= TEMP_THRESHOLD)
-		count_limit = TEMP_HOT_COUNT;
-	else
-		count_limit = TEMP_NORMAL_COUNT;
-
-	if (count++ >= count_limit) {
-		count = 1;
-		dev_info(&tz->device, "[TMU] last_temperature=%d, current_temperature=%d\n",
-			tz->last_temperature, tz->temperature);
-	}
-#endif
 }
 
 static void thermal_zone_device_init(struct thermal_zone_device *tz)

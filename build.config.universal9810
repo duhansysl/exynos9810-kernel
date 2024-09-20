@@ -1,6 +1,6 @@
 ARCH=arm64
 CROSS_COMPILE=aarch64-linux-android-
-DEFCONFIG=universal9810_Q_defconfig
+DEFCONFIG=universal9810_pi_defconfig
 TARGET_SOC=exynos9810
 FILES="
 arch/arm64/boot/Image:kernel

@@ -48,9 +48,3 @@ config DCP_V1_0
         default n
         help
           use dcp v1.0
-
-config SRDZ_V1_0
-        bool "Use SRDZ H/W v1.0"
-        default n
-        help
-          use srdz v1.0

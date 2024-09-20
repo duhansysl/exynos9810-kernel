@@ -533,24 +533,6 @@ config LEDS_MAX77693
 	  multifunction device. It has build in control for two leds in flash
 	  and torch mode.
 
-config LEDS_MAX77865_RGB
-	tristate "LED support for MAX77865 RGB"
-	depends on MFD_MAX77865 && LEDS_CLASS && I2C
-	help
-	  If you say yes here you will get support for
-	  the MAX77865 RGB led chip.
-	  To enable this driver, MFD_MAX77865 should be enabled and
-	  MFD_MAX77865 calls this driver.
-
-config LEDS_MAX77705_RGB
-	tristate "LED support for MAX77705 RGB"
-	depends on MFD_MAX77705 && LEDS_CLASS && I2C
-	help
-	  If you say yes here you will get support for
-	  the MAX77705 RGB led chip.
-	  To enable this driver, MFD_MAX77705 should be enabled and
-	  MFD_MAX77705 calls this driver.
-
 config LEDS_MAX8997
 	tristate "LED support for MAX8997 PMIC"
 	depends on LEDS_CLASS && MFD_MAX8997
@@ -583,7 +565,7 @@ config LEDS_MENF21BMC
 	  will be called leds-menf21bmc.
 
 config LEDS_KTD2692
-	bool "LED support for KTD2692 flash LED controller"
+	tristate "LED support for KTD2692 flash LED controller"
 	depends on LEDS_CLASS_FLASH && OF
 	depends on GPIOLIB || COMPILE_TEST
 	help
@@ -683,24 +665,6 @@ config LEDS_S2MPB02
 	help
 	  This option enables support for the LEDs on the S2MPB02.
 
-config LEDS_KTD2692
-	bool "LED support for the KTD2692"
-	help
-	  If you say yes here you will get support for
-	  for the KTD2692 FLASH led chip.
-
-config LEDS_S2MPB02_MULTI_TORCH_REAR2
-	bool "LED support for second multi flash"
-	help
-	  If you say yes here you will get support for
-	  for second multi flash.
-
-config LEDS_KTD2692_MULTI_TORCH_REAR3
-	bool "LED support for third multi flash"
-	help
-	  If you say yes here you will get support for
-	  for third multi flash.
-
 config LEDS_IRIS_IRLED_SUPPORT
 	bool "IRLED support for IRIS"
 	depends on LEDS_CLASS
@@ -712,6 +676,26 @@ config LEDS_IRIS_IRLED_CERTIFICATE_SUPPORT
 	depends on LEDS_CLASS
 	help
 	  This option enables support for the LEDs on the S2MPB02.
+
+config LEDS_S2MU107_FLASH
+	bool "FLASH LED support for the S2MU107"
+    depends on (MFD_S2MU107) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the LEDS_S2MU107_FLASH led chip.
+
+config LEDS_S2MU106_FLASH
+	bool "FLASH LED support for the S2MU106"
+    depends on (MFD_S2MU106) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the LEDS_S2MU106_FLASH led chip.
+
+config LEDS_RT8547
+	bool "LED support for the RT8547"
+	help
+	  If you say yes here you will get support for
+	  for the RT8547 FLASH led chip.
 
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"

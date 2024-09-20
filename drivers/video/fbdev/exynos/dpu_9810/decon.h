@@ -44,6 +44,10 @@
 
 #include "regs-decon.h"
 
+#ifdef CONFIG_EXYNOS_MASS_PANEL
+#include "decon_abd.h"
+#endif
+
 #include "./panels/decon_lcd.h"
 #include "dsim.h"
 #include "displayport.h"
@@ -115,27 +119,27 @@ void dpu_debug_printk(const char *function_name, const char *format, ...);
 #define decon_err(fmt, ...)							\
 	do {									\
 		if (decon_log_level >= 3) {					\
-			pr_err(pr_fmt(fmt), ##__VA_ARGS__);			\
+			pr_err(pr_fmt("decon: "fmt), ##__VA_ARGS__);			\
 		}								\
 	} while (0)
 
 #define decon_warn(fmt, ...)							\
 	do {									\
 		if (decon_log_level >= 4) {					\
-			pr_warn(pr_fmt(fmt), ##__VA_ARGS__);			\
+			pr_warn(pr_fmt("decon: "fmt), ##__VA_ARGS__);			\
 		}								\
 	} while (0)
 
 #define decon_info(fmt, ...)							\
 	do {									\
 		if (decon_log_level >= 6)					\
-			pr_info(pr_fmt(fmt), ##__VA_ARGS__);			\
+			pr_info(pr_fmt("decon: "fmt), ##__VA_ARGS__);			\
 	} while (0)
 
 #define decon_dbg(fmt, ...)							\
 	do {									\
 		if (decon_log_level >= 7)					\
-			pr_info(pr_fmt(fmt), ##__VA_ARGS__);			\
+			pr_info(pr_fmt("decon: "fmt), ##__VA_ARGS__);			\
 	} while (0)
 
 #define DPU_DEBUG_WIN(fmt, args...)						\
@@ -253,6 +257,7 @@ enum decon_fifo_mode {
 	DECON_FIFO_08K,
 	DECON_FIFO_12K,
 	DECON_FIFO_16K,
+	DECON_FIFO_DUAL,
 };
 
 enum decon_merger_mode {
@@ -573,6 +578,8 @@ struct decon_win_config {
 		DECON_WIN_STATE_BUFFER,
 		DECON_WIN_STATE_UPDATE,
 		DECON_WIN_STATE_CURSOR,
+		DECON_WIN_STATE_MRESOL = 0x10000,
+		DECON_WIN_STATE_FINGERPRINT = 0x20000,
 	} state;
 
 	/* Reusability:This struct is used for IDMA and ODMA */
@@ -639,6 +646,10 @@ struct decon_reg_data {
 	int cursor_win;
 #ifdef CONFIG_SUPPORT_DSU
 	struct dsu_info dsu;
+#endif
+
+#if defined(CONFIG_SUPPORT_MASK_LAYER)
+	bool mask_layer;
 #endif
 };
 
@@ -1095,6 +1106,13 @@ struct decon_device {
 	int id;
 	enum decon_state state;
 
+#if defined(CONFIG_SUPPORT_MASK_LAYER)
+	bool current_mask_layer;
+	struct decon_reg_data *mask_regs;
+	u32 wait_mask_layer_trigger;
+	wait_queue_head_t wait_mask_layer_trigger_queue;
+#endif
+
 	unsigned long prev_used_dpp;
 	unsigned long cur_using_dpp;
 	unsigned long dpp_err_stat;
@@ -1115,6 +1133,11 @@ struct decon_device {
 #ifdef CONFIG_EXYNOS_COMMON_PANEL
 	struct v4l2_subdev *panel_sd;
 	struct panel_state *panel_state;
+#endif
+#ifdef CONFIG_EXYNOS_MASS_PANEL
+	struct abd_protect abd;
+	atomic_t bypass;
+	atomic_t ffu_flag;
 #endif
 	struct v4l2_device v4l2_dev;
 	struct v4l2_subdev sd;
@@ -1472,6 +1495,13 @@ static inline int decon_reset_panel_global(u32 id)
 	struct decon_device *decon = get_decon_drvdata(id);
 
 	return decon_reset_panel(decon);
+}
+#endif
+
+#if defined(CONFIG_EXYNOS_MASS_PANEL)
+static inline bool decon_is_bypass(struct decon_device *decon)
+{
+	return atomic_read(&decon->bypass);
 }
 #endif
 

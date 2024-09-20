@@ -287,10 +287,8 @@ static void set_modem_state(struct mem_link_device *mld, enum modem_state state)
 	struct io_device *iod;
 
 	spin_lock_irqsave(&mc->lock, flags);
-	list_for_each_entry(iod, &mc->modem_state_notify_list, list) {
-		if (iod && atomic_read(&iod->opened) > 0)
-			iod->modem_state_changed(iod, state);
-	}
+	list_for_each_entry(iod, &mc->modem_state_notify_list, list)
+		iod->modem_state_changed(iod, state);
 	spin_unlock_irqrestore(&mc->lock, flags);
 }
 
@@ -312,8 +310,22 @@ static void shmem_handle_cp_crash(struct mem_link_device *mld,
 	stop_net_ifaces(ld);
 	purge_txq(mld);
 
-	if (cp_online(mc))
-		modem_notify_event(state);
+	if (cp_online(mc)) {
+		switch (state) {
+		case STATE_CRASH_RESET:
+			modem_notify_event(MODEM_EVENT_RESET);
+			break;
+		case STATE_CRASH_EXIT:
+			modem_notify_event(MODEM_EVENT_EXIT);
+			break;
+		case STATE_CRASH_WATCHDOG:
+			modem_notify_event(MODEM_EVENT_WATCHDOG);
+			break;
+		default:
+			mif_err("Invalid state to notify\n");
+			break;
+		}
+	}
 
 	if (cp_online(mc) || cp_booting(mc))
 		set_modem_state(mld, state);
@@ -2298,7 +2310,7 @@ exit:
 }
 
 #ifdef CONFIG_MODEM_IF_NET_GRO
-long gro_flush_time = 0;
+long gro_flush_time = 10000;
 module_param(gro_flush_time, long, 0644);
 
 static void gro_flush_timer(struct link_device *ld)

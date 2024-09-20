@@ -22,6 +22,7 @@ enum five_file_integrity {
 	FIVE_FILE_FAIL,
 	FIVE_FILE_RSA,
 	FIVE_FILE_DMVERITY,
+	FIVE_FILE_FSVERITY,
 	FIVE_FILE_HMAC
 };
 
@@ -178,7 +179,6 @@ static inline int integrity_init_keyring(const unsigned int id)
 {
 	return 0;
 }
-
 #endif /* CONFIG_INTEGRITY_SIGNATURE */
 
 #ifdef CONFIG_INTEGRITY_ASYMMETRIC_KEYS

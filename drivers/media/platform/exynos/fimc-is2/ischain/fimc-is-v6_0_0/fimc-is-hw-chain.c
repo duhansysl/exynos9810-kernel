@@ -16,9 +16,7 @@
 #include <linux/errno.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
-#if defined(CONFIG_SECURE_CAMERA_USE)
 #include <linux/smc.h>
-#endif
 
 #include <asm/neon.h>
 
@@ -37,13 +35,7 @@
 #include "../../hardware/fimc-is-hw-control.h"
 #include "../../hardware/fimc-is-hw-mcscaler-v2.h"
 
-#if defined(CONFIG_SECURE_CAMERA_USE)
-#define SECURE_ISCHAIN_PATH_MCSC_SRC0	0   /* ISPLP -> MCSC0 */
-
-#define itfc_to_core(x) \
-	container_of(x, struct fimc_is_core, interface_ischain)
-#endif
-
+DEFINE_MUTEX(sysreg_isppre_lock);
 static struct fimc_is_reg sysreg_isppre_regs[SYSREG_ISPPRE_REG_CNT] = {
 	{0x0400, "ISPPRE_USER_CON"},
 	{0x0404, "ISPPRE_SC_CON0"},
@@ -395,7 +387,6 @@ void fimc_is_hw_group_init(struct fimc_is_group *group)
 	group->subdev[ENTRY_M4P] = NULL;
 	group->subdev[ENTRY_M5P] = NULL;
 	group->subdev[ENTRY_VRA] = NULL;
-	group->subdev[ENTRY_SRDZ] = NULL;
 
 	INIT_LIST_HEAD(&group->subdev_list);
 }
@@ -565,7 +556,7 @@ int fimc_is_hw_group_open(void *group_data)
 	case GROUP_ID_MCS1:
 	case GROUP_ID_DCP:
 		leader->constraints_width = 5376;
-		leader->constraints_height = 4032;
+		leader->constraints_height = 6528;
 		break;
 	case GROUP_ID_VRA0:
 		leader->constraints_width = 640;
@@ -579,6 +570,153 @@ int fimc_is_hw_group_open(void *group_data)
 	return ret;
 }
 
+void fimc_is_hw_camif_init(void)
+{
+	void __iomem *sysreg_isppre_base
+		= ioremap_nocache(SYSREG_ISPPRE_BASE_ADDR, 0x424);
+
+	fimc_is_hw_set_reg(sysreg_isppre_base,
+			&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON0], 0);
+	fimc_is_hw_set_reg(sysreg_isppre_base,
+			&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON1], 1);
+
+	iounmap(sysreg_isppre_base);
+}
+
+#ifdef USE_CAMIF_FIX_UP
+int fimc_is_hw_camif_fix_up(struct fimc_is_device_sensor *sensor)
+{
+	struct fimc_is_device_csi *csi;
+	u32 csi_ch, pdp_ch, actual;
+	enum sysreg_isppre_reg_name pdp_mux;
+#if defined(SECURE_CAMERA_FACE)
+	struct fimc_is_core *core;
+#endif
+	int ret = 0;
+	void __iomem *sysreg_isppre_base = ioremap_nocache(SYSREG_ISPPRE_BASE_ADDR, 0x424);
+
+	csi = (struct fimc_is_device_csi *)v4l2_get_subdevdata(sensor->subdev_csi);
+	if (!csi) {
+		merr("failed to get CSI", sensor);
+		ret = -ENODEV;
+		goto err_get_csi;
+	}
+
+	csi_ch = csi->instance;
+	if (csi_ch >= CSI_ID_MAX) {
+		merr("invalid CSI channel(%d)", sensor, csi_ch);
+		ret = -ERANGE;
+		goto err_invalid_csi_ch;
+	}
+
+	if (test_bit(FIMC_IS_SENSOR_STAND_ALONE, &sensor->state))
+		goto stand_alone_sensor;
+
+	if (!sensor->ischain) {
+		merr("no binded IS chain", sensor);
+		ret = -ENODEV;
+		goto err_no_binded_ischain;
+	}
+
+	/* check PDP mux configuration */
+#if defined(SECURE_CAMERA_FACE)
+	core = (struct fimc_is_core *)dev_get_drvdata(fimc_is_dev);
+	if (!core) {
+		merr("failed to get core", sensor);
+		ret = -ENODEV;
+		goto err_get_core;
+	}
+
+	mutex_lock(&core->secure_state_lock);
+	if (core->scenario == FIMC_IS_SCENARIO_SECURE)
+		goto secure_scenario;
+#endif
+
+	pdp_ch = (sensor->ischain->group_3aa.id == GROUP_ID_3AA1) ? 1 : 0;
+	pdp_mux = pdp_ch ? SYSREG_ISPPRE_R_SC_CON1 : SYSREG_ISPPRE_R_SC_CON0;
+
+	mutex_lock(&sysreg_isppre_lock);
+	actual = fimc_is_hw_get_reg(sysreg_isppre_base, &sysreg_isppre_regs[pdp_mux]);
+	if (actual != csi_ch) {
+		fimc_is_hw_set_reg(sysreg_isppre_base, &sysreg_isppre_regs[pdp_mux], csi_ch);
+
+		minfo("[FIXUP] CSI%d -|-}-> PDP%d\n", sensor, actual, pdp_ch);
+		minfo("[FIXUP] CSI%d -{/\n", sensor, csi_ch);
+	} else {
+		minfo("CSI%d -{}-> PDP%d\n", sensor, csi_ch, pdp_ch);
+	}
+	mutex_unlock(&sysreg_isppre_lock);
+
+#if defined(SECURE_CAMERA_FACE)
+secure_scenario:
+	mutex_unlock(&core->secure_state_lock);
+err_get_core:
+#endif
+err_no_binded_ischain:
+stand_alone_sensor:
+err_invalid_csi_ch:
+err_get_csi:
+	iounmap(sysreg_isppre_base);
+
+	return ret;
+}
+
+int fimc_is_hw_camif_pdp_in_ctrl(struct fimc_is_device_sensor *sensor, bool enable)
+{
+	int ret = 0;
+	struct fimc_is_device_csi *csi;
+	u32 csi_ch, pdp_ch;
+	u32 bit_pos = 0;
+	int pdp_in_en;
+
+	csi = (struct fimc_is_device_csi *) v4l2_get_subdevdata(sensor->subdev_csi);
+	if (!csi) {
+		merr("failed to get CSI", sensor);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	csi_ch = csi->instance;
+	if (csi_ch >= CSI_ID_MAX) {
+		merr("invalid CSI channel(%d)", sensor, csi_ch);
+		ret = -ERANGE;
+		goto exit;
+	}
+
+	if (test_bit(FIMC_IS_SENSOR_STAND_ALONE, &sensor->state))
+		goto exit;
+
+	if (!sensor->ischain) {
+		merr("no binded IS chain", sensor);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	pdp_ch = (sensor->ischain->group_3aa.id == GROUP_ID_3AA1) ? 1 : 0;
+	bit_pos = (pdp_ch * CSI_ID_MAX) + csi_ch;
+
+	mutex_lock(&sysreg_isppre_lock);
+	pdp_in_en = exynos_smc(SMC_SECCAM_SET_PDP_REG, PDP_IN_EN_READ, 0, 0);
+
+	if (enable)
+		pdp_in_en |= ((1 << bit_pos) & 0xff);
+	else
+		pdp_in_en &= (~(1 << bit_pos) & 0xff);
+
+	ret = exynos_smc(SMC_SECCAM_SET_PDP_REG, PDP_IN_EN_WRITE, pdp_in_en, 0);
+	if (ret) {
+		merr("failed to set PDP_IN via SMC", sensor);
+		mutex_unlock(&sysreg_isppre_lock);
+		goto exit;
+	}
+	mutex_unlock(&sysreg_isppre_lock);
+	minfo("CSI%d -{%s}-> PDP%d\n", sensor, csi_ch, enable ? "O" : "X", pdp_ch);
+
+exit:
+	return ret;
+}
+#endif
+
 int fimc_is_hw_camif_cfg(void *sensor_data)
 {
 	int ret = 0;
@@ -588,20 +726,26 @@ int fimc_is_hw_camif_cfg(void *sensor_data)
 	struct fimc_is_device_ischain *ischain;
 	struct fimc_is_subdev *dma_subdev;
 	struct fimc_is_sensor_cfg *sensor_cfg;
-#if !defined(CONFIG_SECURE_CAMERA_USE)
-	void __iomem *isppre_reg = ioremap_nocache(SYSREG_ISPPRE_BASE_ADDR, 0x1000);
-#else
 	void __iomem *isppre_reg = ioremap_nocache(SYSREG_ISPPRE_BASE_ADDR, 0x424);
-#endif
 	u32 pdp_ch = 0;
-	u32 csi_ch = 0;
-	u32 dma_ch = 0;
-	u32 mux_val = 0;
+	u32 csi_ch;
+	u32 dma_ch;
+	u32 mux_val;
 	u32 logical_dma_offset;
+	struct fimc_is_core *core;
+	enum sysreg_isppre_reg_name pdp_mux;
 
 	FIMC_BUG(!sensor_data);
 
 	sensor = sensor_data;
+
+	core = (struct fimc_is_core *)dev_get_drvdata(fimc_is_dev);
+	if (!core) {
+		merr("core is null\n", sensor);
+		ret = -ENODEV;
+		goto err_get_core;
+	}
+
 	csi = (struct fimc_is_device_csi *)v4l2_get_subdevdata(sensor->subdev_csi);
 	if (!csi) {
 		merr("csi is null\n", sensor);
@@ -610,26 +754,50 @@ int fimc_is_hw_camif_cfg(void *sensor_data)
 	}
 
 	csi_ch = csi->instance;
-	if (csi_ch > CSI_ID_MAX) {
+	if (csi_ch >= CSI_ID_MAX) {
 		merr("CSI channel is invalid(%d)\n", sensor, csi_ch);
 		ret = -ERANGE;
 		goto p_err;
 	}
 
+	if (!IS_ENABLED(USE_CAMIF_FIX_UP)) {
+		ret = exynos_smc(SMC_SECCAM_SET_PDP_REG, PDP_IN_EN_WRITE, 0xff, 0);
+		if (ret) {
+			merr("failed to set PDP_IN via SMC", sensor);
+			goto p_err;
+		}
+	}
+
 	/* CSIS to PDP MUX */
 	ischain = sensor->ischain;
 	if (ischain) {
-		pdp_ch = (ischain->group_3aa.id == GROUP_ID_3AA0) ? 0 : 1;
+#if defined(SECURE_CAMERA_FACE)
+		mutex_lock(&core->secure_state_lock);
+		if (core->secure_state == FIMC_IS_STATE_UNSECURE) {
+			if (core->scenario == FIMC_IS_SCENARIO_SECURE) {
+				fimc_is_hw_set_reg(isppre_reg,
+					&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON0], csi_ch);
 
-		switch (pdp_ch) {
-		case 0:
-			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON0], csi_ch);
-			break;
-		case 1:
-			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON1], csi_ch);
-			break;
+				minfo("[SECURE] CSI%d -{}-> PDP%d\n", sensor, csi_ch, 0);
+			} else
+#endif
+			{
+				pdp_ch = (ischain->group_3aa.id == GROUP_ID_3AA0) ? 0 : 1;
+
+				if (!IS_ENABLED(USE_CAMIF_FIX_UP)) {
+					pdp_mux = pdp_ch ? SYSREG_ISPPRE_R_SC_CON1 :
+								SYSREG_ISPPRE_R_SC_CON0;
+
+					fimc_is_hw_set_reg(isppre_reg,
+							&sysreg_isppre_regs[pdp_mux], csi_ch);
+
+					minfo("CSI%d -{}-> PDP%d\n", sensor, csi_ch, pdp_ch);
+				}
+			}
+#if defined(SECURE_CAMERA_FACE)
 		}
-		minfo("CSI(%d) --> PDP(%d)\n", sensor, csi_ch, pdp_ch);
+		mutex_unlock(&core->secure_state_lock);
+#endif
 	}
 
 	/* DMA input MUX */
@@ -648,6 +816,13 @@ int fimc_is_hw_camif_cfg(void *sensor_data)
 			goto p_err;
 		}
 
+		/*
+		  mux_val :
+		  0 = CSIS# OTF output
+		  1 = CSIS# OTF output
+		  2 = PDP CORE0 OTF image output
+		  3 = PDP CORE1 OTF image output
+		*/
 		if (sensor_cfg->pd_mode == PD_NONE) {
 			mux_val = 1;
 			logical_dma_offset = 0;
@@ -662,14 +837,37 @@ int fimc_is_hw_camif_cfg(void *sensor_data)
 			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON2], mux_val);
 			break;
 		case 1:
-			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON4], mux_val);
+#if defined(SECURE_CAMERA_FACE)
+			mutex_lock(&core->secure_state_lock);
+			if (core->secure_state == FIMC_IS_STATE_UNSECURE) {
+				if (core->scenario == FIMC_IS_SCENARIO_SECURE) {
+					fimc_is_hw_set_reg(isppre_reg,
+						&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON4], 2);
+
+				} else
+#endif
+				{
+					fimc_is_hw_set_reg(isppre_reg,
+						&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON4], mux_val);
+				}
+#if defined(SECURE_CAMERA_FACE)
+			}
+			mutex_unlock(&core->secure_state_lock);
+#endif
 			break;
 		case 2:
 			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON6], mux_val);
 			break;
 		case 3:
-#if !defined(CONFIG_SECURE_CAMERA_USE)
-			fimc_is_hw_set_reg(isppre_reg, &sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON8], mux_val);
+#if defined(SECURE_CAMERA_IRIS)
+			mutex_lock(&core->secure_state_lock);
+			if (core->secure_state == FIMC_IS_STATE_UNSECURE) {
+#endif
+				fimc_is_hw_set_reg(isppre_reg,
+						&sysreg_isppre_regs[SYSREG_ISPPRE_R_SC_CON8], mux_val);
+#if defined(SECURE_CAMERA_IRIS)
+			}
+			mutex_unlock(&core->secure_state_lock);
 #endif
 			break;
 		case 4:
@@ -683,6 +881,7 @@ int fimc_is_hw_camif_cfg(void *sensor_data)
 		minfo("DMA #%d VC #%d input(%d)\n", sensor, dma_ch, vc, mux_val);
 	}
 
+err_get_core:
 p_err:
 	iounmap(isppre_reg);
 	return ret;
@@ -690,7 +889,6 @@ p_err:
 
 int fimc_is_hw_camif_open(void *sensor_data)
 {
-	int ret = 0;
 	struct fimc_is_device_sensor *sensor;
 	struct fimc_is_device_csi *csi;
 
@@ -699,39 +897,35 @@ int fimc_is_hw_camif_open(void *sensor_data)
 	sensor = sensor_data;
 	csi = (struct fimc_is_device_csi *)v4l2_get_subdevdata(sensor->subdev_csi);
 
-	switch (csi->instance) {
-	case 0:
-	case 1:
-	case 2:
-	case 3:
-		set_bit(CSIS_DMA_ENABLE, &csi->state);
-#ifdef SOC_SSVC0
-		csi->dma_subdev[CSI_VIRTUAL_CH_0] = &sensor->ssvc0;
-#else
-		csi->dma_subdev[CSI_VIRTUAL_CH_0] = NULL;
-#endif
-#ifdef SOC_SSVC1
-		csi->dma_subdev[CSI_VIRTUAL_CH_1] = &sensor->ssvc1;
-#else
-		csi->dma_subdev[CSI_VIRTUAL_CH_1] = NULL;
-#endif
-#ifdef SOC_SSVC2
-		csi->dma_subdev[CSI_VIRTUAL_CH_2] = &sensor->ssvc2;
-#else
-		csi->dma_subdev[CSI_VIRTUAL_CH_2] = NULL;
-#endif
-#ifdef SOC_SSVC3
-		csi->dma_subdev[CSI_VIRTUAL_CH_3] = &sensor->ssvc3;
-#else
-		csi->dma_subdev[CSI_VIRTUAL_CH_3] = NULL;
-#endif
-		break;
-	default:
-		merr("sensor id is invalid(%d)", sensor, csi->instance);
-		break;
+	if (csi->instance >= CSI_ID_MAX) {
+		merr("CSI channel is invalid(%d)\n", sensor, csi->instance);
+		return -EINVAL;
 	}
 
-	return ret;
+	set_bit(CSIS_DMA_ENABLE, &csi->state);
+
+#ifdef SOC_SSVC0
+	csi->dma_subdev[CSI_VIRTUAL_CH_0] = &sensor->ssvc0;
+#else
+	csi->dma_subdev[CSI_VIRTUAL_CH_0] = NULL;
+#endif
+#ifdef SOC_SSVC1
+	csi->dma_subdev[CSI_VIRTUAL_CH_1] = &sensor->ssvc1;
+#else
+	csi->dma_subdev[CSI_VIRTUAL_CH_1] = NULL;
+#endif
+#ifdef SOC_SSVC2
+	csi->dma_subdev[CSI_VIRTUAL_CH_2] = &sensor->ssvc2;
+#else
+	csi->dma_subdev[CSI_VIRTUAL_CH_2] = NULL;
+#endif
+#ifdef SOC_SSVC3
+	csi->dma_subdev[CSI_VIRTUAL_CH_3] = &sensor->ssvc3;
+#else
+	csi->dma_subdev[CSI_VIRTUAL_CH_3] = NULL;
+#endif
+
+	return 0;
 }
 
 void fimc_is_hw_ischain_qe_cfg(void)
@@ -1844,6 +2038,47 @@ u32 fimc_is_hw_find_settle(u32 mipi_speed)
 	}
 
 	return fimc_is_csi_settle_table[m + 1];
+}
+
+unsigned int get_dma(struct fimc_is_device_sensor *device, u32 *dma_ch)
+{
+	struct fimc_is_core *core;
+	u32 open_sensor_count = 0;
+	struct fimc_is_device_csi *csi;
+	u32 position;
+	int i;
+
+	*dma_ch = 0;
+	core = device->private_data;
+
+	for (i = 0; i < FIMC_IS_SENSOR_COUNT; i++) {
+		if (!test_bit(FIMC_IS_SENSOR_OPEN, &(core->sensor[i].state)))
+			continue;
+
+		open_sensor_count++;
+		position = core->sensor[i].position;
+
+		csi = (struct fimc_is_device_csi *)v4l2_get_subdevdata(core->sensor[i].subdev_csi);
+		if (!csi) {
+			merr("failed to get CSI", device);
+			return -ENODEV;
+		}
+
+		if (csi->instance >= CSI_ID_MAX) {
+			merr("invalid CSI channel(%d)", device, csi->instance);
+			return -ERANGE;
+		}
+
+		if (position < SENSOR_POSITION_MAX) {
+			*dma_ch |= 1 << csi->instance;
+		} else {
+			merr("invalid sensor position(%d)", device, position);
+			return -EINVAL;
+
+		}
+	}
+
+	return 0;
 }
 
 void fimc_is_hw_cip_clk_enable(bool enable)

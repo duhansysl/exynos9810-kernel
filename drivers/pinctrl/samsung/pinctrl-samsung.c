@@ -32,13 +32,13 @@
 
 #include "../core.h"
 #include "pinctrl-samsung.h"
+
 #ifdef CONFIG_SEC_GPIO_DVS
 #include "secgpio_dvs.h"
 #endif
-#ifdef ENABLE_SENSORS_FPRINT_SECURE
-#include <linux/smc.h>
-extern int fpsensor_goto_suspend;
-#define MC_FC_FP_PM_RESUME ((uint32_t)(0x83000022))
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)
+extern int fps_resume_set(void);
 #endif
 
 /* list of all possible config options supported */
@@ -1294,12 +1294,8 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
 		if (!widths[PINCFG_TYPE_CON_PDN])
 			continue;
 
-#ifdef ENABLE_SENSORS_FPRINT_SECURE
-		if (fpsensor_goto_suspend) {
-			fpsensor_goto_suspend = 0;
-			pr_info("vfsspi_resume smc ret=%d\n",
-					exynos_smc(MC_FC_FP_PM_RESUME, 0, 0, 0));
-		}
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)
+		fps_resume_set();
 #endif
 
 		if (widths[PINCFG_TYPE_FUNC] * bank->nr_pins > 32) {

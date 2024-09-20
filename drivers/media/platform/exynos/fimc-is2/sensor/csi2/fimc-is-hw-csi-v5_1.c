@@ -605,6 +605,78 @@ int csi_hw_dma_common_reset(void)
 }
 
 #if !defined(CONFIG_VENDER_PSV)
+#define GET_DMA_CH(x, y)	((x) & (1 << (y)))
+int csi_hw_s_dma_common_dynamic(u32 __iomem *base_reg, size_t size, unsigned int dma_ch)
+{
+	u32 val;
+	u32 sram0_split;
+	u32 sram1_split;
+	u32 max;
+
+	if (!base_reg)
+		return 0;
+
+	/* Common DMA Arbitration Priority register */
+	/* CSIS_DMA_F_DMA_ARB_PRI_1 : 1 = CSIS2 DMA has a high priority */
+	/* CSIS_DMA_F_DMA_ARB_PRI_1 : 2 = CSIS3 DMA has a high priority */
+	/* CSIS_DMA_F_DMA_ARB_PRI_0 : 1 = CSIS0 DMA has a high priority */
+	/* CSIS_DMA_F_DMA_ARB_PRI_0 : 2 = CSIS1 DMA has a high priority */
+	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_ARB_PRI]);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_DMA_ARB_PRI_1], 0x1);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_DMA_ARB_PRI_0], 0x2);
+	fimc_is_hw_set_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_ARB_PRI], val);
+
+	/* Common DMA Control register */
+	/* CSIS_DMA_F_IP_PROCESSING : 1 = Q-channel clock enable  */
+	/* CSIS_DMA_F_IP_PROCESSING : 0 = Q-channel clock disable */
+	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_CTRL]);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_IP_PROCESSING], 0x1);
+	fimc_is_hw_set_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_CTRL], val);
+
+	/* Common DMA SRAM split register */
+	/* CSIS_DMA_F_DMA_SRAM1_SPLIT : internal SRAM1 is 10KB (640 * 16 bytes) */
+	/* CSIS_DMA_F_DMA_SRAM0_SPLIT : internal SRAM0 is 10KB (640 * 16 bytes) */
+	/* This register can be set between 0 to 640 */
+	max = size / 16;
+	sram0_split = max / 2;
+	sram1_split = max / 2;
+
+	if (GET_DMA_CH(dma_ch, 0) && !GET_DMA_CH(dma_ch, 1))
+		sram0_split = max;
+	else if (!GET_DMA_CH(dma_ch, 0) && GET_DMA_CH(dma_ch, 1))
+		sram0_split = 4;
+
+	if (GET_DMA_CH(dma_ch, 2) && !GET_DMA_CH(dma_ch, 3))
+		sram1_split = max;
+	else if (!GET_DMA_CH(dma_ch, 2) && GET_DMA_CH(dma_ch, 3))
+		sram1_split = 4;
+
+	if (GET_DMA_CH(dma_ch, 4))
+		sram0_split = max;
+
+	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_SRAM_SPLIT]);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_DMA_SRAM1_SPLIT], sram1_split);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_DMA_SRAM0_SPLIT], sram0_split);
+	fimc_is_hw_set_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_SRAM_SPLIT], val);
+
+	/* Common DMA Martix register */
+	/* CSIS_DMA_F_DMA_MATRIX : Under Table see */
+	/*       CSIS0      CSIS1      CSIS2      CSIS3  */
+	/* 0  : SRAM0_0    SRAM0_0    SRAM1_0    SRAM1_1 */
+	/* 2  : SRAM0_0    SRAM1_0    SRAM0_1    SRAM1_1 */
+	/* 5  : SRAM0_0    SRAM1_1    SRAM1_0    SRAM0_1 */
+	/* 14 : SRAM1_0    SRAM0_1    SRAM0_0    SRAM1_1 */
+	/* 16 : SRAM1_0    SRAM1_1    SRAM0_0    SRAM0_1 */
+	/* 17 : SRAM1_0    SRAM1_1    SRAM0_1    SRAM0_0 */
+	/* 22 : SRAM1_1    SRAM1_0    SRAM0_0    SRAM0_1 */
+	/* 23 : SRAM1_1    SRAM1_0    SRAM0_1    SRAM0_0 */
+	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_MATRIX]);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_DMA_MATRIX], 0x0);
+	fimc_is_hw_set_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_COMMON_DMA_MATRIX], val);
+
+	return 0;
+}
+
 int csi_hw_s_dma_common(u32 __iomem *base_reg)
 {
 	u32 val;
@@ -659,28 +731,44 @@ int csi_hw_s_dma_common(u32 __iomem *base_reg)
 int csi_hw_s_dma_common(u32 __iomem *base_reg) { return 0; }
 #endif
 
-int csi_hw_s_dma_common_pattern(u32 __iomem *base_reg,
+int csi_hw_s_dma_common_pattern_enable(u32 __iomem *base_reg,
 	u32 width, u32 height, u32 fps, u32 clk)
 {
 	u32 val;
+	int clk_mhz;
+	int vvalid;
 	int vblank;
-	u32 hblank = 8;
-	u32 v_to_hblank = 16;
-	u32 h_to_vblank = 2;
+	int vblank_size;
+	u32 hblank = 70;	/* This value should be guided according to 3AA HW constrain. */
+	u32 v_to_hblank = 0x80;	/* This value should be guided according to 3AA HW constrain. */
+	u32 h_to_vblank = 0x40;	/* This value should be guided according to 3AA HW constrain. */
 
-	if (!width) {
+	if (!width || (width % 8 != 0)) {
 		err("A width(%d) is not aligned to 8", width);
 		return -EINVAL;
 	}
 
-	/* V-blank Calculation */
-	vblank = (clk * 2 / fps) - (width + hblank) * height - v_to_hblank - h_to_vblank;
-	if (vblank <= 0) {
-		info("Invalid size & fps: size(%d x %d), vblank(%d), fps(%d), clk(%d Mhz)\n",
-			width, height, vblank, fps, clk);
-		vblank = clk * 1000; /* 100 us */
-		fps = clk * 2 / (vblank + (width + hblank) * height + v_to_hblank + h_to_vblank);
+	clk_mhz = clk / 1000000;
+
+	/*
+	 * V-valid Calculation:
+	 * The unit of v-valid is usec.
+	 * 2 means 2ppc.
+	 */
+	vvalid = (width * height) / (clk_mhz * 2);
+
+	/*
+	 * V-blank Calculation:
+	 * The unit of v-blank is usec.
+	 * v-blank operates with 1ppc.
+	 */
+	vblank = ((1000000 / fps) - vvalid);
+	if (vblank < 0) {
+		vblank = 1000; /* 1000 us */
+		info("FPS is too high. So, FPS is adjusted forcely. vvalid(%d us), vblank(%d us)\n",
+			vvalid, vblank);
 	}
+	vblank_size = vblank * clk_mhz;
 
 	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_TEST_PATTERN_CTRL]);
 	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_VTOHBLANK], v_to_hblank);
@@ -695,16 +783,22 @@ int csi_hw_s_dma_common_pattern(u32 __iomem *base_reg,
 
 	val = fimc_is_hw_get_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_TEST_PATTERN_ENABLE]);
 	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_PPC_MODE], CSIS_PIXEL_MODE_DUAL);
-	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_VBLANK], vblank);
+	val = fimc_is_hw_set_field_value(val, &csi_dma_fields[CSIS_DMA_F_VBLANK], vblank_size);
 	fimc_is_hw_set_reg(base_reg, &csi_dma_regs[CSIS_DMA_R_TEST_PATTERN_ENABLE], val);
 
 	fimc_is_hw_set_field(base_reg, &csi_dma_regs[CSIS_DMA_R_TEST_PATTERN_ENABLE],
 			&csi_dma_fields[CSIS_DMA_F_TESTPATTERN], 1);
 
-	info("Enable Pattern Generator: size(%d x %d), vblank(%d), fps(%d), clk(%d Mhz)\n",
-		width, height, vblank, fps, clk);
+	info("Enable Pattern Generator: size(%d x %d), fps(%d), clk(%d Hz), vvalid(%d us), vblank(%d us)\n",
+		width, height, fps, clk, vvalid, vblank);
 
 	return 0;
+}
+
+void csi_hw_s_dma_common_pattern_disable(u32 __iomem *base_reg)
+{
+	fimc_is_hw_set_field(base_reg, &csi_dma_regs[CSIS_DMA_R_TEST_PATTERN_ENABLE],
+		&csi_dma_fields[CSIS_DMA_F_TESTPATTERN], 0);
 }
 
 int csi_hw_enable(u32 __iomem *base_reg)

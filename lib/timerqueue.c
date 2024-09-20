@@ -26,9 +26,6 @@
 #include <linux/timerqueue.h>
 #include <linux/rbtree.h>
 #include <linux/export.h>
-#ifdef CONFIG_SEC_PM_DEBUG
-#include <linux/sched.h>
-#endif
 
 /**
  * timerqueue_add - Adds timer to timerqueue.
@@ -48,11 +45,6 @@ bool timerqueue_add(struct timerqueue_head *head, struct timerqueue_node *node)
 	/* Make sure we don't add nodes that are already added */
 	WARN_ON_ONCE(!RB_EMPTY_NODE(&node->node));
 
-#ifdef CONFIG_SEC_PM_DEBUG
-	node->pid = get_current()->pid;
-	strncpy(node->task_comm, get_current()->comm, TASK_COMM_LEN - 1);
-	node->func = __builtin_return_address(0);
-#endif
 	while (*p) {
 		parent = *p;
 		ptr = rb_entry(parent, struct timerqueue_node, node);

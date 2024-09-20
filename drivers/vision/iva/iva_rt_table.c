@@ -56,7 +56,7 @@ typedef struct _rt_iva_table_t {
 	uint8_t 	is_updated;
 	uint8_t		empty;
 	uint32_t	reserved;
-} rt_iva_table_t, *rt_iva_table;
+} rt_iva_table_t;
 
 static inline rt_iva_entry_t *rt_iva_get_first_iva_entry(const rt_iva_table_t *iva_table)
 {

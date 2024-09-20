@@ -129,209 +129,6 @@ atomic_t rbin_pool_pages = ATOMIC_INIT(0);
 int percpu_pagelist_fraction;
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 
-#ifdef CONFIG_PTRACK_DEBUG
-
-#define PTRACK_TABLE_PAGE_ORDERS (8)
-#define PTRACK_TABLE_BYTES (PAGE_SIZE << PTRACK_TABLE_PAGE_ORDERS)
-#define PTRACK_TABLE_ENTRY_NUM (PTRACK_TABLE_BYTES/(sizeof(struct ptrack) * PTRACK_ITEM_NUM))
-#define PTRACK_CEIL(a, b) ((a + b - 1) / b)
-
-static int ptrack_init_on;
-struct ptrack_info ptrack_info;
-static int ptrack_size;
-
-void __init ptrack_init(void)
-{
-	struct memblock_type *type = &memblock.memory;
-	unsigned long i, j;
-
-	ptrack_info.memblockcnt = type->cnt;
-	ptrack_size = sizeof(struct ptrack);
-
-	for (i = 0; i < type->cnt; i++) {
-		unsigned long base, size;
-		unsigned long pagesize;
-		unsigned long tablesize;
-		struct memblock_region *rgn = &type->regions[i];
-
-		struct ptrack **table;
-
-		base = (unsigned long)rgn->base;
-		size = (unsigned long)rgn->size;
-
-		pr_info("%s: base(0x%lx) size(0x%lx)\n", __func__, base, size);
-
-		pagesize = PTRACK_CEIL(size, PAGE_SIZE);
-		tablesize = PTRACK_CEIL(pagesize, PTRACK_TABLE_ENTRY_NUM);
-
-		pr_debug("%s: pagesize(0x%lx) tablesize(0x%lx)\n", __func__, pagesize, tablesize);
-
-		table = kcalloc(tablesize, sizeof(struct ptrack *), GFP_KERNEL);
-		if (table == NULL)
-			goto err;
-
-		ptrack_info.tables[i]  = table;
-		ptrack_info.tables_size[i] = tablesize;
-
-		for (j = 0; j < tablesize; j++) {
-			struct page *p;
-
-			p = alloc_pages(GFP_KERNEL | __GFP_ZERO, PTRACK_TABLE_PAGE_ORDERS);
-			if (!p)
-				goto err;
-
-			table[j] = (struct ptrack *)page_address(p);
-			if (!table[j])
-				goto err;
-		}
-
-		pr_info("%s: memblock%lu - ptrack %luMB\n", __func__, i, tablesize);
-	}
-
-	ptrack_init_on = 1;
-	return;
-
-err:
-	for (i = 0; i < type->cnt; i++) {
-		if (ptrack_info.tables[i] != NULL) {
-			struct page *p;
-			struct ptrack **table = ptrack_info.tables[i];
-
-			for (j = 0; j < ptrack_info.tables_size[i]; j++) {
-				if (table[j] != NULL) {
-					p = virt_to_page(table[j]);
-					__free_pages(p, PTRACK_TABLE_PAGE_ORDERS);
-				}
-			}
-
-			kfree(ptrack_info.tables[i]);
-		}
-
-		ptrack_info.tables[i] = NULL;
-	}
-
-	pr_err("%s: ptrack error\n", __func__);
-}
-
-static int ptrack_check_target(struct page *page)
-{
-	if (!page)
-		return 0;
-
-	return 1;
-}
-
-static struct ptrack *_ptrack_alloc(struct page *page)
-{
-	struct memblock_type *type = &memblock.memory;
-	unsigned long base;
-	unsigned long page_address;
-	unsigned long i;
-
-	if (!ptrack_init_on || page->ptrack)
-		return NULL;
-
-	page_address = page_to_phys(page);
-
-	for (i = 0; i < type->cnt; i++) {
-		struct memblock_region *rgn = &type->regions[i];
-
-		if (page_address >= rgn->base && page_address < rgn->base + rgn->size) {
-			int index;
-			int table_index;
-			int table_offset;
-			struct ptrack **table = ptrack_info.tables[i];
-
-			base = rgn->base;
-			index = (page_address - base) / PAGE_SIZE;
-			table_index = index / PTRACK_TABLE_ENTRY_NUM;
-			table_offset = (index % PTRACK_TABLE_ENTRY_NUM) * PTRACK_ITEM_NUM;
-
-			page->ptrack = &table[table_index][table_offset];
-
-			memset(page->ptrack, 0x00, sizeof(struct ptrack) * PTRACK_ITEM_NUM);
-
-			return page->ptrack;
-		}
-	}
-
-	return NULL;
-}
-
-static struct ptrack *ptrack_get(struct page *page, enum ptrack_item alloc)
-{
-	struct ptrack *p;
-	int curr;
-
-	p = page->ptrack;
-
-	if (!p)
-		return NULL;
-
-	curr = alloc;
-
-	return p + curr;
-}
-
-static void _ptrack_set(struct ptrack *p, unsigned long addr)
-{
-#ifdef CONFIG_STACKTRACE
-	struct stack_trace trace;
-	int i;
-
-	trace.nr_entries = 0;
-	trace.max_entries = PTRACK_ADDRS_COUNT;
-	trace.entries = p->addrs;
-	trace.skip = 3;
-	save_stack_trace(&trace);
-
-	/* See rant in lockdep.c */
-	if (trace.nr_entries != 0 &&
-	    trace.entries[trace.nr_entries - 1] == ULONG_MAX)
-		trace.nr_entries--;
-
-	for (i = trace.nr_entries; i < PTRACK_ADDRS_COUNT; i++)
-		p->addrs[i] = 0;
-#endif
-	p->addr = addr;
-	preempt_disable();
-	p->cpu = smp_processor_id();
-	preempt_enable();
-	p->pid = current->pid;
-	p->when = cpu_clock(0);
-}
-
-static void ptrack_set(struct page *page,
-			enum ptrack_item alloc, unsigned long addr)
-{
-	struct ptrack *p = ptrack_get(page, alloc);
-
-	if (!p)
-		p = _ptrack_alloc(page);
-
-	if (!p)
-		return;
-
-	if (addr) {
-		p = ptrack_get(page, alloc);
-		_ptrack_set(p, addr);
-	}
-}
-#endif
-
-static unsigned int boot_mode;
-static int __init setup_bootmode(char *str)
-{
-	pr_info("%s: boot_mode is %u\n", __func__, boot_mode);
-	if (get_option(&str, &boot_mode)) {
-		pr_info("%s: boot_mode is %u\n", __func__, boot_mode);
-		return 0;
-	}
-
-	return -EINVAL;
-}
-early_param("bootmode", setup_bootmode);
-
 #ifdef CONFIG_PM_SLEEP
 /*
  * The following functions are used by the suspend/hibernate code to temporarily
@@ -459,7 +256,7 @@ int watermark_scale_factor = 10;
  * free memory, to make space for new workloads. Anyone can allocate
  * down to the min watermarks controlled by min_free_kbytes above.
  */
-int extra_free_kbytes;
+int extra_free_kbytes = 0;
 
 static unsigned long __meminitdata nr_kernel_pages;
 static unsigned long __meminitdata nr_all_pages;
@@ -1218,9 +1015,6 @@ static __always_inline bool free_pages_prepare(struct page *page,
 					unsigned int order, bool check_free)
 {
 	int bad = 0;
-#ifdef CONFIG_PTRACK_DEBUG
-	int i, page_num;
-#endif
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
 
@@ -1272,14 +1066,6 @@ static __always_inline bool free_pages_prepare(struct page *page,
 	kernel_poison_pages(page, 1 << order, 0);
 	kernel_map_pages(page, 1 << order, 0);
 	kasan_free_pages(page, order);
-
-#ifdef CONFIG_PTRACK_DEBUG
-	if (ptrack_check_target(page)) {
-		page_num = 1 << order;
-		for (i = 0; i < page_num; i++)
-			ptrack_set(&page[i], PTRACK_FREE, _RET_IP_);
-	}
-#endif
 
 	return true;
 }
@@ -3647,8 +3433,7 @@ retry:
 	 */
 	if (!page && !drained) {
 		unreserve_highatomic_pageblock(ac);
-		if (!need_memory_boosting(NULL))
-			drain_all_pages(NULL);
+		drain_all_pages(NULL);
 		drained = true;
 		goto retry;
 	}
@@ -3836,12 +3621,18 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	bool can_direct_reclaim = gfp_mask & __GFP_DIRECT_RECLAIM;
 	struct page *page = NULL;
 	unsigned int alloc_flags;
-	unsigned long did_some_progress;
+	unsigned long did_some_progress = 0;
 	enum compact_priority compact_priority;
 	enum compact_result compact_result;
 	int compaction_retries;
 	int no_progress_loops;
 	unsigned int cpuset_mems_cookie;
+	unsigned long pages_reclaimed = 0;
+	int retry_loop_count = 0;
+	unsigned long jiffies_s = jiffies;
+	cputime_t stime_s = 0, stime_e, stime_d;
+
+	task_cputime(current, NULL, &stime_s);
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3940,6 +3731,7 @@ retry_cpuset:
 	}
 
 retry:
+	retry_loop_count++;
 	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop */
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, ac);
@@ -3995,6 +3787,7 @@ retry:
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
+	pages_reclaimed += did_some_progress;
 	if (page)
 		goto got_pg;
 
@@ -4063,6 +3856,29 @@ nopage:
 	warn_alloc(gfp_mask,
 			"page allocation failure: order:%u", order);
 got_pg:
+	task_cputime(current, NULL, &stime_e);
+	stime_d = stime_e - stime_s;
+	if (cputime_to_jiffies(stime_d) > HZ / 4) {
+		pg_data_t *pgdat;
+
+		unsigned long a_anon = 0;
+		unsigned long in_anon = 0;
+		unsigned long a_file = 0;
+		unsigned long in_file = 0;
+		for_each_online_pgdat(pgdat) {
+			a_anon += node_page_state(pgdat, NR_ACTIVE_ANON);
+			in_anon += node_page_state(pgdat, NR_INACTIVE_ANON);
+			a_file += node_page_state(pgdat, NR_ACTIVE_FILE);
+			in_file += node_page_state(pgdat, NR_INACTIVE_FILE);
+		}
+		pr_info("alloc stall: timeJS(ms):%u|%u rec:%lu|%lu ret:%d o:%d gfp:%#x(%pGg) AaiFai:%lukB|%lukB|%lukB|%lukB\n",
+			jiffies_to_msecs(jiffies - jiffies_s),
+			jiffies_to_msecs(cputime_to_jiffies(stime_d)),
+			did_some_progress, pages_reclaimed, retry_loop_count,
+			order, gfp_mask, &gfp_mask,
+			a_anon << (PAGE_SHIFT-10), in_anon << (PAGE_SHIFT-10),
+			a_file << (PAGE_SHIFT-10), in_file << (PAGE_SHIFT-10));
+	}
 	clear_tsk_thread_flag(current, TIF_MEMALLOC);
 	return page;
 }
@@ -4083,10 +3899,6 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 		.nodemask = nodemask,
 		.migratetype = gfpflags_to_migratetype(gfp_mask),
 	};
-
-#ifdef CONFIG_PTRACK_DEBUG
-	int i, page_num;
-#endif
 
 	if (cpusets_enabled()) {
 		alloc_mask |= __GFP_HARDWALL;
@@ -4177,14 +3989,6 @@ out:
 		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
 
 	trace_mm_page_alloc(page, order, alloc_mask, ac.migratetype);
-
-#ifdef CONFIG_PTRACK_DEBUG
-	if (ptrack_check_target(page)) {
-		page_num = 1 << order;
-		for (i = 0; i < page_num; i++)
-			ptrack_set(&page[i], PTRACK_ALLOC, _RET_IP_);
-	}
-#endif
 
 	return page;
 }

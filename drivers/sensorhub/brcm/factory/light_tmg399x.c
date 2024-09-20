@@ -27,6 +27,8 @@
 #define CHIP_ID		"TMD4905"
 #elif defined(CONFIG_SENSORS_SSP_TMD4906)
 #define CHIP_ID		"TMD4906"
+#elif defined(CONFIG_SENSORS_SSP_TMD3725)
+#define CHIP_ID		"TMD3725"
 #else
 #define CHIP_ID		"UNKNOWN"
 #endif
@@ -52,9 +54,9 @@ static ssize_t light_lux_show(struct device *dev,
 	struct ssp_data *data = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%u,%u,%u,%u,%u,%u\n",
-		data->buf[LIGHT_SENSOR].r, data->buf[LIGHT_SENSOR].g,
-		data->buf[LIGHT_SENSOR].b, data->buf[LIGHT_SENSOR].w,
-		data->buf[LIGHT_SENSOR].a_time, data->buf[LIGHT_SENSOR].a_gain);
+		data->buf[UNCAL_LIGHT_SENSOR].r, data->buf[UNCAL_LIGHT_SENSOR].g,
+		data->buf[UNCAL_LIGHT_SENSOR].b, data->buf[UNCAL_LIGHT_SENSOR].w,
+		data->buf[UNCAL_LIGHT_SENSOR].a_time, data->buf[UNCAL_LIGHT_SENSOR].a_gain);
 }
 
 static ssize_t light_data_show(struct device *dev,
@@ -63,9 +65,9 @@ static ssize_t light_data_show(struct device *dev,
 	struct ssp_data *data = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%u,%u,%u,%u,%u,%u\n",
-		data->buf[LIGHT_SENSOR].r, data->buf[LIGHT_SENSOR].g,
-		data->buf[LIGHT_SENSOR].b, data->buf[LIGHT_SENSOR].w,
-		data->buf[LIGHT_SENSOR].a_time, data->buf[LIGHT_SENSOR].a_gain);
+		data->buf[UNCAL_LIGHT_SENSOR].r, data->buf[UNCAL_LIGHT_SENSOR].g,
+		data->buf[UNCAL_LIGHT_SENSOR].b, data->buf[UNCAL_LIGHT_SENSOR].w,
+		data->buf[UNCAL_LIGHT_SENSOR].a_time, data->buf[UNCAL_LIGHT_SENSOR].a_gain);
 }
 
 static ssize_t light_coef_show(struct device *dev,
@@ -139,6 +141,16 @@ static ssize_t light_coef_store(struct device *dev,
 }
 #endif
 
+#ifndef CONFIG_SENSORS_SSP_GTACTIVE3
+static ssize_t light_circle_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "16.0 4.8 1.8\n");
+}
+
+static DEVICE_ATTR(light_circle, 0440, light_circle_show, NULL);
+#endif
+
 static DEVICE_ATTR(vendor, 0440, light_vendor_show, NULL);
 static DEVICE_ATTR(name, 0440, light_name_show, NULL);
 static DEVICE_ATTR(lux, 0440, light_lux_show, NULL);
@@ -150,12 +162,16 @@ static DEVICE_ATTR(coef, 0660, light_coef_show, light_coef_store);
 static DEVICE_ATTR(coef, 0440, light_coef_show, NULL);
 #endif
 
+
 static struct device_attribute *light_attrs[] = {
 	&dev_attr_vendor,
 	&dev_attr_name,
 	&dev_attr_lux,
 	&dev_attr_raw_data,
 	&dev_attr_coef,
+#ifndef CONFIG_SENSORS_SSP_GTACTIVE3
+	&dev_attr_light_circle,
+#endif
 	NULL,
 };
 

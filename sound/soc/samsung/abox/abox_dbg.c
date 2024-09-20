@@ -532,7 +532,6 @@ static int samsung_abox_debug_probe(struct platform_device *pdev)
 			dev_warn(dev, "Failed to create file: %s\n",
 					battr->attr.name);
 	}
-	memset(data->dump_base, 0x0, abox_rmem->size);
 
 	return ret;
 }

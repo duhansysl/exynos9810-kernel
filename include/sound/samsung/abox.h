@@ -17,11 +17,6 @@
 #include <sound/soc.h>
 #include <sound/samsung/abox_ipc.h>
 
-#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
-#define CHANGE_DEV_PRINT
-#include <sound/samsung/sec_audio_debug.h>
-#endif
-
 /**
  * abox irq handler type definition
  * @param[in]	ipc_id	id of ipc

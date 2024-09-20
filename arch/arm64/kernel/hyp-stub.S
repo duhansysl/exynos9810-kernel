@@ -32,11 +32,7 @@
 
 	.align 11
 
-#ifdef CONFIG_RKP_CFP_JOPP
-VECTOR_ENTRY(__hyp_stub_vectors)
-#else
 ENTRY(__hyp_stub_vectors)
-#endif
 	ventry	el2_sync_invalid		// Synchronous EL2t
 	ventry	el2_irq_invalid			// IRQ EL2t
 	ventry	el2_fiq_invalid			// FIQ EL2t

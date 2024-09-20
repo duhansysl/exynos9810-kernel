@@ -384,7 +384,7 @@ config PHY_EXYNOS_DEBUGFS
 	depends on DEBUG_FS
 	depends on PHY_EXYNOS_USBDRD
 	select GENERIC_PHY
-	default n
+	default y
 	help
 	  Enable USB DRD PHY DEBUGFS support for Exynos SoC series.
 	  This driver provides PHY debugging interface for USBDRD PHY controller
@@ -395,7 +395,7 @@ config PHY_EXYNOS_DP_DEBUGFS
 	depends on DEBUG_FS
 	depends on PHY_EXYNOS_DEBUGFS
 	select GENERIC_PHY
-	default n
+	default y
 	help
 	  Enable USB DRD DP PHY DEBUGFS support for Exynos SoC series.
 	  This driver provides PHY debugging interface for USBDRD DP PHY controller

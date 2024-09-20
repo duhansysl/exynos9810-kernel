@@ -223,11 +223,6 @@ static int process_check_accessory(void *data)
 	uint16_t pid = usbpd_data->Product_ID;
 	uint16_t dock_type = 0;
 
-	if (((pid < GEARVR_PRODUCT_ID) || (pid > GEARVR_PRODUCT_ID_5)) && (pid != CCIC_DOCK_NEW) && (pid != CCIC_DOCK_DEXPAD)) {
-		vid = SAMSUNG_VENDOR_ID;
-		pid = DEXDOCK_PRODUCT_ID;
-	}
-
 	/* detect Gear VR */
 	if (usbpd_data->acc_type == CCIC_DOCK_DETACHED) {
 		if (vid == SAMSUNG_VENDOR_ID) {

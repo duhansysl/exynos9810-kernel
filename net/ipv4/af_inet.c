@@ -72,7 +72,6 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/in.h>
-#include <linux/in6.h>
 #include <linux/kernel.h>
 #include <linux/kmod.h>
 #include <linux/sched.h>
@@ -99,16 +98,12 @@
 #include <linux/netdevice.h>
 #include <net/checksum.h>
 #include <net/ip.h>
-#include <net/ipv6.h>
 #include <net/protocol.h>
 #include <net/arp.h>
 #include <net/route.h>
 #include <net/ip_fib.h>
 #include <net/inet_connection_sock.h>
 #include <net/tcp.h>
-#ifdef CONFIG_MPTCP
-#include <net/mptcp.h>
-#endif
 #include <net/udp.h>
 #include <net/udplite.h>
 #include <net/ping.h>
@@ -166,11 +161,6 @@ void inet_sock_destruct(struct sock *sk)
 		pr_err("Attempt to release alive inet socket %p\n", sk);
 		return;
 	}
-
-#ifdef CONFIG_MPTCP
-	if (sock_flag(sk, SOCK_MPTCP))
-		mptcp_disable_static_key();
-#endif
 
 	WARN_ON(atomic_read(&sk->sk_rmem_alloc));
 	WARN_ON(atomic_read(&sk->sk_wmem_alloc));
@@ -264,12 +254,8 @@ EXPORT_SYMBOL(inet_listen);
  *	Create an inet socket.
  */
 
-#ifdef CONFIG_MPTCP
-int inet_create(struct net *net, struct socket *sock, int protocol, int kern)
-#else
 static int inet_create(struct net *net, struct socket *sock, int protocol,
 		       int kern)
-#endif
 {
 	struct sock *sk;
 	struct inet_protosw *answer;
@@ -412,6 +398,7 @@ out_rcu_unlock:
 	rcu_read_unlock();
 	goto out;
 }
+
 
 /*
  *	The peer socket should always be NULL (or else). When we call this
@@ -719,23 +706,6 @@ int inet_accept(struct socket *sock, struct socket *newsock, int flags)
 	lock_sock(sk2);
 
 	sock_rps_record_flow(sk2);
-#ifdef CONFIG_MPTCP
-	if (sk2->sk_protocol == IPPROTO_TCP && mptcp(tcp_sk(sk2))) {
-		struct sock *sk_it = sk2;
-
-		mptcp_for_each_sk(tcp_sk(sk2)->mpcb, sk_it)
-			sock_rps_record_flow(sk_it);
-
-		if (tcp_sk(sk2)->mpcb->master_sk) {
-			sk_it = tcp_sk(sk2)->mpcb->master_sk;
-
-			write_lock_bh(&sk_it->sk_callback_lock);
-			sk_it->sk_wq = newsock->wq;
-			sk_it->sk_socket = newsock;
-			write_unlock_bh(&sk_it->sk_callback_lock);
-		}
-	}
-#endif
 	WARN_ON(!((1 << sk2->sk_state) &
 		  (TCPF_ESTABLISHED | TCPF_SYN_RECV |
 		  TCPF_CLOSE_WAIT | TCPF_CLOSE)));
@@ -785,22 +755,20 @@ EXPORT_SYMBOL(inet_getname);
 int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 {
 	struct sock *sk = sock->sk;
-	int err;
 
 	sock_rps_record_flow(sk);
 
 	/* We may need to bind the socket. */
 	if (!inet_sk(sk)->inet_num && !sk->sk_prot->no_autobind &&
-		inet_autobind(sk))
+	    inet_autobind(sk))
 		return -EAGAIN;
 
-	err = sk->sk_prot->sendmsg(sk, msg, size);
-	return err;
+	return sk->sk_prot->sendmsg(sk, msg, size);
 }
 EXPORT_SYMBOL(inet_sendmsg);
 
 ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset,
-		size_t size, int flags)
+		      size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 
@@ -808,7 +776,7 @@ ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset,
 
 	/* We may need to bind the socket. */
 	if (!inet_sk(sk)->inet_num && !sk->sk_prot->no_autobind &&
-		inet_autobind(sk))
+	    inet_autobind(sk))
 		return -EAGAIN;
 
 	if (sk->sk_prot->sendpage)
@@ -828,9 +796,8 @@ int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 	err = sk->sk_prot->recvmsg(sk, msg, size, flags & MSG_DONTWAIT,
 				   flags & ~MSG_DONTWAIT, &addr_len);
-	if (err >= 0) {
+	if (err >= 0)
 		msg->msg_namelen = addr_len;
-	}
 	return err;
 }
 EXPORT_SYMBOL(inet_recvmsg);
@@ -1895,11 +1862,6 @@ static int __init inet_init(void)
 	 */
 
 	ip_init();
-
-#ifdef CONFIG_MPTCP
-	/* We must initialize MPTCP before TCP. */
-	mptcp_init();
-#endif
 
 	tcp_v4_init();
 

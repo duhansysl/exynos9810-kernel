@@ -1,0 +1,40 @@
+
+menuconfig SND_SOC_TAS2562
+	tristate "Texas Instruments TAS2562 SmartAmp(R)"
+
+if SND_SOC_TAS2562
+config TAS2562_REGMAP
+    bool "Use of RegMap API"
+    help
+      Enable support for TAS2562 regmap driver.
+      This includes i2c i2c driver structure,
+      IRQ processing, registers read and write
+      by i2c operations.
+
+config TAS2562_CODEC
+    bool "Codec Driver support"
+    help
+      Enable support for TAS2562 codec driver.
+      This includes codec driver interfaces
+      and functions.
+
+config PLATFORM_EXYNOS
+    bool "Exynos platform support"
+    default y
+    help
+      Enable support for Exynos platformt.
+
+config TAS25XX_ALGO
+    bool "TAS2562 Calibration Support"
+    depends on SND_SOC_TAS2562
+    help 
+      Enable support for TAS25xx Calibration driver.
+      This includes TAS2562 Calibration driver interfaces
+      and functions.
+
+#config TAS2558_CODEC
+
+#config TAS2562_MISC
+#    bool "Misc Driver support"
+
+endif # SND_SOC_TAS2562

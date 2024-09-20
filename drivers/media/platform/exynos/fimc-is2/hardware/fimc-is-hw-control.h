@@ -87,7 +87,6 @@ enum fimc_is_hardware_id {
 	DEV_HW_FD,
 	DEV_HW_VRA,	/* = 15 */
 	DEV_HW_DCP,
-	DEV_HW_SRDZ,
 	DEV_HW_END
 };
 
@@ -135,6 +134,26 @@ enum fimc_is_setfile_type {
 	SETFILE_V2 = 2,
 	SETFILE_V3 = 3,
 	SETFILE_MAX
+};
+
+enum cal_type {
+	CAL_TYPE_AF = 1,
+	CAL_TYPE_LSC_UVSP = 2,
+	CAL_TYPE_MAX
+};
+
+struct cal_info {
+	/* case CAL_TYPE_AF:
+	 * Not implemented yet
+	 */
+	/* case CLA_TYPE_LSC_UVSP
+	 * data[0]: lsc_center_x;
+	 * data[1]: lsc_center_y;
+	 * data[2]: lsc_radial_biquad_a;
+	 * data[3]: lsc_radial_biquad_b;
+	 * data[4] - data[15]: reserved
+	 */
+	u32 data[16];
 };
 
 struct hw_debug_info {
@@ -252,7 +271,6 @@ struct fimc_is_hw_ip {
 	struct hw_ip_status			status;
 	atomic_t				fcount;
 	atomic_t				instance;
-	u32					internal_fcount;
 	void __iomem				*regs;
 	resource_size_t				regs_start;
 	resource_size_t				regs_end;
@@ -264,6 +282,7 @@ struct fimc_is_hw_ip {
 	struct is_region			*region[FIMC_IS_STREAM_COUNT];
 	u32					hindex[FIMC_IS_STREAM_COUNT];
 	u32					lindex[FIMC_IS_STREAM_COUNT];
+	u32					internal_fcount[FIMC_IS_STREAM_COUNT];
 	struct fimc_is_framemgr			*framemgr;
 	struct fimc_is_framemgr			*framemgr_late;
 	struct fimc_is_hardware			*hardware;
@@ -271,7 +290,7 @@ struct fimc_is_hw_ip {
 	struct fimc_is_interface		*itf;
 	/* control interface */
 	struct fimc_is_interface_ischain	*itfc;
-	struct fimc_is_hw_ip_setfile		setfile[SENSOR_POSITION_END];
+	struct fimc_is_hw_ip_setfile		setfile[SENSOR_POSITION_MAX];
 	u32					applied_scenario;
 	/* for dump sfr */
 	u8					*sfr_dump;
@@ -353,19 +372,27 @@ struct fimc_is_hardware {
 	/* for access mcuctl regs */
 	void __iomem			*base_addr_mcuctl;
 
-	atomic_t			streaming[SENSOR_POSITION_END];
+	struct cal_info			cal_info[SENSOR_POSITION_MAX];
+	atomic_t			streaming[SENSOR_POSITION_MAX];
 	atomic_t			bug_count;
 	atomic_t			log_count;
 
-#ifdef HW_BUG_WA_NO_CONTOLL_PER_FRAME
-	struct semaphore		smp_mcsc_hw_bug;
-#endif
 	bool				video_mode;
+	/* fast read out in hardware */
+	bool				hw_fro_en;
+	unsigned long			hw_recovery_flag;
+	u32				recovery_numbuffers;
+
+	/*
+	 * To deliver MCSC noise index.
+	 * 0: MCSC0, 1: MCSC1
+	 */
+	struct camera2_ni_udm ni_udm[2][NI_BACKUP_MAX];
 };
 
 #define framemgr_e_barrier_common(this, index, flag)		\
 	do {							\
-		if (in_interrupt()) {				\
+		if (in_irq()) {					\
 			framemgr_e_barrier(this, index);	\
 		} else {						\
 			framemgr_e_barrier_irqs(this, index, flag);	\
@@ -374,7 +401,7 @@ struct fimc_is_hardware {
 
 #define framemgr_x_barrier_common(this, index, flag)		\
 	do {							\
-		if (in_interrupt()) {				\
+		if (in_irq()) {					\
 			framemgr_x_barrier(this, index);	\
 		} else {						\
 			framemgr_x_barrier_irqr(this, index, flag);	\
@@ -383,7 +410,7 @@ struct fimc_is_hardware {
 
 u32 get_hw_id_from_group(u32 group_id);
 void fimc_is_hardware_flush_frame(struct fimc_is_hw_ip *hw_ip,
-	enum fimc_is_hw_frame_state state,
+	enum fimc_is_frame_state state,
 	enum ShotErrorType done_type);
 int fimc_is_hardware_probe(struct fimc_is_hardware *hardware,
 	struct fimc_is_interface *itf, struct fimc_is_interface_ischain *itfc);

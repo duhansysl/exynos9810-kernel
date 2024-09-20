@@ -11,7 +11,7 @@
 
 #ifndef FIMC_IS_CIS_3M3_SET_B_H
 #define FIMC_IS_CIS_3M3_SET_B_H
-#if 0
+
 #include "fimc-is-cis.h"
 #include "fimc-is-cis-3m3.h"
 
@@ -1098,5 +1098,5 @@ static const struct sensor_pll_info_compact *sensor_3m3_pllinfos_B[] = {
 	&sensor_3m3_pllinfo_B_1344x756_120fps,
 	&sensor_3m3_pllinfo_B_2016x1134_30fps,
 };
-#endif
+
 #endif

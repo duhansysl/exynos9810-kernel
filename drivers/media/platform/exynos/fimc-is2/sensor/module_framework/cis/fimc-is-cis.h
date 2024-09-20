@@ -12,6 +12,8 @@
 #ifndef FIMC_IS_CIS_H
 #define FIMC_IS_CIS_H
 
+#include "fimc-is-metadata.h"
+
 #ifdef CONFIG_VENDER_PSV
 #define CIS_TEST_PATTERN_MODE 2 /* PSV set only color-bar */
 #else
@@ -58,6 +60,7 @@ enum i2c_write {
 
 int sensor_cis_set_registers(struct v4l2_subdev *subdev, const u32 *regs, const u32 size);
 int sensor_cis_set_registers_addr8(struct v4l2_subdev *subdev, const u32 *regs, const u32 size);
+int sensor_cis_check_rev_on_init(struct v4l2_subdev *subdev);
 int sensor_cis_check_rev(struct fimc_is_cis *cis);
 
 u32 sensor_cis_calc_again_code(u32 permile);
@@ -75,4 +78,6 @@ u32 sensor_cis_do_div64(u64 num, u32 den);
 int sensor_cis_wait_streamoff(struct v4l2_subdev *subdev);
 int sensor_cis_wait_streamon(struct v4l2_subdev *subdev);
 
+int sensor_cis_set_initial_exposure(struct v4l2_subdev *subdev);
+int sensor_cis_set_test_pattern(struct v4l2_subdev *subdev, camera2_sensor_ctl_t *sensor_ctl);
 #endif

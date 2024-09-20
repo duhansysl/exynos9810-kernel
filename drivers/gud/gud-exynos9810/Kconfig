@@ -37,8 +37,12 @@ config TRUSTONIC_TRUSTED_UI_FB_BLANK
 
 config TRUSTED_UI_TOUCH_ENABLE
     bool "TBase Trusted UI use touch related code"
-    default y
     depends on TRUSTONIC_TRUSTED_UI
 
+config GUD_DRIVER_Q_LAUNCHING
+    bool "Trustonic for Q luanching"
+    default n
+
+#ExySp
 source "drivers/gud/gud-exynos9810/sec-os-ctrl/Kconfig"
 source "drivers/gud/gud-exynos9810/sec-os-booster/Kconfig"

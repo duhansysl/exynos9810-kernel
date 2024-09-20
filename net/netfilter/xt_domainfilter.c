@@ -25,13 +25,10 @@
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter/xt_domainfilter.h>
 
-// Below char works as wildcard (*), it can be used as part or whole domain
-static const char   WILDCARD    =  '%';
-
 /*
  * Check if a given string is the ending substring of another.
  */
-static bool endsWith(const char *host, const char *rule) {
+bool endsWith(const char *host, const char *rule) {
     size_t hostLen = strlen(host);
     size_t ruleLen = strlen(rule);
     if (hostLen >= ruleLen) {
@@ -45,7 +42,7 @@ static bool endsWith(const char *host, const char *rule) {
 /*
  * Check if a given string is the beginning substring of another.
  */
-static bool beginsWith(const char *host, const char *rule) {
+bool beginsWith(const char *host, const char *rule) {
     size_t hostLen = strlen(host);
     size_t ruleLen = strlen(rule);
     if (hostLen >= ruleLen) {
@@ -58,7 +55,7 @@ static bool beginsWith(const char *host, const char *rule) {
 /*
  * Check if the given host matches the provided white/black list rules.
  */
-static bool matchHost(const char *rule, const char *host) {
+bool matchHost(const char *rule, const char *host) {
     size_t ruleLen = strlen(rule);
     if (ruleLen == 1 && rule[0] == WILDCARD) { // rule is *, means all hosts
         return true;

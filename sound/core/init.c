@@ -343,7 +343,6 @@ static int snd_disconnect_release(struct inode *inode, struct file *file)
 	}
 
 	panic("%s(%p, %p) failed!", __func__, inode, file);
-	return 0;
 }
 
 static unsigned int snd_disconnect_poll(struct file * file, poll_table * wait)

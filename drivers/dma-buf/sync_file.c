@@ -344,13 +344,8 @@ int sync_file_wait(struct sync_file *sync_file, long timeout)
 		return ret;
 	} else if (ret == 0) {
 		if (timeout) {
-#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-			pr_info("fence timeout on [%pK] after %dms\n", sync_file,
-					jiffies_to_msecs(timeout));
-#else
 			pr_info("fence timeout on [%p] after %dms\n", sync_file,
 					jiffies_to_msecs(timeout));
-#endif
 #ifdef CONFIG_MALI_SEC_JOB_STATUS_CHECK
 			gpu_job_fence_status_dump(sync_file);
 #endif
@@ -361,11 +356,7 @@ int sync_file_wait(struct sync_file *sync_file, long timeout)
 
 	signaled = fence_is_signaled(sync_file->fence);
 	if (!signaled) {
-#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		pr_info("fence error %d on [%pK]\n", signaled, sync_file);
-#else
 		pr_info("fence error %d on [%p]\n", signaled, sync_file);
-#endif
 #ifdef CONFIG_MALI_SEC_JOB_STATUS_CHECK
 		gpu_job_fence_status_dump(sync_file);
 #endif

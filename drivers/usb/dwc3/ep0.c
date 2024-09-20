@@ -355,9 +355,7 @@ static int dwc3_ep0_handle_status(struct dwc3 *dwc,
 {
 	struct dwc3_ep		*dep;
 	u32			recip;
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
 	u32			reg;
-#endif
 	u16			usb_status = 0;
 	__le16			*response_pkt;
 
@@ -369,7 +367,6 @@ static int dwc3_ep0_handle_status(struct dwc3 *dwc,
 		 */
 		usb_status |= dwc->gadget.is_selfpowered;
 
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
 		if ((dwc->speed == DWC3_DSTS_SUPERSPEED) ||
 		    (dwc->speed == DWC3_DSTS_SUPERSPEED_PLUS)) {
 			reg = dwc3_readl(dwc->regs, DWC3_DCTL);
@@ -378,7 +375,6 @@ static int dwc3_ep0_handle_status(struct dwc3 *dwc,
 			if (reg & DWC3_DCTL_INITU2ENA)
 				usb_status |= 1 << USB_DEV_STAT_U2_ENABLED;
 		}
-#endif
 
 		break;
 
@@ -420,9 +416,6 @@ static int dwc3_ep0_handle_feature(struct dwc3 *dwc,
 	u32			recip;
 	u32			wValue;
 	u32			wIndex;
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
-	u32			reg;
-#endif
 	int			ret;
 	enum usb_device_state	state;
 
@@ -437,7 +430,6 @@ static int dwc3_ep0_handle_feature(struct dwc3 *dwc,
 		switch (wValue) {
 		case USB_DEVICE_REMOTE_WAKEUP:
 			break;
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
 		/*
 		 * 9.4.1 says only only for SS, in AddressState only for
 		 * default control pipe
@@ -453,12 +445,7 @@ static int dwc3_ep0_handle_feature(struct dwc3 *dwc,
 			if (set && dwc->revision < DWC3_REVISION_230A)
 				return 0;
 
-			reg = dwc3_readl(dwc->regs, DWC3_DCTL);
-			if (set)
-				reg |= DWC3_DCTL_INITU1ENA;
-			else
-				reg &= ~DWC3_DCTL_INITU1ENA;
-			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+			/* Disable U1/U2 mode */
 			break;
 
 		case USB_DEVICE_U2_ENABLE:
@@ -472,14 +459,8 @@ static int dwc3_ep0_handle_feature(struct dwc3 *dwc,
 			if (set && dwc->revision < DWC3_REVISION_230A)
 				return 0;
 
-			reg = dwc3_readl(dwc->regs, DWC3_DCTL);
-			if (set)
-				reg |= DWC3_DCTL_INITU2ENA;
-			else
-				reg &= ~DWC3_DCTL_INITU2ENA;
-			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+			/* Disable U1/U2 mode */
 			break;
-#endif
 
 		case USB_DEVICE_LTM_ENABLE:
 			return -EINVAL;
@@ -593,9 +574,7 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 	enum usb_device_state state = dwc->gadget.state;
 	u32 cfg;
 	int ret;
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
 	u32 reg;
-#endif
 
 	cfg = le16_to_cpu(ctrl->wValue);
 
@@ -618,7 +597,6 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 				usb_gadget_set_state(&dwc->gadget,
 						USB_STATE_CONFIGURED);
 
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_DISABLE_U1_U2
 			/*
 			 * NEGATIVE RX DETECTION
 			 * Some host controllers (e.g. Intel) perform far-end
@@ -630,18 +608,12 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 			 * DWC3 core 2.30a, GCTL register has bit U2EXIT_LFPS,
 			 * which improves interoperability with such HCs.
 			 */
-			if (dwc->revision >= DWC3_REVISION_230A) {
-				/*
-				 * Enable transition to U1/U2 state when
-				 * nothing is pending from application.
-				 */
-				reg = dwc3_readl(dwc->regs, DWC3_DCTL);
-				reg |= (DWC3_DCTL_ACCEPTU1ENA | DWC3_DCTL_ACCEPTU2ENA);
-				dwc3_writel(dwc->regs, DWC3_DCTL, reg);
-			}
 
-#endif
-			}
+			/* Disable U1/U2 mode */
+			reg = dwc3_readl(dwc->regs, DWC3_DCTL);
+			reg &= ~(DWC3_DCTL_INITU2ENA | DWC3_DCTL_INITU1ENA);
+			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+		}
 		break;
 
 	case USB_STATE_CONFIGURED:

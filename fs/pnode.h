@@ -17,6 +17,7 @@
 #endif
 #define IS_MNT_SLAVE(m) ((m)->mnt_master)
 #define IS_MNT_NEW(m)  (!(m)->mnt_ns)
+
 #ifdef CONFIG_RKP_NS_PROT
 #define CLEAR_MNT_SHARED(m) rkp_reset_mnt_flags((m)->mnt,MNT_SHARED)
 #define IS_MNT_UNBINDABLE(m) ((m)->mnt->mnt_flags & MNT_UNBINDABLE)
@@ -43,8 +44,8 @@
 #define CL_COPY_MNT_NS_FILE	0x80
 
 #define CL_COPY_ALL		(CL_COPY_UNBINDABLE | CL_COPY_MNT_NS_FILE)
+
 #ifdef CONFIG_RKP_NS_PROT
-	
 extern void rkp_assign_mnt_flags(struct vfsmount *,int);
 static inline void set_mnt_shared(struct mount *mnt)
 {

@@ -155,7 +155,6 @@ struct exynos_tmu_data {
 	u16 temp_error1, temp_error2;
 	struct thermal_zone_device *tzd;
 	unsigned int ntrip;
-	bool enabled;
 	struct thermal_cooling_device *cool_dev;
 	struct list_head node;
 	u32 sensors;
@@ -166,6 +165,7 @@ struct exynos_tmu_data {
 	char tmu_name[THERMAL_NAME_LENGTH + 1];
 	struct device_node *np;
 	int balance_offset;
+	bool enabled;
 
 	int (*tmu_initialize)(struct platform_device *pdev);
 	void (*tmu_control)(struct platform_device *pdev, bool on);

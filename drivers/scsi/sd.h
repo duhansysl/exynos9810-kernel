@@ -112,7 +112,7 @@ struct scsi_disk {
 	int		prv_media_present;
 #endif
 };
-#define to_scsi_disk(obj) container_of(obj, struct scsi_disk, dev)
+#define to_scsi_disk(obj) container_of(obj,struct scsi_disk,dev)
 
 static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
 {
@@ -166,11 +166,6 @@ static inline int scsi_medium_access_command(struct scsi_cmnd *scmd)
 static inline sector_t logical_to_sectors(struct scsi_device *sdev, sector_t blocks)
 {
 	return blocks << (ilog2(sdev->sector_size) - 9);
-}
-
-static inline unsigned int logical_to_bytes(struct scsi_device *sdev, sector_t blocks)
-{
-	return blocks * sdev->sector_size;
 }
 
 /*

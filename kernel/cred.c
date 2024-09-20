@@ -234,7 +234,11 @@ void __put_cred(struct cred *cred)
 #endif
 	BUG_ON(cred == current->cred);
 	BUG_ON(cred == current->real_cred);
-
+#ifdef CONFIG_RKP_KDP
+	if (rkp_ro_page((unsigned long)cred)) {
+		put_ro_cred(cred);
+	} else
+#endif /*CONFIG_RKP_KDP*/
 	if (cred->non_rcu)
 		put_cred_rcu(&cred->rcu);
 	else
@@ -629,6 +633,13 @@ int commit_creds(struct cred *new)
 {
 	struct task_struct *task = current;
 	const struct cred *old = task->real_cred;
+#ifdef CONFIG_RKP_KDP
+	struct cred *new_ro;
+	void *use_cnt_ptr = NULL;
+	unsigned int rkp_use_cnt = 0;
+	void *tsec = NULL;
+	u64 pgd =(u64)(current->mm?current->mm->pgd:swapper_pg_dir);
+#endif
 
 	kdebug("commit_creds(%p{%d,%d})", new,
 	       atomic_read(&new->usage),
@@ -640,9 +651,21 @@ int commit_creds(struct cred *new)
 	validate_creds(old);
 	validate_creds(new);
 #endif
+#ifdef CONFIG_RKP_KDP
+	if (rkp_ro_page((unsigned long)new))
+		BUG_ON((rocred_uc_read(new)) < 1);
+	else
+#endif
 	BUG_ON(atomic_read(&new->usage) < 1);
 
+
+#ifdef CONFIG_RKP_KDP
+	if(!rkp_cred_enable) {
+#endif  /* CONFIG_RKP_KDP */
 	get_cred(new); /* we will require a ref for the subj creds too */
+#ifdef CONFIG_RKP_KDP
+	}
+#endif  /* CONFIG_RKP_KDP */
 
 	/* dumpability changes */
 	if (!uid_eq(old->euid, new->euid) ||
@@ -678,8 +701,44 @@ int commit_creds(struct cred *new)
 	alter_cred_subscribers(new, 2);
 	if (new->user != old->user)
 		atomic_inc(&new->user->processes);
+#ifdef CONFIG_RKP_KDP
+	if(rkp_cred_enable) {
+		cred_param_t cred_param;
+		new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
+		if (!new_ro)
+			panic("commit_creds(): kmem_cache_alloc() failed");
+
+		use_cnt_ptr = kmem_cache_alloc(usecnt_jar,GFP_KERNEL);
+		if(!use_cnt_ptr)
+			panic("commit_creds() : Unable to allocate usage pointer\n");
+		
+		tsec = kmem_cache_alloc(tsec_jar, GFP_KERNEL);
+		if(!tsec)
+			panic("commit_creds() : Unable to allocate security pointer\n");
+
+		rkp_cred_fill_params(new,new_ro,use_cnt_ptr,tsec,RKP_CMD_CMMIT_CREDS,0);
+		uh_call(UH_APP_RKP, 0x46,(u64)&cred_param,0,0,0);
+		if((new_ro->bp_task != current)||
+			(current->mm 
+			&& (!( in_interrupt() || in_softirq())) 
+			&& new_ro->bp_pgd != (void *)pgd) ||
+			(new_ro->security != tsec) ||
+			(new_ro->use_cnt != use_cnt_ptr)) {
+			panic("Commit Creds: RKP Call failed task=#%p:%p#, sec=#%p:%p#, usecnt=#%p:%p#, pgd=#%p:%p#",new_ro->bp_task,current,new_ro->security,tsec,new_ro->use_cnt,use_cnt_ptr,new_ro->bp_pgd,(void *)pgd);
+		}
+		rcu_assign_pointer(task->real_cred, new_ro);
+		rcu_assign_pointer(task->cred, new_ro);
+
+		rocred_uc_set(new_ro,2);
+	} 
+	else {
+		rcu_assign_pointer(task->real_cred, new);
+		rcu_assign_pointer(task->cred, new);
+	}
+#else
 	rcu_assign_pointer(task->real_cred, new);
 	rcu_assign_pointer(task->cred, new);
+#endif  /* CONFIG_RKP_KDP */
 	if (new->user != old->user)
 		atomic_dec(&old->user->processes);
 	alter_cred_subscribers(old, -2);
@@ -696,7 +755,17 @@ int commit_creds(struct cred *new)
 	    !gid_eq(new->sgid,  old->sgid) ||
 	    !gid_eq(new->fsgid, old->fsgid))
 		proc_id_connector(task, PROC_EVENT_GID);
-
+#ifdef CONFIG_RKP_KDP
+	if (rkp_cred_enable && 
+		!rkp_ro_page((unsigned long)new)) {
+		rkp_use_cnt = atomic_read(&new->usage);
+		if(rkp_use_cnt == 1) {
+			atomic_set(&new->usage, 0);
+			rkp_free_security((unsigned long)new->security);
+			kmem_cache_free(cred_jar, new);
+		}
+	}
+#endif  /* CONFIG_RKP_KDP */
 	/* release the old obj and subj refs both */
 	put_cred(old);
 	put_cred(old);
@@ -720,6 +789,11 @@ void abort_creds(struct cred *new)
 #ifdef CONFIG_DEBUG_CREDENTIALS
 	BUG_ON(read_cred_subscribers(new) != 0);
 #endif
+#ifdef CONFIG_RKP_KDP
+	if (rkp_ro_page((unsigned long)new))
+		BUG_ON((rocred_uc_read(new)) < 1);
+	else
+#endif  /* CONFIG_RKP_KDP */
 	BUG_ON(atomic_read(&new->usage) < 1);
 	put_cred(new);
 }
@@ -732,9 +806,21 @@ EXPORT_SYMBOL(abort_creds);
  * Install a set of temporary override subjective credentials on the current
  * process, returning the old set for later reversion.
  */
+#ifdef CONFIG_RKP_KDP
+const struct cred *rkp_override_creds(struct cred **cnew)
+#else
 const struct cred *override_creds(const struct cred *new)
+#endif  /* CONFIG_RKP_KDP */
 {
 	const struct cred *old = current->cred;
+#ifdef CONFIG_RKP_KDP
+	struct cred *new = *cnew;
+	struct cred *new_ro;
+	volatile unsigned int rkp_use_count = rkp_get_usecount(new);
+	void *use_cnt_ptr = NULL;
+	void *tsec = NULL;
+	u64 pgd =(u64)(current->mm?current->mm->pgd:swapper_pg_dir);
+#endif  /* CONFIG_RKP_KDP */
 
 	kdebug("override_creds(%p{%d,%d})", new,
 	       atomic_read(&new->usage),
@@ -754,9 +840,52 @@ const struct cred *override_creds(const struct cred *new)
 	 * Also note that we did validate_creds() manually, not depending
 	 * on the validation in 'get_cred()'.
 	 */
+#ifdef CONFIG_RKP_KDP
+	if(rkp_cred_enable) {
+		cred_param_t cred_param;
+		new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
+		if (!new_ro)
+			panic("override_creds(): kmem_cache_alloc() failed");
+
+		use_cnt_ptr = kmem_cache_alloc(usecnt_jar,GFP_KERNEL);
+		if(!use_cnt_ptr)
+			panic("override_creds() : Unable to allocate usage pointer\n");
+
+		tsec = kmem_cache_alloc(tsec_jar, GFP_KERNEL);
+		if(!tsec)
+			panic("override_creds() : Unable to allocate security pointer\n");
+
+		rkp_cred_fill_params(new,new_ro,use_cnt_ptr,tsec,RKP_CMD_OVRD_CREDS,rkp_use_count);	
+		uh_call(UH_APP_RKP, 0x46,(u64)&cred_param,0,0,0);
+		if((new_ro->bp_task != current)||
+			(current->mm 
+			&& (!( in_interrupt() || in_softirq())) 
+			&& new_ro->bp_pgd != (void *)pgd) ||
+			(new_ro->security != tsec) ||
+			(new_ro->use_cnt != use_cnt_ptr)) {
+			panic("Commit Creds: RKP Call failed task=#%p:%p#, sec=#%p:%p#, usecnt=#%p:%p#, pgd=#%p:%p#",new_ro->bp_task,current,new_ro->security,tsec,new_ro->use_cnt,use_cnt_ptr,new_ro->bp_pgd,(void *)pgd);
+		}
+		rocred_uc_set(new_ro,2);
+		rcu_assign_pointer(current->cred, new_ro);
+
+		if(!rkp_ro_page((unsigned long)new)){
+			if(atomic_read(&new->usage) == 1) {
+				rkp_free_security((unsigned long)new->security);
+				kmem_cache_free(cred_jar, (void *)(*cnew));
+				*cnew = new_ro; 
+			}
+		}
+	}
+	else {
+		get_cred(new);
+		alter_cred_subscribers(new, 1);
+		rcu_assign_pointer(current->cred, new);
+	}
+#else
 	get_new_cred((struct cred *)new);
 	alter_cred_subscribers(new, 1);
 	rcu_assign_pointer(current->cred, new);
+#endif  /* CONFIG_RKP_KDP */
 	alter_cred_subscribers(old, -1);
 
 	kdebug("override_creds() = %p{%d,%d}", old,

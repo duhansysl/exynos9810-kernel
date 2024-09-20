@@ -926,12 +926,14 @@ static int kbase_jit_allocate_prepare(struct kbase_jd_atom *katom)
 		info->bin_id = 0;
 		memset(info->padding, 0, sizeof(info->padding));
 	} else {
-		int i;
+		u32 i;
 
 		/* Check padding is all zeroed */
 		for (i = 0; i < sizeof(info->padding); i++) {
-			if (info->padding[i] != 0)
+			if (info->padding[i] != 0) {
+				ret = -EINVAL;
 				goto free_info;
+			}
 		}
 	}
 

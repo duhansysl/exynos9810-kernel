@@ -180,4 +180,3 @@ static long snd_timer_user_ioctl_compat(struct file *file, unsigned int cmd,
 	mutex_unlock(&tu->ioctl_lock);
 	return ret;
 }
- 

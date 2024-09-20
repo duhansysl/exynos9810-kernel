@@ -53,18 +53,12 @@
 /* for BC1.2 spec */
 int dwc3_set_vbus_current(int state)
 {
-	struct power_supply *psy;
-	union power_supply_propval pval = {0};
+	union power_supply_propval val;
 
-	psy = power_supply_get_by_name("battery");
-	if (!psy) {
-		pr_err("%s: fail to get battery power_supply\n", __func__);
-		return -1;
-	}
+	val.intval = state;
+	psy_do_property("battery", set,
+			POWER_SUPPLY_EXT_PROP_USB_CONFIGURE, val);
 
-	pval.intval = state;
-	power_supply_set_property(psy, POWER_SUPPLY_EXT_PROP_USB_CONFIGURE, &pval);
-	power_supply_put(psy);
 	return 0;
 }
 
@@ -309,8 +303,17 @@ static int dwc3_core_soft_reset(struct dwc3 *dwc)
 
 	do {
 		reg = dwc3_readl(dwc->regs, DWC3_DCTL);
-		if (!(reg & DWC3_DCTL_CSFTRST))
-			goto done;
+		if (!(reg & DWC3_DCTL_CSFTRST)) {
+			/*
+			 * For DWC_usb31 controller, once DWC3_DCTL_CSFTRST bit is cleared,
+			 * we must wait at least 50ms before accessing the PHY domain
+			 * (synchronization delay). DWC_usb31 programming guide section 1.3.2.
+			 */
+			if (dwc3_is_usb31(dwc))
+				msleep(50);
+
+			return 0;
+		}
 
 		udelay(1);
 	} while (--retries);
@@ -330,17 +333,6 @@ err_usb3phy_power:
 	phy_power_off(dwc->usb3_generic_phy);
 
 	return ret;
-
-done:
-	/*
-	 * For DWC_usb31 controller, once DWC3_DCTL_CSFTRST bit is cleared,
-	 * we must wait at least 50ms before accessing the PHY domain
-	 * (synchronization delay). DWC_usb31 programming guide section 1.3.2.
-	 */
-	if (dwc3_is_usb31(dwc))
-		msleep(50);
-
-	return 0;
 }
 
 /**

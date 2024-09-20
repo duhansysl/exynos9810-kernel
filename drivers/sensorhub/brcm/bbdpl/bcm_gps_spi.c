@@ -39,6 +39,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/kernel_stat.h>
+#include <linux/sec_class.h>
 
 #include "bbd.h"
 #include "bcm_gps_spi.h"
@@ -375,8 +376,11 @@ static ssize_t bcm_spi_read(struct file *filp, char __user *buf, size_t size, lo
 	do {
 		size_t cnt_to_end = CIRC_CNT_TO_END(circ->head, circ->tail, BCM_SPI_READ_BUF_SIZE);
 		size_t copied = min(cnt_to_end, size);
+		int ret = copy_to_user(buf + rd_size, (void *) circ->buf + circ->tail, copied);
 
-		WARN_ON(copy_to_user(buf + rd_size, (void *) circ->buf + circ->tail, copied));
+		if (ret < 0)
+			pr_err("[SSPBBD] %s: copy_to_user error(%d)", __func__, ret);
+
 		size -= copied;
 		rd_size += copied;
 		circ->tail = (circ->tail + copied) & (BCM_SPI_READ_BUF_SIZE-1);
@@ -407,9 +411,11 @@ static ssize_t bcm_spi_write(struct file *filp, const char __user *buf, size_t s
 	do {
 		size_t space_to_end = CIRC_SPACE_TO_END(circ->head, circ->tail, BCM_SPI_WRITE_BUF_SIZE);
 		size_t copied = min(space_to_end, size);
+		int ret = copy_from_user((void *) circ->buf + circ->head, buf + wr_size, copied);
 
+		if (ret < 0)
+			pr_err("[SSPBBD] %s: copy_from_user error(%d)", __func__, ret);
 
-		WARN_ON(copy_from_user((void *) circ->buf + circ->head, buf + wr_size, copied));
 		size -= copied;
 		wr_size += copied;
 		circ->head = (circ->head + copied) & (BCM_SPI_WRITE_BUF_SIZE - 1);
@@ -1149,7 +1155,8 @@ static void bcm_spi_shutdown(struct spi_device *spi)
 
 static int bcm_spi_probe(struct spi_device *spi)
 {
-	int host_req, mcu_req, mcu_resp;
+	int host_req, mcu_req, mcu_resp, gps_pwr_en;
+	struct device *gps_dev;
 	struct bcm_spi_priv *priv;
 	int ret;
 
@@ -1162,6 +1169,7 @@ static int bcm_spi_probe(struct spi_device *spi)
 		goto err_exit;
 	}
 
+	gps_pwr_en = of_get_named_gpio(spi->dev.of_node, "ssp-gps-pwr-en", 0);
 	host_req = of_get_named_gpio(spi->dev.of_node, "ssp-host-req", 0);
 	mcu_req  = of_get_named_gpio(spi->dev.of_node, "ssp-mcu-req", 0);
 	mcu_resp = of_get_named_gpio(spi->dev.of_node, "ssp-mcu-resp", 0);
@@ -1199,6 +1207,22 @@ static int bcm_spi_probe(struct spi_device *spi)
 		pr_err("[SSPBBD]: failed set MCU RESP as input mode, ret:%d", ret);
 		goto err_exit;
 	}
+
+	gps_dev = sec_device_create(NULL, "gps");	
+
+	if (gpio_request(gps_pwr_en, "GPS_PWR_EN")) {
+		pr_err("fail to request gpio(GPS_PWR_EN)\n");
+	}
+	ret = gpio_direction_output(gps_pwr_en, 0);
+	if (ret) {
+		pr_err("[SSPBBD]: failed to set GPS_PWR_EN");
+	}
+	gpio_export(gps_pwr_en, 1);
+	ret = gpio_export_link(gps_dev, "GPS_PWR_EN", gps_pwr_en);
+	if (ret) {
+		pr_err("[SSPBBD]: failed to export symbol link for GPS_PWR_EN(%d)", ret);
+	}
+
 
 	/* Alloc everything */
 	priv = (struct bcm_spi_priv*) kmalloc(sizeof(*priv), GFP_KERNEL);

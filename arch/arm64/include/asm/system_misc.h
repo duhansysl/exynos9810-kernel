@@ -56,17 +56,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 	__show_ratelimited;						\
 })
 
-#define show_do_kernel_fault_ratelimited()				\
-({									\
-	static DEFINE_RATELIMIT_STATE(_rs,				\
-				      DEFAULT_RATELIMIT_INTERVAL,	\
-				      DEFAULT_RATELIMIT_BURST);		\
-	bool __show_ratelimited = false;				\
-	if (__ratelimit(&_rs))						\
-		__show_ratelimited = true;				\
-	__show_ratelimited;						\
-})
-
 #endif	/* __ASSEMBLY__ */
 
 #endif	/* __ASM_SYSTEM_MISC_H */

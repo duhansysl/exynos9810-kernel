@@ -85,11 +85,7 @@ static void flip_cover_work(struct work_struct *work)
 	if (first == second) {
 		flip_cover = first;
 
-#ifdef CONFIG_HALL_EVENT_REVERSE
 		input_report_switch(ddata->input, ddata->event_val, !flip_cover);
-#else
-		input_report_switch(ddata->input, ddata->event_val, flip_cover);
-#endif
 		input_sync(ddata->input);
 	}
 }
@@ -108,11 +104,7 @@ static void flip_cover_work(struct work_struct *work)
 
 	flip_cover = first;
 
-#ifdef CONFIG_HALL_EVENT_REVERSE
 	input_report_switch(ddata->input, ddata->event_val, !flip_cover);
-#else
-	input_report_switch(ddata->input, ddata->event_val, flip_cover);
-#endif
 	input_sync(ddata->input);
 }
 #endif

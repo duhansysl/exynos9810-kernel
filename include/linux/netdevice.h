@@ -1907,9 +1907,6 @@ struct net_device {
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
 	bool			proto_down;
-#ifdef CONFIG_NETPM
-	bool netpm_use;
-#endif
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -2870,7 +2867,9 @@ struct softnet_data {
 	struct sk_buff_head	input_pkt_queue;
 	struct napi_struct	backlog;
 
+#ifdef CONFIG_MODEM_IF_NET_GRO
 	struct napi_struct	*current_napi;
+#endif
 };
 
 static inline void input_queue_head_incr(struct softnet_data *sd)
@@ -3336,7 +3335,10 @@ struct sk_buff *napi_get_frags(struct napi_struct *napi);
 gro_result_t napi_gro_frags(struct napi_struct *napi);
 struct packet_offload *gro_find_receive_by_type(__be16 type);
 struct packet_offload *gro_find_complete_by_type(__be16 type);
+
+#ifdef CONFIG_SEC_SIPC_MODEM_IF
 struct napi_struct *napi_get_current(void);
+#endif
 
 static inline void napi_free_frags(struct napi_struct *napi)
 {

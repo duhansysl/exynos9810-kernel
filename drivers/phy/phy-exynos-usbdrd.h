@@ -185,6 +185,7 @@ struct exynos_usbdrd_phy {
 	int is_conn;
 	int is_irq_enabled;
 	u32 phy_port;
+	u32 reverse_phy_port;
 };
 
 void __iomem *phy_exynos_usbdp_get_address(void);

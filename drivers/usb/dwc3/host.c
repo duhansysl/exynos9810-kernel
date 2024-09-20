@@ -130,7 +130,6 @@ int dwc3_host_init(struct dwc3 *dwc)
 			  dev_name(&xhci->dev));
 
 #ifdef CONFIG_SND_EXYNOS_USB_AUDIO
-	/* dma alloc for usb audio pcm buffer */
 	xhci_data.in_data_addr = dma_alloc_coherent(dwc->dev, (PAGE_SIZE * 256), &dma,
 			GFP_KERNEL);
 	xhci_data.in_data_dma = dma;

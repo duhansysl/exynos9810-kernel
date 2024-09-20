@@ -608,9 +608,10 @@ void fimc_is_dual_mode_update(struct fimc_is_device_ischain *device,
 	resourcemgr = device->resourcemgr;
 	dual_info = &core->dual_info;
 
-	/* Continue if wide and tele complete fimc_is_sensor_s_input(). */
+	/* Continue if wide and tele/s-wide complete fimc_is_sensor_s_input(). */
 	if (!(test_bit(SENSOR_POSITION_REAR, &core->sensor_map) &&
-		test_bit(SENSOR_POSITION_REAR2, &core->sensor_map)))
+		(test_bit(SENSOR_POSITION_REAR2, &core->sensor_map) ||
+		 test_bit(SENSOR_POSITION_REAR3, &core->sensor_map))))
 		return;
 
 	if (group->head->device_type != FIMC_IS_DEVICE_SENSOR)
@@ -622,6 +623,7 @@ void fimc_is_dual_mode_update(struct fimc_is_device_ischain *device,
 		dual_info->max_fps_master = frame->shot->ctl.aa.aeTargetFpsRange[1];
 		break;
 	case SENSOR_POSITION_REAR2:
+	case SENSOR_POSITION_REAR3:
 		dual_info->max_fps_slave = frame->shot->ctl.aa.aeTargetFpsRange[1];
 		break;
 	default:
@@ -662,9 +664,10 @@ void fimc_is_dual_dvfs_update(struct fimc_is_device_ischain *device,
 	static_ctrl = resourcemgr->dvfs_ctrl.static_ctrl;
 	dual_info = &core->dual_info;
 
-	/* Continue if wide and tele complete fimc_is_sensor_s_input(). */
+	/* Continue if wide and tele/s-wide complete fimc_is_sensor_s_input(). */
 	if (!(test_bit(SENSOR_POSITION_REAR, &core->sensor_map) &&
-		test_bit(SENSOR_POSITION_REAR2, &core->sensor_map)))
+		(test_bit(SENSOR_POSITION_REAR2, &core->sensor_map) ||
+		 test_bit(SENSOR_POSITION_REAR3, &core->sensor_map))))
 		return;
 
 	if (group->head->device_type != FIMC_IS_DEVICE_SENSOR)
@@ -727,5 +730,17 @@ void fimc_is_dual_dvfs_update(struct fimc_is_device_ischain *device,
 
 	/* Update current mode to pre_mode. */
 	dual_info->pre_mode = dual_info->mode;
+}
+
+unsigned int fimc_is_get_bit_count(unsigned long bits)
+{
+	unsigned int count = 0;
+
+	while (bits) {
+		bits &= (bits - 1);
+		count++;
+	}
+
+	return count;
 }
 #endif

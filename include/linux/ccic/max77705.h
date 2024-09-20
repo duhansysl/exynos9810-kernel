@@ -159,6 +159,7 @@
 /*
  * REG_CC_STATUS2
  */
+#define BIT_CCSBUSHORT			BITS(7, 6)
 #define BIT_VCONNOCP			BIT(5)
 #define BIT_VCONNSC				BIT(4)
 #define BIT_VSAFE0V				BIT(3)
@@ -213,16 +214,17 @@ enum max77705_vcon_role {
 #define FW_WAIT_TIMEOUT			(1000 * 5) /* 5 sec */
 #define I2C_SMBUS_BLOCK_HALF	(I2C_SMBUS_BLOCK_MAX / 2)
 
-struct max77705_fw_header {
-	u8 data0;
-	u8 data1;
-	u8 data2;
-	u8 data3;
-	u8 data4; /* FW version LSB */
-	u8 data5;
-	u8 data6;
-	u8 data7; /* FW version MSB */
-};
+#define GET_CONTROL3_LOCK_ERROR_EN(_x)		((_x & (0x1 << 1)) >> 1)
+
+typedef struct {
+	u32 magic;     /* magic number */
+	u8 major;         /* major version */
+	u8 minor:3;       /* minor version */
+	u8 product_id:5;  /* product id */
+	u8 id;            /* id */
+	u8 rev;           /* rev */
+} max77705_fw_header;
+#define MAX77705_SIGN 0xCEF166C1
 
 enum {
 	FW_UPDATE_START = 0x00,
@@ -380,6 +382,10 @@ enum max77705_usbc_SYSMsg {
 
 	SYSMSG_SET_GRL = 0x64,
 
+	SYSMSG_PD_CCx_5V_SHORT = 0x65,
+	SYSMSG_PD_SBUx_5V_SHORT = 0x66,
+	SYSMSG_PD_SHORT_NONE = 0x67,
+
 	SYSERROR_FACTORY_RID0 = 0x70,
 	SYSERROR_POWER_NEGO = 0x80,
 };
@@ -503,6 +509,8 @@ typedef enum {
 	OPCODE_CHGIN_ILIM2_W,
 	OPCODE_CTRLREG_INIT_R = 0x1A,
 	OPCODE_CTRLREG_INIT_W,
+	OPCODE_CTRLREG3_R = 0x1C,
+	OPCODE_CTRLREG3_W = 0x1D,
 	OPCODE_AFC_HV_W = 0x20,
 	OPCODE_AFC_RESULT_R,
 	OPCODE_QC2P0_SET = 0x22,
@@ -557,5 +565,13 @@ typedef enum {
 /* SAMSUNG OPCODE */
 #define REG_NONE 0xff
 #define CCIC_IRQ_INIT_DETECT		(-1)
+
+#define MINOR_VERSION_MASK 0b00000111
+
+/* PRODUCT ID  */
+#define FW_PRODUCT_ID_REG 3
+//#define STAR_PRODUCT_ID 0b0000
+//#define Lykan_PRODUCT_ID 0b0001
+//#define BEYOND_PRODUCT_ID 0b0010
 #endif
 

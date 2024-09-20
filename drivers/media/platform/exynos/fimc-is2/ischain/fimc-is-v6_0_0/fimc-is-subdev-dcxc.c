@@ -190,25 +190,25 @@ static int fimc_is_ischain_dcxc_tag(struct fimc_is_subdev *subdev,
 	switch (node->vid) {
 	case FIMC_IS_VIDEO_DCP0C_NUM:
 		index = PARAM_DCP_OUTPUT_MASTER;
-		target_addr = ldr_frame->shot->uctl.scalerUd.sccTargetAddress; /* TODO: name */
+		target_addr = ldr_frame->sccTargetAddress; /* TODO: name */
 		break;
 	case FIMC_IS_VIDEO_DCP1C_NUM:
 		index = PARAM_DCP_OUTPUT_SLAVE;
-		target_addr = ldr_frame->shot->uctl.scalerUd.scpTargetAddress; /* TODO: name */
+		target_addr = ldr_frame->scpTargetAddress; /* TODO: name */
 		break;
 	case FIMC_IS_VIDEO_DCP2C_NUM:
 		index = PARAM_DCP_OUTPUT_DISPARITY;
-		target_addr = ldr_frame->shot->uctl.scalerUd.dxcTargetAddress;
+		target_addr = ldr_frame->dxcTargetAddress;
 		break;
 	case FIMC_IS_VIDEO_DCP3C_NUM:
 		index = PARAM_DCP_OUTPUT_MASTER_DS;
 		/* FIXME: sccTargetAddress is overwrited */
-		target_addr = ldr_frame->shot->uctl.scalerUd.sccTargetAddress;
+		target_addr = ldr_frame->sccTargetAddress;
 		break;
 	case FIMC_IS_VIDEO_DCP4C_NUM:
 		index = PARAM_DCP_OUTPUT_SLAVE_DS;
 		/* FIXME: scpTargetAddress is overwrited */
-		target_addr = ldr_frame->shot->uctl.scalerUd.scpTargetAddress;
+		target_addr = ldr_frame->scpTargetAddress;
 		break;
 	default:
 		mserr("vid(%d) is not matched", device, subdev, node->vid);

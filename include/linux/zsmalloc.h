@@ -25,10 +25,7 @@
 enum zs_mapmode {
 	ZS_MM_RW, /* normal read-write mapping */
 	ZS_MM_RO, /* read-only (no copy-out at unmap time) */
-	ZS_MM_WO, /* write-only (no copy-in at map time) */
-#ifdef CONFIG_ZSWAP_SAME_PAGE_SHARING
-	ZS_MM_RO_NOWAIT /* read-only (no wait if the handle is busy)*/
-#endif
+	ZS_MM_WO /* write-only (no copy-in at map time) */
 	/*
 	 * NOTE: ZS_MM_WO should only be used for initializing new
 	 * (uninitialized) allocations.  Partial writes to already

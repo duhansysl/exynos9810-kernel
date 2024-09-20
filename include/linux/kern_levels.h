@@ -15,7 +15,7 @@
 
 #define KERN_DEFAULT	KERN_SOH "d"	/* the default kernel loglevel */
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 #define KERN_AUTO	KERN_SOH	/* auto-summary messages */
 #define KERN_AUTO1	"B"
 #define KERN_AUTO2	"C"
@@ -48,7 +48,7 @@
 #define LOGLEVEL_INFO		6	/* informational */
 #define LOGLEVEL_DEBUG		7	/* debug-level messages */
 
-#ifdef CONFIG_SEC_DEBUG_AUTO_SUMMARY
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 #define LOGLEVEL_PR_AUTO_BASE	90	/* base log level for auto summary */
 #endif
 

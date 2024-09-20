@@ -220,7 +220,7 @@ static int exynos_cs_lockup_handler(struct notifier_block *nb,
 	unsigned int *cpu = (unsigned int *)core;
 	int ret;
 
-	pr_auto(ASL5, "CPU[%d] saved pc value\n", *cpu);
+	pr_err("CPU[%d] saved pc value\n", *cpu);
 
 	/* If big cluster is Meerkat */
 	if (exynos_cs_get_cpu_part_num(*cpu) == ARM_CPU_PART_MEERKAT)
@@ -236,10 +236,8 @@ static int exynos_cs_lockup_handler(struct notifier_block *nb,
 
 		val = exynos_cs_pc[*cpu][iter].pc;
 		sprint_symbol(buf, val);
-		pr_auto(ASL5, "      0x%016zx : %s\n",	val, buf);
+		pr_err("      0x%016zx : %s\n",	val, buf);
 	}
-
-	pr_auto(ASL5, "\n");
 
 	return 0;
 }

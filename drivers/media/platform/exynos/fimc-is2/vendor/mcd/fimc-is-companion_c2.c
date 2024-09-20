@@ -588,7 +588,7 @@ p_err:
 int fimc_is_comp_check_crc_with_signature(struct fimc_is_core *core)
 {
 	int ret = 0;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	struct fimc_is_companion_retention *ret_data;
 	struct fimc_is_vender_specific *specific;
 	char *cal_buf;
@@ -670,7 +670,7 @@ int fimc_is_comp_check_crc_with_signature(struct fimc_is_core *core)
 		fimc_is_sec_get_front_cal_buf(&cal_buf);
 	}
 
-	if (fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if (fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		if(core->current_position == SENSOR_POSITION_REAR) {
 			if (companion_lsc_isvalid) {
 				ret = fimc_is_comp_compare_crc_value(lsc_main_grid_crc,
@@ -723,7 +723,7 @@ int fimc_is_comp_check_crc_with_signature(struct fimc_is_core *core)
 int fimc_is_comp_check_cal_crc(struct fimc_is_core *core)
 {
 	int ret = 0;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 
 	if (core->current_position == SENSOR_POSITION_REAR) {
@@ -734,7 +734,7 @@ int fimc_is_comp_check_cal_crc(struct fimc_is_core *core)
 		fimc_is_sec_get_front_cal_buf(&cal_buf);
 	}
 
-	if (fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if (fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		if(core->current_position == SENSOR_POSITION_REAR) {
 			if (companion_lsc_isvalid) {
 				ret = fimc_is_comp_check_crc32(core,
@@ -789,8 +789,8 @@ static int fimc_is_comp_load_binary(struct fimc_is_core *core, char *name, int b
 	char version_str[60];
 	u16 addr1, addr2;
 	char companion_rev[12] = {0, };
-	struct fimc_is_from_info *sysfs_finfo;
-	struct fimc_is_from_info *sysfs_pinfo;
+	struct fimc_is_rom_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_pinfo;
 	struct fimc_is_companion_retention *ret_data;
 	struct fimc_is_vender_specific *specific;
 #ifdef USE_ION_ALLOC
@@ -1064,7 +1064,7 @@ static int fimc_is_comp_load_cal(struct fimc_is_core *core, char *name, int posi
 
 	int ret = 0, endian;
 	u32 data_size = 0, offset;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 	u16 data1, data2;
 	u32 comp_addr = 0;
@@ -1083,14 +1083,14 @@ static int fimc_is_comp_load_cal(struct fimc_is_core *core, char *name, int posi
 		if (position == SENSOR_POSITION_REAR) {
 			data_size = FIMC_IS_COMPANION_LSC_SIZE;
 			comp_addr = MEM_GRAS_B;
-			if (fimc_is_sec_check_from_ver(core, position))
+			if (fimc_is_sec_check_rom_ver(core, position))
 				endian = LITTLE_ENDIAN;
 			else
 				endian = BIG_ENDIAN;
 		} else {
 			data_size = FIMC_IS_COMPANION_LSC_SIZE_FRONT;
 			comp_addr = MEM_GRAS_B_front;
-			if (fimc_is_sec_check_from_ver(core, position))
+			if (fimc_is_sec_check_rom_ver(core, position))
 				endian = LITTLE_ENDIAN;
 			else
 				endian = BIG_ENDIAN;
@@ -1140,7 +1140,7 @@ static int fimc_is_comp_read_i2c_cal(struct fimc_is_core *core, u32 addr)
 	u16 data1, data2;
 	u8 read_data[2];
 
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 
 	fimc_is_sec_get_sysfs_finfo(&sysfs_finfo);
 
@@ -1201,7 +1201,7 @@ static int fimc_is_comp_load_i2c_cal(struct fimc_is_core *core, u32 addr, int po
 	u32 i, data_size = 0;
 	u16 data1, data2, data3 ,data4 = 0;
 	u32 comp_addr = 0;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	char *cal_buf;
 
 	if (position == SENSOR_POSITION_REAR) {
@@ -1388,7 +1388,7 @@ int fimc_is_power_binning(void *core_data)
 		return -ENODEV;
 	}
 
-	ret = read_data_from_file(FIMC_IS_ISP_CV, buf, 1, &pos);
+	ret = read_data_rom_file(FIMC_IS_ISP_CV, buf, 1, &pos);
 	if(ret > 0) {
 		if (kstrtoint(buf, 10, &vout_sel))
 			err("convert fail");
@@ -1519,7 +1519,7 @@ u16 fimc_is_comp_get_ver(void)
 int fimc_is_comp_loadcal(void *core_data, int position)
 {
 	struct fimc_is_core *core = core_data;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	int ret = 0;
 	struct exynos_platform_fimc_is *core_pdata = NULL;
 
@@ -1534,7 +1534,7 @@ int fimc_is_comp_loadcal(void *core_data, int position)
 		goto p_err;
 	}
 
-	if (!fimc_is_sec_check_from_ver(core, position)) {
+	if (!fimc_is_sec_check_rom_ver(core, position)) {
 		err("%s: error, not implemented! skip..", __func__);
 		return 0;
 	}
@@ -1553,7 +1553,7 @@ int fimc_is_comp_loadcal(void *core_data, int position)
 		fimc_is_sec_get_sysfs_finfo_front(&sysfs_finfo);
 	}
 
-	if (fimc_is_sec_check_from_ver(core, position)) {
+	if (fimc_is_sec_check_rom_ver(core, position)) {
 		ret = fimc_is_comp_load_i2c_cal(core, sysfs_finfo->lsc_i0_gain_addr, position);
 		if (ret) {
 			err("fimc_is_comp_load_binary(0x%04x) fail", sysfs_finfo->lsc_i0_gain_addr);
@@ -1656,7 +1656,7 @@ int fimc_is_comp_loadcal(void *core_data, int position)
 		}
 	}
 
-	if (fimc_is_sec_check_from_ver(core, position)) {
+	if (fimc_is_sec_check_rom_ver(core, position)) {
 		if ((companion_lsc_isvalid && position == SENSOR_POSITION_REAR)
 		||(companion_front_lsc_isvalid && position == SENSOR_POSITION_FRONT)) {
 			ret = fimc_is_comp_load_cal(core, COMP_LSC, position);
@@ -1683,7 +1683,7 @@ int fimc_is_comp_loadcal(void *core_data, int position)
 
 	/*Workaround : If FROM has ver.V003, Skip PDAF Cal loading to companion.*/
 	if(position == SENSOR_POSITION_REAR) {
-		if (fimc_is_sec_check_from_ver(core, position)) {
+		if (fimc_is_sec_check_rom_ver(core, position)) {
 			ret = fimc_is_comp_load_cal(core, COMP_PDAF, position);
 			if (ret) {
 				err("fimc_is_comp_load_binary(%s) fail", COMP_PDAF);
@@ -1814,7 +1814,7 @@ int fimc_is_comp_retention(void *core_data)
 		goto p_err;
 	}
 
-	if (fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if (fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		ret = fimc_is_comp_check_cal_crc(core);
 		if (ret) {
 			err("fimc_is_comp_check_crc32(cal) fail");
@@ -1879,7 +1879,7 @@ int fimc_is_comp_retention(void *core_data)
 #endif
 
 	/* Use M2M Cal Data */
-	if(fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if(fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		if ((companion_lsc_isvalid && companion_coef_isvalid && core->current_position == SENSOR_POSITION_REAR)
 			||(companion_front_lsc_isvalid && core->current_position == SENSOR_POSITION_FRONT)) {
 			ret = fimc_is_comp_single_write(core, FIMC_IS_COMPANION_USING_M2M_CAL_DATA_ADDR, 0x0001);
@@ -1906,7 +1906,7 @@ int fimc_is_comp_loadfirm(void *core_data)
 	int retry_count = 3;
 	struct fimc_is_core *core = core_data;
 	struct exynos_platform_fimc_is *core_pdata = NULL;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 	struct fimc_is_companion_retention *ret_data;
 	struct fimc_is_vender_specific *specific;
 
@@ -1974,7 +1974,7 @@ retry:
 			ret_data->firmware_size - FIMC_IS_COMPANION_CRC_SIZE,
 			ret_data->firmware_crc32);
 
-	if (fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if (fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		ret |= fimc_is_comp_check_cal_crc(core);
 	}
 
@@ -2004,7 +2004,7 @@ retry:
 	usleep_range(1000, 1000);
 
 	/* Use M2M Cal Data */
-	if(fimc_is_sec_check_from_ver(core, core->current_position)) {
+	if(fimc_is_sec_check_rom_ver(core, core->current_position)) {
 		if ((companion_lsc_isvalid && companion_coef_isvalid && core->current_position == SENSOR_POSITION_REAR)
 			||(companion_front_lsc_isvalid && core->current_position == SENSOR_POSITION_FRONT)) {
 			ret = fimc_is_comp_single_write(core, FIMC_IS_COMPANION_USING_M2M_CAL_DATA_ADDR, 0x0001);
@@ -2028,7 +2028,7 @@ int fimc_is_comp_loadsetf(void *core_data)
 {
 	int ret = 0;
 	struct fimc_is_core *core = core_data;
-	struct fimc_is_from_info *sysfs_finfo;
+	struct fimc_is_rom_info *sysfs_finfo;
 
 	if (!core->spi1.device) {
 		pr_debug("spi1 device is not available");

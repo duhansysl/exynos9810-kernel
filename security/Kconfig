@@ -177,12 +177,6 @@ config HARDENED_USERCOPY_PAGESPAN
 	  been removed. This config is intended to be used only while
 	  trying to find such users.
 
-config NO_SDP_BASE
-	bool "disable SDP base"
-	default n
-	help
-	  This will disable SDP Base code.
-
 source security/selinux/Kconfig
 source security/smack/Kconfig
 source security/tomoyo/Kconfig
@@ -192,11 +186,10 @@ source security/yama/Kconfig
 source security/mstdrv/Kconfig
 
 source security/integrity/Kconfig
-source security/tz_iccc/Kconfig
 source security/samsung/five/Kconfig
-source security/samsung/defex_lsm/Kconfig
-source security/samsung/dsms/Kconfig
 source security/proca/Kconfig
+source security/samsung/dsms/Kconfig
+source security/samsung/defex_lsm/Kconfig
 
 choice
 	prompt "Default security module"
@@ -234,14 +227,22 @@ config DEFAULT_SECURITY
 	default "tomoyo" if DEFAULT_SECURITY_TOMOYO
 	default "apparmor" if DEFAULT_SECURITY_APPARMOR
 	default "" if DEFAULT_SECURITY_DAC
+
 config SDP
-    bool "Enables SDP"
-    default n
-    help
-    Sensitive Data Protection
+	bool "Enables SDP"
+	default n
+	help
+	Sensitive Data Protection
 
 config SDP_KEY_DUMP
-    bool "SDP KEY DUMP"
-    default n
+	bool "SDP KEY DUMP"
+	default n
+
+config DDAR
+	bool "Enables dual encryption"
+	default n
+	help
+	Knox Dual-DAR (Data-At-Rest) protection
+
 endmenu
 

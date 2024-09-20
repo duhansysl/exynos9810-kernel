@@ -469,7 +469,7 @@ config DEBUG_OBJECTS_PERCPU_COUNTER
 config DEBUG_OBJECTS_ENABLE_DEFAULT
 	int "debug_objects bootup default value (0-1)"
         range 0 1
-        default "0"
+        default "1"
         depends on DEBUG_OBJECTS
         help
           Debug objects boot parameter default value
@@ -1155,15 +1155,6 @@ config DEBUG_ATOMIC_SLEEP
 	  held, inside an rcu read side critical section, inside preempt disabled
 	  sections, inside an interrupt, etc...
 
-config DEBUG_ATOMIC_SLEEP_PANIC
-	bool "Panic (Reboot) On Atomic Sleep"
-	depends on DEBUG_ATOMIC_SLEEP
-	depends on SEC_DEBUG && !SAMSUNG_PRODUCT_SHIP
-	help
-	  Say Y here to enable the kernel to panic on "atomic sleep",
-
-	  Say N if you want warning messages only.
-
 config DEBUG_LOCKING_API_SELFTESTS
 	bool "Locking API boot-time self-tests"
 	depends on DEBUG_KERNEL
@@ -1254,10 +1245,6 @@ config DEBUG_LIST
 
 	  If unsure, say N.
 
-config DEBUG_LIST_PANIC
-	def_bool y if DEBUG_LIST
-	depends on SEC_DEBUG && !SAMSUNG_PRODUCT_SHIP
-
 config DEBUG_PI_LIST
 	bool "Debug priority linked list manipulation"
 	depends on DEBUG_KERNEL
@@ -1287,12 +1274,6 @@ config DEBUG_NOTIFIERS
 	  modules properly unregister themselves from notifier chains.
 	  This is a relatively cheap check but if you care about maximum
 	  performance, say N.
-
-config DEBUG_NOTIFIERS_PRINT_ELAPSED_TIME
-	bool "Print elapsed time of specific notifier call chains"
-	depends on DEBUG_KERNEL
-	help
-	  Enable this to turn on printing elapsed time of notifier call chains.
 
 config DEBUG_CREDENTIALS
 	bool "Debug credential management"

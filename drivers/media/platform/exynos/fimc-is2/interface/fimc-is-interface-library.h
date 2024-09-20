@@ -31,13 +31,13 @@
 #endif
 
 #define LIB_ISP_OFFSET		(0x00000080)
-#define LIB_ISP_CODE_SIZE	(0x00240000)
+#define LIB_ISP_CODE_SIZE	(0x00247000)
 
 #define LIB_VRA_OFFSET		(0x00000400)
 #define LIB_VRA_CODE_SIZE	(0x00040000)
 
 #define LIB_RTA_OFFSET		(0x00000000)
-#define LIB_RTA_CODE_SIZE	(0x00100000)
+#define LIB_RTA_CODE_SIZE	(0x00200000)
 
 #define LIB_MAX_TASK		(FIMC_IS_MAX_TASK)
 
@@ -76,11 +76,16 @@ enum task_index {
 /* #define TASK_RTA_AFFINITY		(1) */ /* There is no need to set of cpu affinity for RTA task */
 #define TASK_VRA_AFFINITY		(2)
 
-#define CAMERA_BINARY_RTA_DATA_OFFSET   LIB_RTA_CODE_SIZE
-#define CAMERA_BINARY_DDK_DATA_OFFSET   0x380000
-#define CAMERA_BINARY_DDK_CODE_OFFSET   0x080000
 #define CAMERA_BINARY_VRA_DATA_OFFSET   0x040000
 #define CAMERA_BINARY_VRA_DATA_SIZE     0x040000
+#ifdef USE_ONE_BINARY
+#define CAMERA_BINARY_DDK_CODE_OFFSET   VRA_LIB_SIZE
+#define CAMERA_BINARY_DDK_DATA_OFFSET   (VRA_LIB_SIZE + LIB_ISP_CODE_SIZE)
+#else
+#define CAMERA_BINARY_DDK_CODE_OFFSET   0x000000
+#define CAMERA_BINARY_DDK_DATA_OFFSET   LIB_ISP_CODE_SIZE
+#endif
+#define CAMERA_BINARY_RTA_DATA_OFFSET   LIB_RTA_CODE_SIZE
 
 enum BinLoadType{
     BINARY_LOAD_ALL,
@@ -99,7 +104,6 @@ typedef void(*os_system_func_t)(void);
 
 #define DDK_SHUT_DOWN_FUNC_ADDR	(DDK_LIB_ADDR + 0x100)
 typedef int (*ddk_shut_down_func_t)(void *data);
-
 #define RTA_SHUT_DOWN_FUNC_ADDR	(RTA_LIB_ADDR + 0x100)
 typedef int (*rta_shut_down_func_t)(void *data);
 
@@ -126,7 +130,9 @@ enum memory_track_type {
 
 	/* memory block */
 	MT_TYPE_MB_HEAP	= 0x10,
-	MT_TYPE_MB_DMA,
+	MT_TYPE_MB_DMA_STAT,
+	MT_TYPE_MB_DMA_MEDRC,
+	MT_TYPE_MB_DMA_TNR,
 
 	MT_TYPE_MB_VRA	= 0x20,
 
@@ -221,7 +227,9 @@ struct fimc_is_lib_support {
 
 	/* memory blocks */
 	struct lib_mem_block			mb_heap_rta;
-	struct lib_mem_block			mb_dma;
+	struct lib_mem_block			mb_dma_taaisp;
+	struct lib_mem_block			mb_dma_medrc;
+	struct lib_mem_block			mb_dma_tnr;
 	struct lib_mem_block			mb_vra;
 	/* non-memory block */
 	spinlock_t				slock_nmb;
@@ -320,7 +328,7 @@ int fimc_is_dva_vra(ulong kva, u32 *dva);
 void fimc_is_inv_vra(ulong kva, u32 size);
 void fimc_is_clean_vra(ulong kva, u32 size);
 
-bool fimc_is_lib_in_interrupt(void);
+bool fimc_is_lib_in_irq(void);
 
 int fimc_is_load_bin_on_boot(void);
 void fimc_is_load_ctrl_unlock(void);

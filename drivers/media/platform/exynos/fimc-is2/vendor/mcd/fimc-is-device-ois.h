@@ -10,6 +10,9 @@
  * published by the Free Software Foundation.
  */
 
+#ifndef FIMC_IS_DEVICE_OIS_H
+#define FIMC_IS_DEVICE_OIS_H
+
 struct fimc_is_ois_gpio {
 	char *sda;
 	char *scl;
@@ -34,10 +37,25 @@ struct fimc_is_ois_exif {
 };
 
 struct fimc_is_ois_info {
-	char	header_ver[7];
-	char	load_fw_name[50];
+	char header_ver[9];
+	char load_fw_name[50];
+	char wide_xgg[5];
+	char wide_ygg[5];
+	char tele_xgg[5];
+	char tele_ygg[5];
+	char wide_xcoef[3];
+	char wide_ycoef[3];
+	char tele_xcoef[3];
+	char tele_ycoef[3];
+	char wide_supperssion_xratio[3];
+	char wide_supperssion_yratio[3];
+	char tele_supperssion_xratio[3];
+	char tele_supperssion_yratio[3];
+	u8 wide_cal_mark[2];
+	u8 tele_cal_mark[2];
 	u8 checksum;
 	u8 caldata;
+	bool reset_check;
 };
 
 #ifdef USE_OIS_SLEEP_MODE
@@ -76,11 +94,12 @@ void fimc_is_ois_exif_data(struct fimc_is_core *core);
 int fimc_is_ois_get_exif_data(struct fimc_is_ois_exif **exif_info);
 void fimc_is_ois_fw_status(struct fimc_is_core *core);
 void fimc_is_ois_fw_update(struct fimc_is_core *core);
+void fimc_is_ois_fw_update_from_sensor(void *ois_core);
 bool fimc_is_ois_check_fw(struct fimc_is_core *core);
 bool fimc_is_ois_auto_test(struct fimc_is_core *core,
 				int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y);
 bool fimc_is_ois_read_fw_ver(struct fimc_is_core *core, char *name, char *ver);
-#ifdef CAMERA_REAR2_OIS
+#ifdef CAMERA_2ND_OIS
 bool fimc_is_ois_auto_test_rear2(struct fimc_is_core *core,
 				int threshold, bool *x_result, bool *y_result, int *sin_x, int *sin_y,
 				bool *x_result_2nd, bool *y_result_2nd, int *sin_x_2nd, int *sin_y_2nd);
@@ -89,4 +108,7 @@ void fimc_is_ois_gyro_sleep(struct fimc_is_core *core);
 #ifdef USE_OIS_SLEEP_MODE
 void fimc_is_ois_set_oissel_info(int oissel);
 int fimc_is_ois_get_oissel_info(void);
+#endif
+int fimc_is_sec_get_ois_minfo(struct fimc_is_ois_info **minfo);
+int fimc_is_sec_get_ois_pinfo(struct fimc_is_ois_info **pinfo);
 #endif

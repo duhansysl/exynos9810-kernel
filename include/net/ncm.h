@@ -16,23 +16,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* START_OF_KNOX_NPA */
+// KNOX NPA - START
 
 #ifndef NCM_COMMON_H__
 #define NCM_COMMON_H__
 
-/* Address length consistent with com_android_server_enterprise_nap_NetworkAnalyticsDriver.cpp */
-#define INET6_ADDRSTRLEN_NAP 48
-
-#define NCM_VERSION 10
+#define NCM_VERSION 11
 
 #define INIT_UID_NAP 0
 #define INIT_PID_NAP 1
-
 #define DNS_PORT_NAP 53
-
 #define IPV4_FAMILY_NAP 2
 #define IPV6_FAMILY_NAP 10
+#define INET6_ADDRSTRLEN_NAP 48
 
 #define NCM_FLOW_TYPE_DEFAULT -1
 #define NCM_FLOW_TYPE_ALL 0
@@ -88,7 +84,7 @@ struct knox_socket_metadata {
 /* The interface used by the flow to transmit packet */
 	char interface_name[IFNAMSIZ];
 /* The flow type is used identify the current state of the network flow*/
-	int flow_type;
+	int   flow_type;
 /* The struct defined is responsible for inserting the socket meta-data into kfifo */
 	struct work_struct work_kfifo;
 };
@@ -132,13 +128,12 @@ struct knox_user_socket_metadata {
 /* The interface used by the flow to transmit packet */
 	char interface_name[IFNAMSIZ];
 /* The flow type is used identify the current state of the network flow*/
-	int flow_type;
+	int   flow_type;
 };
 
 /* The list of function which is being referenced */
 extern unsigned int check_ncm_flag(void);
 extern void knox_collect_conntrack_data(struct nf_conn *ct, int startStop, int where);
-
 extern bool kfifo_status(void);
 extern void insert_data_kfifo_kthread(struct knox_socket_metadata* knox_socket_metadata);
 extern unsigned int check_intermediate_flag(void);
@@ -153,8 +148,6 @@ extern unsigned int get_intermediate_timeout(void);
 #endif /* NCM_DEBUG */
 #define NCM_LOGE(...) printk("ncm: "__VA_ARGS__)
 
-
-
 /* IOCTL definitions*/
 #define __NCMIOC    0x120
 #define NCM_ACTIVATED_OPEN       _IO(__NCMIOC, 2)
@@ -166,4 +159,4 @@ extern unsigned int get_intermediate_timeout(void);
 
 #endif
 
-/* END_OF_KNOX_NPA */
+// KNOX NPA - END
