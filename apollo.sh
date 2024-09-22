@@ -40,7 +40,7 @@ CR_DTB=$CR_DIR/arch/$CR_ARCH/boot/dtb.img
 # defconfig dir
 CR_DEFCONFIG=$CR_DIR/arch/$CR_ARCH/configs
 # Kernel Name and Version
-CR_VERSION=V1.5.1
+CR_VERSION=V1.6
 CR_NAME=DS-ACK
 # Thread count
 CR_JOBS=$(nproc --all)
