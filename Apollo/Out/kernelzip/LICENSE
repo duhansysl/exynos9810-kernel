@@ -1,0 +1,112 @@
+## hadesKernel Script License:
+    Copyright 2020-2021 © corsicanu
+    hadesKernel Script is licensed under Creative Commons 
+    Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+    Full license is available at:
+        https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+        
+    This is a human-readable summary (and not a substitute) of the license.
+    
+    You are free to:
+        *Share — copy and redistribute the material in any medium or format
+        *Adapt — remix, transform, and build upon the material
+        The licensor cannot revoke these freedoms as long as you follow the license terms.
+    
+    Under the following terms:
+        *Attribution — You must give appropriate credit, provide a link to the license,
+        and indicate if changes were made. You may do so in any reasonable manner,
+        but not in any way that suggests the licensor endorses you or your use.
+        
+        *NonCommercial — You may not use the material for commercial purposes.
+        
+        *ShareAlike — If you remix, transform, or build upon the material, you must
+        distribute your contributions under the same license as the original.
+
+        No additional restrictions — You may not apply legal terms or technological
+        measures that legally restrict others from doing anything the license permits.
+        
+    Notices:
+    You do not have to comply with the license for elements of the material in the public
+    domain or where your use is permitted by an applicable exception or limitation.
+    No warranties are given. The license may not give you all of the permissions necessary
+    for your intended use. For example, other rights such as publicity, privacy, or moral
+    rights may limit how you use the material.
+
+
+## Included Binary Licenses:
+
+magiskboot, magiskpolicy (Magisk): GPLv3+
+
+    Magisk, including all git submodules are free software:
+    you can redistribute it and/or modify it under the terms of the
+    GNU General Public License as published by the Free Software Foundation,
+    either version 3 of the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Per Section 6(d), official compiled binaries from unmodified source:
+    https://github.com/topjohnwu/Magisk
+
+busybox: GPLv2
+
+    BusyBox is distributed under version 2 of the General Public
+    License. Version 2 is the only version of this license which this
+    version of BusyBox (or modified versions derived from this one) may
+    be distributed under.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    Per Section 3(b), Magisk compiled binary from modified source:
+    https://git.busybox.net/busybox/
+    https://github.com/topjohnwu/ndk-busybox
+    (pre-patched source tree used to build available upon request)
+
+bsdiff/bspatch: BSD
+
+    Copyright 2003-2005 Colin Percival <cperciva@daemonology.net>
+    All rights reserved
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted providing that the following conditions 
+    are met:
+    1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+    ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+    OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+    STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+    IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+    POSSIBILITY OF SUCH DAMAGE.
+
+## Extra credits:
+    @Noxxxious
+    @ananjaser1211
+    @osm0sis
+    @topjohnwu
+    @arter97
+    @SuperR
+    
+    If you consider your name should be here, don't hesitate and send me
+    an email: me <at> corsicanu <dot> ro.    

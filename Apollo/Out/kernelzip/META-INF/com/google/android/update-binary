@@ -1,0 +1,104 @@
+#!/sbin/sh
+# Copyright 2020-2022 © corsicanu
+# Licensed under CC BY-NC-SA 4.0
+# https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+device=$(cat /proc/cmdline | sed 's/ /\n/g' | grep "androidboot.bootloader")
+if [ ! $device ] ; then
+    device=$1
+fi
+
+if [[ $2 = 0 ]]; then
+    OUTFD="/dev/null"
+else
+    OUTFD="/proc/self/fd/$2"
+fi
+ZIP=$3
+
+ui_print() {
+        echo -n -e "ui_print $1\n" > $OUTFD
+        echo -n -e "ui_print\n" > $OUTFD
+}
+
+
+if echo $device | grep '[GN]96[05][FN]'; then
+    # Cleanup
+    cd /tmp
+    rm -rf floyd
+    unzip -o "$ZIP"
+    chmod 755 /tmp/floyd/tools/*
+    cd /tmp/floyd
+
+    bb=/tmp/floyd/tools/busybox
+    boot=$($bb find /dev/block/platform -iname boot)
+
+    
+    ui_print " "
+    ui_print "DS-ACK-V1.7-09.11.2024 Installer"
+    ui_print " "
+
+    ui_print "Detecting device..."
+    if echo $device | grep 'G960[F]'; then
+        ui_print "- S9 G960F detected"
+        mv G960F-kernel kernel
+        mv G960F-dtb extra
+        sleep 1
+    elif echo $device | grep 'G965[F]'; then
+        ui_print "- S9+ G965F detected"
+        ./tools/bsdiff G960F-kernel kernel G965F-kernel
+        ./tools/bsdiff G960F-dtb extra G965F-dtb
+        sleep 1
+    elif echo $device | grep 'N960[F]'; then
+        ui_print "- Note9 N960F detected"
+        ./tools/bsdiff G960F-kernel kernel N960F-kernel
+        ./tools/bsdiff G960F-dtb extra N960F-dtb
+        sleep 1
+    elif echo $device | grep 'G960[N]'; then
+        ui_print "- S9 G960N detected"
+        ./tools/bsdiff G960F-kernel kernel G960N-kernel
+        ./tools/bsdiff G960F-dtb extra G960N-dtb
+        sleep 1
+    elif echo $device | grep 'G965[N]'; then
+        ui_print "- S9+ G965N detected"
+        ./tools/bsdiff G960F-kernel kernel G965N-kernel
+        ./tools/bsdiff G960F-dtb extra G965N-dtb
+        sleep 1
+    elif echo $device | grep 'N960[N]'; then
+        ui_print "- Note9 N960N detected"
+        ./tools/bsdiff G960F-kernel kernel N960N-kernel
+        ./tools/bsdiff G960F-dtb extra N960N-dtb
+        sleep 1
+    else
+        ui_print "! Device is not supported"
+        ui_print "Aborting..."
+        sleep 1
+        exit
+    fi
+
+    ui_print "- Installing ApolloKernel"
+    cd /tmp/floyd && rm -rf /tmp/floydKernel && mkdir -p /tmp/floydKernel && cd /tmp/floydKernel
+    cp /tmp/floyd/tools/magiskboot imgtool && chmod 777 imgtool
+    dd if=$boot of=/tmp/floydKernel/old-boot.img bs=4096
+    ./imgtool unpack old-boot.img
+    rm -rf kernel && cp /tmp/floyd/kernel kernel
+    rm -rf extra && cp /tmp/floyd/extra extra
+    ./imgtool repack -n old-boot.img
+    cp new-boot.img /tmp/floyd/boot.img
+    dd if=/tmp/floyd/boot.img of=$boot bs=4096
+    sleep 1
+
+    ui_print "- Cleaning leftovers.."
+    sleep 1
+    rm -rf /tmp/floyd
+    ui_print " "
+    ui_print "DS-ACK-V1.7-09.11.2024 Installed"
+    ui_print "Reboot and enjoy!"
+    ui_print " "
+    sync
+else
+    ui_print " "
+    ui_print "!! Device is not supported, aborting..."
+    ui_print " "
+    exit 1
+fi
+
