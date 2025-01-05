@@ -75,7 +75,7 @@ if echo $device | grep '[GN]96[05][FN]'; then
         exit
     fi
 
-    ui_print "- Installing ApolloKernel"
+    ui_print "- Installing DS-ACK-V1 Kernel"
     cd /tmp/floyd && rm -rf /tmp/floydKernel && mkdir -p /tmp/floydKernel && cd /tmp/floydKernel
     cp /tmp/floyd/tools/magiskboot imgtool && chmod 777 imgtool
     dd if=$boot of=/tmp/floydKernel/old-boot.img bs=4096
