@@ -1077,10 +1077,6 @@ struct bpf_cgroup_dev_ctx {
 	__u32 minor;
 };
 
-struct bpf_raw_tracepoint_args {
-	__u64 args[0];
-};
-
 struct bpf_sysctl {
 	__u32	write;		/* Sysctl is being read (= 0) or written (= 1).
 				 * Allows 1,2,4-byte read, but no write.
