@@ -252,6 +252,7 @@ typedef struct {
 	u32      (*get_entry_clu0)(DENTRY_T *);
 	void     (*set_entry_clu0)(DENTRY_T *, u32);
 	u64      (*get_entry_size)(DENTRY_T *);
+	u64      (*get_entry_validsize)(DENTRY_T *);
 	void     (*set_entry_size)(DENTRY_T *, u64);
 	void     (*get_entry_time)(DENTRY_T *, TIMESTAMP_T *, u8);
 	void     (*set_entry_time)(DENTRY_T *, TIMESTAMP_T *, u8);

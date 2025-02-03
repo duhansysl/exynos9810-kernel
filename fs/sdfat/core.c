@@ -832,7 +832,7 @@ static s32 search_empty_slot(struct super_block *sb, HINT_FEMP_T *hint_femp, CHA
 static s32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, s32 num_entries)
 {
 	s32 dentry;
-	u32 ret, last_clu;
+	u32 ret, last_clu = CLUS_EOF;
 	u64 sector;
 	u64 size = 0;
 	CHAIN_T clu;
@@ -862,16 +862,28 @@ static s32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, s32 num_entries
 		if (fsi->fs_func->check_max_dentries(fid))
 			return -ENOSPC;
 
-		/* we trust p_dir->size regardless of FAT type */
-		if (__find_last_cluster(sb, p_dir, &last_clu))
-			return -EIO;
+		if (!IS_CLUS_EOF(p_dir->dir)) {
+			/* we trust p_dir->size regardless of FAT type */
+			if (__find_last_cluster(sb, p_dir, &last_clu))
+				return -EIO;
 
-		/*
-		 * Allocate new cluster to this directory
-		 */
-		clu.dir = last_clu + 1;
-		clu.size = 0; /* UNUSED */
-		clu.flags = p_dir->flags;
+			/*
+			 * Allocate new cluster to this directory
+			 */
+			clu.dir = last_clu + 1;
+			clu.size = 0; /* UNUSED */
+			clu.flags = p_dir->flags;
+		} else if (fsi->vol_type == EXFAT && p_dir->size == 0) {
+			/* This directory is empty, zero sized */
+			clu.dir = CLUS_EOF;
+			clu.size = 0; /* UNUSED */
+			clu.flags = 0x03;
+		} else {
+			/* Directory must not be zero sized */
+			DMSG("%s: bogus directory: no cluster, zero-size (p_dir : %u, entry : 0x%08x)",
+			     __func__, fid->dir.dir, fid->entry);
+			return -EIO;
+		}
 
 		/* (0) check if there are reserved clusters
 		 * (create_dir 의 주석 참고)
@@ -887,6 +899,9 @@ static s32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, s32 num_entries
 
 		if (__clear_cluster(inode, clu.dir))
 			return -EIO;
+
+		if (IS_CLUS_EOF(last_clu))
+			p_dir->dir = clu.dir;
 
 		/* (2) append to the FAT chain */
 		if (clu.flags != p_dir->flags) {
@@ -924,6 +939,8 @@ static s32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, s32 num_entries
 					&(fid->dir), fid->entry+1, &sector);
 			if (!ep)
 				return -EIO;
+			if (IS_CLUS_EOF(last_clu))
+				fsi->fs_func->set_entry_clu0(ep, p_dir->dir);
 			fsi->fs_func->set_entry_size(ep, size);
 			fsi->fs_func->set_entry_flag(ep, p_dir->flags);
 			if (dcache_modify(sb, sector))
@@ -937,6 +954,7 @@ static s32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, s32 num_entries
 		i_size_write(inode, (loff_t)size);
 		SDFAT_I(inode)->i_size_ondisk += fsi->cluster_size;
 		SDFAT_I(inode)->i_size_aligned += fsi->cluster_size;
+		SDFAT_I(inode)->fid.start_clu = p_dir->dir;
 		SDFAT_I(inode)->fid.size = size;
 		SDFAT_I(inode)->fid.flags = p_dir->flags;
 		inode->i_blocks += 1 << (fsi->cluster_size_bits - sb->s_blocksize_bits);
@@ -2026,14 +2044,50 @@ s32 fscore_lookup(struct inode *inode, u8 *path, FILE_ID_T *fid)
 		fid->rwoffset = 0;
 		fid->hint_bmap.off = CLUS_EOF;
 		fid->attr = fsi->fs_func->get_entry_attr(ep);
+		fid->flags = fsi->fs_func->get_entry_flag(ep2);
+		fid->start_clu = fsi->fs_func->get_entry_clu0(ep2);
 
-		fid->size = fsi->fs_func->get_entry_size(ep2);
-		if ((fid->type == TYPE_FILE) && (fid->size == 0)) {
+		/*
+		 * NOTICE:
+		 * exFAT-spec does not allow validSize != size for directories.
+		 * However, it allows validSize != size for limited(tail) sparse
+		 * files. Unfortunatly, sdFAT does not have any plan to support
+		 * limited sparse files. So I just keep AS-IS policy for those
+		 * files, which exports validsize as its file size. If not, it
+		 * could make security issues that read old data instead of
+		 * zero-fill for range validSize ~ size.
+		 */
+		if (fsi->fs_func->get_entry_validsize) {
+			fid->size = fsi->fs_func->get_entry_validsize(ep2);
+
+			if (fid->size == 0 && fid->type == TYPE_DIR &&
+			    !IS_CLUS_FREE(fid->start_clu)) {
+				fid->size = fsi->fs_func->get_entry_size(ep2);
+			}
+		} else {
+			fid->size = fsi->fs_func->get_entry_size(ep2);
+		}
+
+		/* If type is DIR, make its size multiple of the cluster one */
+		if (fid->size && fid->type == TYPE_DIR) {
+			u64 num_clus = ((fid->size - 1) >> fsi->cluster_size_bits) + 1;
+
+			fid->size = num_clus << fsi->cluster_size_bits;
+		}
+
+		/* Adjust flags and start_clu for correct zero-size cases */
+		if (fid->type == TYPE_FILE && fid->size == 0) {
 			fid->flags = (fsi->vol_type == EXFAT) ? 0x03 : 0x01;
 			fid->start_clu = CLUS_EOF;
-		} else {
-			fid->flags = fsi->fs_func->get_entry_flag(ep2);
-			fid->start_clu = fsi->fs_func->get_entry_clu0(ep2);
+		} else if (fsi->vol_type == EXFAT &&
+			   fid->type == TYPE_DIR && fid->size == 0) {
+			if (!IS_CLUS_FREE(fid->start_clu)) {
+				EMSG("%s: bogus directory: not zero cluster(%u), but zero size (p_dir : %u, entry : 0x%08x)",
+					__func__, fid->start_clu, fid->dir.dir, fid->entry);
+				sdfat_debug_bug_on(1);
+			}
+			fid->flags = 0x03;
+			fid->start_clu = CLUS_EOF;
 		}
 
 		if ((fid->type == TYPE_DIR) && (fsi->vol_type != EXFAT)) {
@@ -2803,7 +2857,8 @@ s32 fscore_rename(struct inode *old_parent_inode, FILE_ID_T *fid,
 		}
 
 		/* Free the clusters if new_inode is a dir(as if fscore_rmdir) */
-		if (new_entry_type == TYPE_DIR) {
+		if (new_entry_type == TYPE_DIR &&
+		    !IS_CLUS_EOF(new_fid->start_clu)) {
 			/* new_fid, new_clu_to_free */
 			CHAIN_T new_clu_to_free;
 
@@ -3597,7 +3652,14 @@ s32 fscore_readdir(struct inode *inode, DIR_ENTRY_T *dir_entry)
 					dir_entry->NameBuf.sfnbuf_len);
 			}
 
-			dir_entry->Size = fsi->fs_func->get_entry_size(ep);
+			if (fsi->fs_func->get_entry_validsize) {
+				dir_entry->Size = fsi->fs_func->get_entry_validsize(ep);
+
+				if (dir_entry->Size == 0 && type == TYPE_DIR)
+					dir_entry->Size = fsi->fs_func->get_entry_size(ep);
+			} else {
+				dir_entry->Size = fsi->fs_func->get_entry_size(ep);
+			}
 
 			/*
 			 * Update hint information :

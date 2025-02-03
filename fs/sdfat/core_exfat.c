@@ -209,8 +209,15 @@ static u64 exfat_get_entry_size(DENTRY_T *p_entry)
 {
 	STRM_DENTRY_T *ep = (STRM_DENTRY_T *)p_entry;
 
-	return le64_to_cpu(ep->valid_size);
+	return le64_to_cpu(ep->size);
 } /* end of exfat_get_entry_size */
+
+static u64 exfat_get_entry_validsize(DENTRY_T *p_entry)
+{
+	STRM_DENTRY_T *ep = (STRM_DENTRY_T *)p_entry;
+
+	return le64_to_cpu(ep->valid_size);
+} /* end of exfat_get_entry_validsize */
 
 static void exfat_set_entry_size(DENTRY_T *p_entry, u64 size)
 {
@@ -601,7 +608,7 @@ ENTRY_SET_CACHE_T *get_dentry_set_in_dir(struct super_block *sb,
 
 	MMSG("trying to malloc %lx bytes for %d entries\n",
 		(unsigned long)(offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T)), num_entries);
-	es = kmalloc((offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T)), GFP_KERNEL);
+	es = kmalloc((offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T)), GFP_NOFS);
 	if (!es) {
 		EMSG("%s: failed to alloc entryset\n", __func__);
 		goto err_out;
@@ -1512,6 +1519,7 @@ static FS_FUNC_T exfat_fs_func = {
 	.get_entry_clu0 = exfat_get_entry_clu0,
 	.set_entry_clu0 = exfat_set_entry_clu0,
 	.get_entry_size = exfat_get_entry_size,
+	.get_entry_validsize = exfat_get_entry_validsize,
 	.set_entry_size = exfat_set_entry_size,
 	.get_entry_time = exfat_get_entry_time,
 	.set_entry_time = exfat_set_entry_time,

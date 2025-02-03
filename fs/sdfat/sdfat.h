@@ -120,7 +120,8 @@ struct sdfat_mount_options {
 	unsigned char utf8;
 	unsigned char casesensitive;
 	unsigned char adj_hidsect;
-	unsigned char tz_utc;
+	unsigned char tz_set;
+	int time_offset;
 	unsigned char improved_allocation;
 	unsigned char defrag;
 	unsigned char symlink;      /* support symlink operation */
@@ -480,13 +481,13 @@ extern struct timeval __t2;
 #define SDFAT_MSG_LEVEL		SDFAT_MSG_LV_INFO
 
 #define SDFAT_TAG_NAME	"SDFAT"
-#define __S(x) #x
-#define _S(x) __S(x)
+#define ___S(x) #x
+#define __S(x) ___S(x)
 
 extern void __sdfat_dmsg(int level, const char *fmt, ...) __printf(2, 3) __cold;
 
 #define SDFAT_EMSG_T(level, ...)	\
-	__sdfat_dmsg(level, KERN_ERR "[" SDFAT_TAG_NAME "] [" _S(__FILE__) "(" _S(__LINE__) ")] " __VA_ARGS__)
+	__sdfat_dmsg(level, KERN_ERR "[" SDFAT_TAG_NAME "] [" __S(__FILE__) "(" __S(__LINE__) ")] " __VA_ARGS__)
 #define SDFAT_DMSG_T(level, ...)	\
 	__sdfat_dmsg(level, KERN_INFO "[" SDFAT_TAG_NAME "] " __VA_ARGS__)
 

@@ -111,13 +111,13 @@ static inline int wbc_to_write_flags(struct writeback_control *wbc)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
-static inline void __sdfat_submit_bio_write2(int flags, struct bio *bio)
+static inline void __sdfat_write_submit_bio_2(int flags, struct bio *bio)
 {
 	bio_set_op_attrs(bio, REQ_OP_WRITE, flags);
 	submit_bio(bio);
 }
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0) */
-static inline void __sdfat_submit_bio_write2(int flags, struct bio *bio)
+static inline void __sdfat_write_submit_bio_2(int flags, struct bio *bio)
 {
 	submit_bio(WRITE | flags, bio);
 }
@@ -336,12 +336,35 @@ static void __mpage_write_end_io(struct bio *bio, int err)
 static struct bio *mpage_bio_submit_write(int flags, struct bio *bio)
 {
 	bio->bi_end_io = mpage_write_end_io;
-	__sdfat_submit_bio_write2(flags, bio);
+	__sdfat_write_submit_bio_2(flags, bio);
 	return NULL;
 }
 
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 static struct bio *
-mpage_alloc(struct block_device *bdev,
+mpage_alloc(struct block_device *bdev, struct writeback_control *wbc,
+		sector_t first_sector, int nr_vecs,
+		gfp_t gfp_flags)
+{
+	unsigned int flags = REQ_OP_WRITE | wbc_to_write_flags(wbc);
+	struct bio *bio;
+
+	bio = bio_alloc(bdev, nr_vecs, flags, gfp_flags);
+
+	if (bio == NULL && (current->flags & PF_MEMALLOC)) {
+		while (!bio && (nr_vecs /= 2))
+			bio = bio_alloc(bdev, nr_vecs, flags, gfp_flags);
+	}
+
+	if (bio)
+		__sdfat_set_bio_sector(bio, first_sector);
+
+	return bio;
+}
+#else
+static struct bio *
+mpage_alloc(struct block_device *bdev, struct writeback_control *wbc,
 		sector_t first_sector, int nr_vecs,
 		gfp_t gfp_flags)
 {
@@ -360,6 +383,7 @@ mpage_alloc(struct block_device *bdev,
 	}
 	return bio;
 }
+#endif
 
 
 #if IS_BUILTIN(CONFIG_SDFAT_FS)
@@ -394,6 +418,10 @@ static void __write_boundary_block(struct block_device *bdev,
 #define sdfat_buffer_heads_over_limit	(0)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 19, 0)
+#define page_folio(p)	(p)
+#endif
+
 static void clean_buffers(struct page *page, unsigned int first_unmapped)
 {
 	unsigned int buffer_counter = 0;
@@ -416,8 +444,9 @@ static void clean_buffers(struct page *page, unsigned int first_unmapped)
 	 * readpage would fail to serialize with the bh and it would read from
 	 * disk before we reach the platter.
 	 */
+
 	if (sdfat_buffer_heads_over_limit && PageUptodate(page))
-		try_to_free_buffers(page);
+		try_to_free_buffers(page_folio(page));
 }
 
 static int sdfat_mpage_writepage(struct page *page,
@@ -624,7 +653,7 @@ page_is_mapped:
 
 alloc_new:
 	if (!bio) {
-		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
+		bio = mpage_alloc(bdev, wbc, blocks[0] << (blkbits - 9),
 				bio_get_nr_vecs(bdev), GFP_NOFS|__GFP_HIGH);
 		if (!bio)
 			goto confused;

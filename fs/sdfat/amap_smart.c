@@ -419,11 +419,20 @@ int amap_create(struct super_block *sb, u32 pack_ratio, u32 sect_per_au, u32 hid
 
 	/* Allocate AU info table */
 	n_au_table = (amap->n_au + N_AU_PER_TABLE - 1) / N_AU_PER_TABLE;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+	amap->au_table = kvmalloc(sizeof(AU_INFO_T *) * n_au_table, GFP_NOIO);
+#else
 	amap->au_table = kmalloc(sizeof(AU_INFO_T *) * n_au_table, GFP_NOIO);
+#endif
 	if (!amap->au_table) {
 		sdfat_msg(sb, KERN_ERR,
 			"failed to alloc amap->au_table\n");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+		kvfree(amap);
+#else
 		kfree(amap);
+#endif
 		return -ENOMEM;
 	}
 
@@ -554,7 +563,12 @@ free_and_eio:
 			else
 				vfree(amap->fclu_nodes);
 		}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+		kvfree(amap);
+#else
 		kfree(amap);
+#endif
 	}
 	return -EIO;
 }
@@ -585,7 +599,11 @@ void amap_destroy(struct super_block *sb)
 		free_page((unsigned long)amap->fclu_nodes);
 	else
 		vfree(amap->fclu_nodes);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+	kvfree(amap);
+#else
 	kfree(amap);
+#endif
 	SDFAT_SB(sb)->fsi.amap = NULL;
 }
 
