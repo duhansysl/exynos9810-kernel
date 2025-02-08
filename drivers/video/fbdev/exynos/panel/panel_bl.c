@@ -764,13 +764,19 @@ static int panel_get_brightness(struct backlight_device *bd)
 static int panel_set_brightness(struct backlight_device *bd)
 {
 	int ret = 0;
-	int id, brightness = bd->props.brightness;
+	int id, brightness;
 	struct panel_bl_device *panel_bl = bl_get_data(bd);
 	struct panel_device *panel = to_panel_device(panel_bl);
 
 	mutex_lock(&panel_bl->lock);
 	mutex_lock(&panel->op_lock);
 	id = panel_bl->props.id;
+
+	if (bd->props.brightness >= 0 && bd->props.brightness < 256)
+		brightness = bd->props.brightness * 100;
+	else
+		brightness = bd->props.brightness;
+
 	if (!is_valid_brightness(panel_bl, brightness)) {
 		pr_alert("Brightness %d is out of range\n", brightness);
 		ret = -EINVAL;
@@ -788,6 +794,7 @@ static int panel_set_brightness(struct backlight_device *bd)
 		goto exit_set;
 	}
 #endif
+
 	ret = panel_bl_set_brightness(panel_bl, id, 1);
 	if (ret) {
 		pr_err("%s, failed to set_brightness (ret %d)\n",
