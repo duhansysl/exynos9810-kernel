@@ -186,6 +186,20 @@ void ovl_path_lower(struct dentry *dentry, struct path *path)
 	*path = oe->numlower ? oe->lowerstack[0] : (struct path) { NULL, NULL };
 }
 
+#ifdef CONFIG_KSU_SUSFS_SUS_OVERLAYFS
+void ovl_path_lowerdata(struct dentry *dentry, struct path *path)
+{
+	struct ovl_entry *oe = dentry->d_fsdata;
+
+	if (oe->numlower) {
+		path->mnt = oe->lowerstack[oe->numlower - 1].mnt;
+		path->dentry = oe->lowerstack[oe->numlower - 1].dentry;
+	} else {
+		*path = (struct path) { };
+	}
+}
+#endif
+
 int ovl_want_write(struct dentry *dentry)
 {
 	struct ovl_fs *ofs = dentry->d_sb->s_fs_info;
@@ -653,6 +667,18 @@ static int ovl_statfs(struct dentry *dentry, struct kstatfs *buf)
 	struct dentry *root_dentry = dentry->d_sb->s_root;
 	struct path path;
 	int err;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_OVERLAYFS
+	ovl_path_lowerdata(root_dentry, &path);
+	if (likely(path.mnt && path.dentry)) {
+		err = vfs_statfs(&path, buf);
+		if (!err) {
+			buf->f_namelen = 255; // 255 for erofs, ext2/4, f2fs
+			buf->f_type = path.dentry->d_sb->s_magic;
+		}
+		return err;
+	}
+#endif
 
 	ovl_path_real(root_dentry, &path);
 

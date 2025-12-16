@@ -2237,6 +2237,10 @@ struct task_struct {
 	atomic_t stack_refcount;
 #endif
 /* CPU-specific state of this task */
+#ifdef CONFIG_KSU_SUSFS
+	u64 susfs_task_state;
+	u64 susfs_last_fake_mnt_id;
+#endif
 	struct thread_struct thread;
 /*
  * WARNING: on x86, 'thread_struct' contains a variable-sized
