@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Apollo Build Script V3.5
+# Apollo Build Script V3.6
 # For Exynos9810
 # Forked from Exynos8890 Script
 # Coded by AnanJaser1211 @ 2019-2022
@@ -18,7 +18,7 @@
 # Main Dir
 CR_DIR=$(pwd)
 # Compiler Dir
-CR_TC=../compiler
+CR_TC=$CR_DIR/toolchain
 # Target ARCH
 CR_ARCH=arm64
 # Define proper arch and dir for dts files
@@ -40,7 +40,7 @@ CR_DTB=$CR_DIR/arch/$CR_ARCH/boot/dtb.img
 # defconfig dir
 CR_DEFCONFIG=$CR_DIR/arch/$CR_ARCH/configs
 # Kernel Name and Version
-CR_VERSION=V1.11
+CR_VERSION=V1.12beta
 CR_NAME=DS-ACK
 # Thread count
 CR_JOBS=$(nproc --all)
@@ -48,7 +48,7 @@ CR_JOBS=$(nproc --all)
 CR_ANDROID=q
 CR_PLATFORM=13.0.0
 # Current Date
-CR_DATE=$(date +%d.%m.%Y)
+CR_DATE=$(date +%Y%m%d)
 # General init
 export ANDROID_MAJOR_VERSION=$CR_ANDROID
 export PLATFORM_VERSION=$CR_PLATFORM
@@ -76,12 +76,73 @@ CR_SELINUX="2"
 CR_KSU="n"
 CR_CLEAN="n"
 # Default Compilation
-DEFAULT_TARGET=3   # crownlte
+DEFAULT_TARGET=5   # star2ltekor
 DEFAULT_COMPILER=3 # clang18
 DEFAULT_SELINUX=2  # enforce
 DEFAULT_KSU=y      # enabled
+DEFAULT_SUS=n	   # Disable susfs
 DEFAULT_CLEAN=n    # dirty
 #####################################################
+READY="$CR_DIR/buildtools"
+# Function for first-time setup
+first_time_setup() {
+    local packages=(
+        "zstd"
+        "git"
+        "gnupg"
+        "flex"
+        "bison"
+        "build-essential"
+        "zip"
+        "curl"
+        "zlib1g-dev"
+        "libc6-dev-i386"
+        "x11proto-core-dev"
+        "libx11-dev"
+        "lib32z1-dev"
+        "libgl1-mesa-dev"
+        "libxml2-utils"
+        "xsltproc"
+        "unzip"
+        "fontconfig"
+        "python-dev-is-python3"
+        "bsdiff"
+    )
+
+    # Check if apt and dpkg-query are available (Debian-like system)
+    if command -v apt >/dev/null && command -v dpkg-query >/dev/null; then
+    	echo -e "\nFirst Time Setup: The following packages are required for the build tools:"
+	printf ' - %s\n' "${packages[@]}"
+        read -p "Do you want to install these packages? This requires sudo privileges. (y/n) > " INSTALL_BUILD_TOOLS
+        if [[ "$INSTALL_BUILD_TOOLS" =~ ^[yY]$ ]]; then
+            echo "Installing required packages..."
+            sudo apt update
+            sudo apt install -y "${packages[@]}"
+
+            echo "Verifying package installation..."
+            for package in "${packages[@]}"; do
+                if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "ok installed"; then
+                    echo "Failed to install $package. Please try installing it manually."
+                    exit 1
+                fi
+            done
+
+            touch "$READY"
+            echo -e "\n$READY created successfully. Delete this file to re-run setup.\n"
+        else
+            echo "Installation skipped. Please install the required packages manually and re-run."
+            exit 1
+        fi
+
+    else
+    	echo -e "\nFirst Time Setup: "
+        echo -e "\nNon-Debian system detected (missing apt or dpkg-query)."
+        echo "Please install the following packages manually:"
+        printf ' - %s\n' "${packages[@]}"
+        echo -e "\nTo hide this message in the future, run:"
+        echo -e "\n  touch $READY\n"
+    fi
+}
 
 # Compiler Selection
 BUILD_COMPILER()
@@ -95,19 +156,19 @@ BUILD_COMPILER()
 
 if [ $CR_COMPILER = "1" ]; then
 CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r416183/clang-r416183.tar.gz
-CR_CLANG=$CR_TC/clang-12.0.4-r416183
+CR_CLANG=$CR_TC/clang-r416183
 fi
 if [ $CR_COMPILER = "2" ]; then
 CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r450784/clang-r450784b.tar.gz
-CR_CLANG=$CR_TC/clang-14.0.4-r450784
+CR_CLANG=$CR_TC/clang-r450784
 fi
 if [ $CR_COMPILER = "3" ]; then
 CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r522817/clang-r522817.tar.gz
-CR_CLANG=$CR_TC/clang-18.0.1-r522817
+CR_CLANG=$CR_TC/clang-r522817
 fi
 if [ $CR_COMPILER = "4" ]; then
-CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-CR_CLANG=$CR_TC/clang-20.0.0-r547379
+CR_CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r530567/clang-r530567.tar.gz
+CR_CLANG=$CR_TC/clang-r530567
 fi
 if [ $CR_COMPILER = "5" ]; then
 CR_CLANG_URL=https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/05012024/neutron-clang-05012024.tar.zst
@@ -118,13 +179,10 @@ CR_CLANG_URL=https://github.com/Neutron-Toolchains/clang-build-catalogue/release
 CR_CLANG=$CR_TC/neutron-clang-19.0.0
 fi
 if [ $CR_COMPILER = "7" ]; then
-CR_CLANG=$CR_TC/neutron-clang-20.0.0
-fi
-if [ $CR_COMPILER = "8" ]; then
 CR_CLANG=$CR_TC/clang-custom
 fi
 
-if [ $CR_COMPILER != "8" ]; then
+if [ $CR_COMPILER != "7" ]; then
 	if [ ! -d "$CR_CLANG/bin" ] || [ ! -d "$CR_CLANG/lib" ]; then
 		echo " "
 		echo " $CR_CLANG compiler is missing"
@@ -240,35 +298,78 @@ BUILD_IMAGE_NAME()
 # Build options
 BUILD_OPTIONS()
 {
-	# KSU Version
-	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
+	# Compute KSU_VERSION if KernelSU is enabled
+	if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
+		KERNELSU_DIR="drivers/kernelsu"
+		if [ -e "$KERNELSU_DIR/../.git" ]; then
+			# Unshallow if needed
+			if [ -f "$KERNELSU_DIR/../.git/shallow" ]; then
+				git -C "$KERNELSU_DIR" fetch --unshallow
+			fi
+			GIT_VERSION=$(git -C "$KERNELSU_DIR" rev-list --count HEAD 2>/dev/null)
+			if [[ "$GIT_VERSION" =~ ^[0-9]+$ ]]; then
+				KSU_VERSION=$((10000 + GIT_VERSION + 200))
+			else
+				KSU_VERSION="unknown"
+			fi
+		else
+			# Default
+			KSU_VERSION=11998
+		fi
+	fi
+	
+	# Get SUSFS_VERSION if SuS is enabled
+	if [[ "$CR_SUS" =~ ^[yY]$ ]]; then
+		SUSFS_HEADER="include/linux/susfs.h"
+		if [ -f "$SUSFS_HEADER" ]; then
+			SUSFS_VERSION=$(grep -E '^#define[[:space:]]+SUSFS_VERSION' "$SUSFS_HEADER" | awk '{print $3}' | tr -d '"')
+		else
+			SUSFS_VERSION="unknown"
+		fi
+	fi
+
 	echo "----------------------------------------------"
-	echo " Apollo Kernel Build Options "
+	echo " DS-ACK Kernel Build Options "
 	echo " "
 	echo " Kernel		- $CR_IMAGE_NAME"
 	echo " Device		- $CR_VARIANT"
 	echo " Compiler	- $CR_COMPILER_ARG"
+
 	if [[ "$CR_CLEAN" =~ ^[yY]$ ]]; then
 		echo " Env		- Clean Build"
 	else
 		echo " Env		- Dirty Build"
 	fi
-	if [ $CR_SELINUX = "1" ]; then
-		echo " SELinux	- Permissive"
+
+	if [ "$CR_SELINUX" = "1" ]; then
+		echo " Selinux	- Permissive"
 	else
-		echo " SELinux	- Enforcing"
+		echo " Selinux	- Enforcing"
 	fi
+
 	if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
 		if [ -n "$KSU_VERSION" ]; then
-		echo " KernelSU	- Version: $KSU_VERSION"
+			echo " KernelSU	- Version: $KSU_VERSION"
 		else
-		echo " KernelSU	- Enabled"
+			echo " KernelSU	- Enabled"
+		fi
+
+		if [[ "$CR_SUS" =~ ^[yY]$ ]]; then
+			if [ -n "$SUSFS_VERSION" ]; then
+				echo " SuSFS		- Version: $SUSFS_VERSION"
+			else
+				echo " SuSFS		- Enabled"
+			fi
+		else
+			echo " SuSFS		- Disabled"
 		fi
 	else
 		echo " KernelSU	- Disabled"
 	fi
+
 	echo " "
 }
+
 
 # Config Generation Function
 
@@ -297,22 +398,96 @@ BUILD_GENERATE_CONFIG()
   echo " Region	- $CR_CONFIG_REGION "
   cat $CR_DEFCONFIG/$CR_CONFIG_REGION >> $CR_DEFCONFIG/tmp_defconfig
   # Apollo Custom defconfig
-  echo " Apollo	- $CR_CONFIG_APOLLO "
+  echo " DS-AC	- $CR_CONFIG_APOLLO "
   cat $CR_DEFCONFIG/$CR_CONFIG_APOLLO >> $CR_DEFCONFIG/tmp_defconfig
   # Selinux Never Enforce all targets
   if [ $CR_SELINUX = "1" ]; then
-    echo " Building SELinux Permissive Kernel"
+    echo " Building SElinux Permissive Kernel"
     echo "CONFIG_ALWAYS_PERMISSIVE=y" >> $CR_DEFCONFIG/tmp_defconfig
     CR_IMAGE_NAME=$CR_IMAGE_NAME-Permissive
     zver=$zver-Permissive
   else
-    echo " Building SELinux Enforced Kernel"
+    echo " Building SElinux Enforced Kernel"
   fi
+  # Kernel SU
+  # Ensure Submodule is present
+  git submodule update --init --recursive
+  # Default
+  git config -f .gitmodules submodule.KernelSU.branch next
   if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
-    echo " Building KernelSU"
+    echo " Building KernelSU-Next"
+    # SUSFS-NEXT on Fork
+    if [[ "$CR_SUS" =~ ^[yY]$ ]]; then
+      REPO_URL="https://github.com/sidex15/KernelSU-Next"
+      BRANCH="next-susfs"
+      echo " Using sidex15 SuSFS repository and branch"
+    else
+      REPO_URL="https://github.com/KernelSU-Next/KernelSU-Next"
+      BRANCH="next"
+      echo " Using standard repository and branch"
+    fi
+    
+    # Update .gitmodules with correct repository
+    git config -f .gitmodules submodule.KernelSU.url "$REPO_URL"
+    git config -f .gitmodules submodule.KernelSU.branch "$BRANCH"
+    
+    # Sync and update submodule
+    git submodule sync --recursive
+    git submodule update --init --recursive
+    
+    # Image Info
     echo "CONFIG_KSU=y" >> $CR_DEFCONFIG/tmp_defconfig
-    CR_IMAGE_NAME=$CR_IMAGE_NAME-KSU
+    CR_IMAGE_NAME=$CR_IMAGE_NAME-ksu
     zver=$zver-KernelSU
+    
+  if [[ "$CR_SUS" =~ ^[yY]$ ]]; then
+    echo " Adding KernelSU-Next-SuSFS"
+    # SuSFS Config
+    echo "CONFIG_KSU_SUSFS=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_PATH=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> $CR_DEFCONFIG/tmp_defconfig
+    CR_IMAGE_NAME=$CR_IMAGE_NAME-susfs
+    zver=$zver-SuSFS
+  else
+    # Disable SuSFS
+    echo "CONFIG_KSU_SUSFS=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_PATH=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_MOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_KSTAT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_ENABLE_LOG=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=n" >> $CR_DEFCONFIG/tmp_defconfig
+    echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> $CR_DEFCONFIG/tmp_defconfig
+  fi
+    echo " Fetching KernelSU-Next $BRANCH Branch from $REPO_URL"
+    cd $CR_DIR/KernelSU
+    git reset --hard
+    git clean -fdx
+    git fetch origin
+    git checkout -B "$BRANCH" origin/"$BRANCH"
+    git pull --ff-only origin "$BRANCH"
+    cd $CR_DIR
   else
     echo "# CONFIG_KSU is not set" >> $CR_DEFCONFIG/tmp_defconfig
   fi
@@ -324,23 +499,7 @@ BUILD_GENERATE_CONFIG()
 # Kernel information Function
 BUILD_OUT()
 {
-# KSU Version
-	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
-  echo "----------------------------------------------"
-  echo " Kernel		- $CR_IMAGE_NAME"
-  echo " Device		- $CR_VARIANT"
-  echo " Compiler	- $CR_COMPILER_ARG"
-	if [[ "$CR_CLEAN" =~ ^[yY]$ ]]; then
-		echo " Env		- Clean Build"
-	else
-		echo " Env		- Dirty Build"
-	fi
-	if [ $CR_SELINUX = "1" ]; then
-		echo " SELinux	- Permissive"
-	else
-		echo " SELinux	- Enforcing"
-	fi
-  echo " KernelSU	- Version: $KSU_VERSION"
+  echo " "
   echo "----------------------------------------------"
   echo "$CR_VARIANT kernel build finished."
   echo "Compiled DTB Size = $sizdT Kb"
@@ -350,6 +509,23 @@ BUILD_OUT()
   echo "Press Any key to end the script"
   echo "----------------------------------------------"
 }
+
+LIST_COMPILED_ZIPS() {
+    echo ""
+    echo "----------------------------------------------"
+    echo "Compiled ZIPs (this session):"
+    echo "----------------------------------------------"
+
+    for zver in "${COMPILED_ZIPS[@]}"; do
+        find "$CR_PRODUCT" -type f -name "$zver*.zip" | sort | while read zipfile; do
+            size_kb=$(du -k "$zipfile" | cut -f1)
+            echo "$(basename "$zipfile") - ${size_kb} KB"
+        done
+    done
+
+    echo "----------------------------------------------"
+}
+
 
 # Kernel Compile Function
 BUILD_ZIMAGE()
@@ -456,7 +632,7 @@ BUILD()
 	fi
 	if [ "$CR_TARGET" = "3" ]
 	then
-		echo " Galaxy Note9 INTL"
+		echo " Galaxy Note 9 INTL"
 		CR_CONFIG_SPLIT=$CR_CONFIG_N960
 		CR_CONFIG_REGION=$CR_CONFIG_INTL
 		CR_VARIANT=$CR_VARIANT_N960F
@@ -478,7 +654,7 @@ BUILD()
 	fi
 	if [ "$CR_TARGET" = "6" ]
 	then
-		echo " Galaxy Note9 KOR"
+		echo " Galaxy Note 9 KOR"
 		CR_CONFIG_SPLIT=$CR_CONFIG_N960
 		CR_CONFIG_REGION=$CR_CONFIG_KOR
 		CR_VARIANT=$CR_VARIANT_N960N
@@ -526,6 +702,53 @@ BUILD
 export -n "CONFIG_MACH_EXYNOS9810_CROWNLTE_KOR"
 }
 
+BUILD_ALL_COMBINATIONS(){
+echo "----------------------------------------------"
+echo " Compiling ALL ZIPs "
+echo " ZIP - Non-Root "
+echo "----------------------------------------------"
+CR_COMPILER=3 # clang18
+CR_SELINUX=2  # enforce
+CR_KSU=n      # disable ksu
+CR_SUS=n	   # Disable susfs
+BUILD_ALL
+echo "----------------------------------------------"
+echo " ZIP - Non-Root - Permissive"
+CR_COMPILER=3 # clang18
+CR_SELINUX=1  # permissive
+CR_KSU=n      # disable ksu
+CR_SUS=n	   # Disable susfs
+BUILD_ALL
+echo "----------------------------------------------"
+echo " ZIP - Root "
+CR_COMPILER=3 # clang18
+CR_SELINUX=2  # enforce
+CR_KSU=y      # enable ksu
+CR_SUS=n	   # Disable susfs
+BUILD_ALL
+echo "----------------------------------------------"
+echo " ZIP - Root - Permissive"
+CR_COMPILER=3 # clang18
+CR_SELINUX=1  # permissive
+CR_KSU=y      # enable ksu
+CR_SUS=n	   # Disable susfs
+BUILD_ALL
+echo "----------------------------------------------"
+echo " ZIP - Root - SuSFS"
+CR_COMPILER=3 # clang18
+CR_SELINUX=2  # enforce
+CR_KSU=y      # enable ksu
+CR_SUS=y	   # enable susfs
+BUILD_ALL
+echo "----------------------------------------------"
+echo " ZIP - Root - SuSFS - Permissive"
+CR_COMPILER=3 # clang18
+CR_SELINUX=1  # permissive
+CR_KSU=y      # enable ksu
+CR_SUS=y	   # enable susfs
+BUILD_ALL
+}
+
 # Preconfigured Debug build
 BUILD_DEBUG(){
 echo "----------------------------------------------"
@@ -534,9 +757,10 @@ CR_TARGET=5
 CR_COMPILER=3
 CR_SELINUX=0
 CR_KSU="y"
+CR_SUS="n"
 CR_CLEAN="n"
 echo " DEBUG : Set Build options "
-echo " DEBUG : Variant  : $CR_VARIANT_N960F"
+echo " DEBUG : Variant  : $CR_VARIANT_G965N"
 echo " DEBUG : Compiler : Clang 18"
 echo " DEBUG : Selinux  : $CR_SELINUX Enforcing"
 echo " DEBUG : Clean    : $CR_CLEAN"
@@ -557,24 +781,6 @@ echo " Packing ZIP "
 # Variables
 CR_BASE_KERNEL=$CR_OUTZIP/floyd/G960F-kernel
 CR_BASE_DTB=$CR_OUTZIP/floyd/G960F-dtb
-
-# Check packages
-if ! dpkg-query -W -f='${Status}' bsdiff  | grep "ok installed"; then 
-	echo "bsdiff is missing and is required for ZIP Packaging."
-	read -p "Do you want to install bsdiff? This requires sudo privileges. (y/n) > " INSTALL_BSDIFF
-	if [ "$INSTALL_BSDIFF" = "y" ]; then
-		echo "installing bsdiff."
-		sudo apt update
-		sudo apt install -y bsdiff
-		if ! dpkg-query -W -f='${Status}' bsdiff | grep "ok installed"; then
-			echo "Failed to install bsdiff. Please try installing it manually."
-			exit 0;
-		fi
-	else
-		echo "Please install bsdiff with sudo apt install bsdiff and try again."
-		exit 0;
-	fi
-fi
 
 # Initalize with base image (Starlte)
 if [ "$CR_TARGET" = "1" ]; then # Always must run ONCE during BUILD_ALL otherwise fail. Setup directories
@@ -634,6 +840,8 @@ if [ "$CR_TARGET" = "6" ]; then # Final kernel build
 	echo "$CR_NAME kernel build finished."
 	echo "Compiled Package Size = $sizdz Kb"
 	echo "$zver.zip Ready"
+	# Store zips
+	COMPILED_ZIPS+=("$zver")
 	echo "Press Any key to end the script"
 	echo "----------------------------------------------"
 fi
@@ -643,71 +851,94 @@ fi
 clear
 echo "----------------------------------------------"
 echo "$CR_NAME $CR_VERSION Build Script $CR_DATE"
-if [ "$1" = "-d" ]; then
-BUILD_DEBUG
-fi
-echo " "
-echo " "
-echo "1) starlte" "   2) star2lte" "   3) crownlte"
-echo "4) starltekor" "5) star2ltekor" "6) crownltekor"
-echo  " "
-echo "7) Build All/ZIP"               "8) Abort"
-echo "----------------------------------------------"
-read -p "Please select your build target (1-8) > " CR_TARGET
-echo "----------------------------------------------"
-echo " "
-echo "1) Google Clang 12 (LLVM +LTO)"
-echo "2) Google Clang 14 (LLVM +LTO)"
-echo "3) Google Clang 18 (LLVM +LTO PGO Bolt MLGO Polly)"
-echo "4) Google Clang 20 (LLVM +LTO PGO Bolt MLGO Polly)"
-echo "5) Neutron Clang 18 (^)"
-echo "6) Neutron Clang 19 (^)"
-echo "7) Neutron Clang 20 (BETA)"
-echo "8) Other (Apollo/toolchain/clang-custom)"
-echo " "
-read -p "Please select your compiler (1-7) > " CR_COMPILER
-echo " "
-echo "1) SELinux Permissive "  "2) SELinux Enforcing"
-echo " "
-read -p "Please select your SElinux mode (1-2) > " CR_SELINUX
-echo " "
-read -p "Enable KernelSU? (y/n) > " CR_KSU
-echo " "
-if [ "$CR_TARGET" = "8" ]; then
-echo "Build Aborted"
-exit
-fi
-echo " "
-read -p "Clean Builds? (y/n) > " CR_CLEAN
-echo " "
 
-# Validate options
+if [ "$1" = "-d" ]; then
+    BUILD_DEBUG
+fi
+
+echo ""
+if [ ! -f "$READY" ]; then
+    first_time_setup
+    echo "----------------------------------------------"
+else
+    echo "Build tools are installed."
+    echo "----------------------------------------------"
+    echo ""
+fi
+
+# Target Menu
+echo "1) starlte      2) star2lte      3) crownlte"
+echo "4) starltekor   5) star2ltekor   6) crownltekor"
+echo "7) Build All/ZIP"
+echo "8) Build All/ZIP Combinations"
+echo "9) Abort"
+echo "----------------------------------------------"
+read -p "Please select your build target (1-9) > " CR_TARGET
+echo "----------------------------------------------"
+
+# Abort
+if [ "$CR_TARGET" = "9" ]; then
+    echo "Build Aborted"
+    exit 0
+fi
+
+# Compiler & Options (only if not option 8)
+if [ "$CR_TARGET" != "8" ]; then
+    echo ""
+    echo "1) Clang 12 (LLVM +LTO)"
+    echo "2) Clang 14 (LLVM +LTO)"
+    echo "3) [Default] Clang 18 (LLVM +LTO PGO Bolt Mlgo Poly)"
+    echo "4) Clang 19 (^)"
+    echo "5) Neutron Clang 18 (^)"
+    echo "6) Neutron Clang 19 (^)"
+    echo "7) Other (Apollo/toolchain/clang-custom)"
+    echo ""
+    read -p "Please select your compiler (1-7) > " CR_COMPILER
+
+    echo ""
+    echo "1) Selinux Permissive   [Default] 2) Selinux Enforcing"
+    echo ""
+    read -p "Please select your SElinux mode (1-2) > " CR_SELINUX
+
+    echo ""
+    read -p "Enable KernelSU? (y/n) > " CR_KSU
+    if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
+        read -p "Enable KSU + SuSFS? (y/n) > " CR_SUS
+    fi
+    echo ""
+fi
+
+# Clean Builds
+read -p "Clean Builds? (y/n) > " CR_CLEAN
+echo ""
+
+# Validation
 if ! [[ "$CR_TARGET" =~ ^[1-8]$ ]]; then
     CR_TARGET=$DEFAULT_TARGET
-    echo " No target selected, defaulting to star2ltekor"
+    echo "No valid target selected, defaulting to star2ltekor"
 fi
 
-if ! [[ "$CR_COMPILER" =~ ^[1-7]$ ]]; then
-    CR_COMPILER=$DEFAULT_COMPILER
-fi
+# Default Entry
+if ! [[ "$CR_COMPILER" =~ ^[1-7]$ ]]; then CR_COMPILER=$DEFAULT_COMPILER; fi
+if ! [[ "$CR_SELINUX" =~ ^[1-2]$ ]]; then CR_SELINUX=$DEFAULT_SELINUX; fi
+if ! [[ "$CR_KSU" =~ ^[yYnN]$ ]]; then CR_KSU=$DEFAULT_KSU; fi
+if ! [[ "$CR_SUS" =~ ^[yYnN]$ ]]; then CR_SUS=$DEFAULT_SUS; fi
+if ! [[ "$CR_CLEAN" =~ ^[yYnN]$ ]]; then CR_CLEAN=$DEFAULT_CLEAN; fi
 
-if ! [[ "$CR_SELINUX" =~ ^[1-2]$ ]]; then
-    CR_SELINUX=$DEFAULT_SELINUX
-fi
-
-if ! [[ "$CR_KSU" =~ ^[yYnN]$ ]]; then
-    CR_KSU=$DEFAULT_KSU
-fi
-if ! [[ "$CR_CLEAN" =~ ^[yYnN]$ ]]; then
-    CR_CLEAN=$DEFAULT_CLEAN
-fi
-
-# Call functions
-if [ "$CR_TARGET" = "7" ]; then
-echo " "
-read -p "Build Flashable ZIP ? (y/n) > " CR_MKZIP
-echo " "
-BUILD_ALL
+# Build Logic
+if [ "$CR_TARGET" = "8" ]; then
+    echo ""
+    read -p "Build Flashable ZIP Combinations? (y/n) (n to build .imgs)> " CR_MKZIP
+    echo ""
+    BUILD_ALL_COMBINATIONS
+    echo "All combinations compiled."
+    LIST_COMPILED_ZIPS
+    COMPILED_ZIPS=""
+elif [ "$CR_TARGET" = "7" ]; then
+    echo ""
+    read -p "Build Flashable ZIP? (y/n) (n to build .imgs)> " CR_MKZIP
+    echo ""
+    BUILD_ALL
 else
-BUILD
+    BUILD
 fi
