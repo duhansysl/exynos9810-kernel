@@ -1,0 +1,3 @@
+19.0.0
+based on r530567
+for additional information on LLVM revision and cherry-picks, see clang_source_info.md

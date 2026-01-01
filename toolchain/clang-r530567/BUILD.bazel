@@ -1,0 +1,33 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "binaries",
+    srcs = glob([
+        "bin/*",
+        "lib/*",
+        "lib/x86_64-unknown-linux-gnu/*",
+    ]),
+)
+
+filegroup(
+    name = "includes",
+    srcs = glob([
+        "lib/clang/*/include/**",
+        "include/c++/**",
+        "include/x86_64-unknown-linux-gnu/c++/**",
+    ]),
+)
+
+# Special python3 for u-boot.
+py_runtime(
+    name = "python3",
+    files = glob(
+        ["python3/**"],
+        exclude = [
+            "**/site-packages/**",
+        ],
+    ),
+    interpreter = "python3/bin/python3",
+    python_version = "PY3",
+    visibility = ["//u-boot:__subpackages__"],
+)

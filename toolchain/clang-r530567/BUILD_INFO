@@ -1,0 +1,623 @@
+{
+    "best_target_priority": 1,
+    "bid": "12085363",
+    "branch": "aosp-llvm-toolchain",
+    "branch_priority": 1,
+    "build_configs": {},
+    "build_dependencies": [
+        {
+            "dependencyBuildId": "12081304",
+            "dependencyInfo": {
+                "artifactPrefixs": [
+                    "pgo",
+                    "bolt"
+                ],
+                "branch": "aosp-master-plus-llvm",
+                "destDir": "artifacts/profiles",
+                "fixedBuildId": "",
+                "target": "Clang-BOLT"
+            }
+        },
+        {
+            "dependencyBuildId": "12081304",
+            "dependencyInfo": {
+                "artifactPrefixs": [
+                    "stage1-install"
+                ],
+                "branch": "aosp-master-plus-llvm",
+                "destDir": "artifacts/linux_bootstrap",
+                "fixedBuildId": "",
+                "target": "linux_bootstrap"
+            }
+        }
+    ],
+    "build_type": "submitted",
+    "dependency_targets": [],
+    "device_dir": "/mnt/disks/build-disk/src/android/llvm-toolchain",
+    "docker_image": "us-docker.pkg.dev/google.com/android-llvm-kokoro/android-llvm/llvm-ubuntu@sha256:3217e16549ec740c1706fe9aee8843c5b5b7bb585e484a422d774d9f04a2255d",
+    "enable_docker": true,
+    "git-pull": null,
+    "git-server": "https://android.googlesource.com",
+    "hostname": "r-b48e55d33e5c9b8b-j10q",
+    "inc-build": false,
+    "java-version": null,
+    "last_logfile": null,
+    "out_dir": "/mnt/disks/build-disk/src/android/llvm-toolchain/out",
+    "parsed_manifest": {
+        "parsedDefault": {
+            "remote": "aosp",
+            "revision": "main",
+            "syncJ": "4"
+        },
+        "projects": [
+            {
+                "name": "platform/bionic",
+                "path": "bionic",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "5530c8e302e12a2e2428e69c60c31b75bd1e41d2"
+            },
+            {
+                "name": "toolchain/binutils",
+                "path": "toolchain/binutils",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "c19795e958ed532462948fd14b1bdfd4f6e96e03"
+            },
+            {
+                "name": "toolchain/llvm-project",
+                "path": "toolchain/llvm-project",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "97a699bf4812a18fb657c2779f5296a4ab2694d2"
+            },
+            {
+                "name": "toolchain/llvm_android",
+                "path": "toolchain/llvm_android",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "b252122cd2eb860912531f4352ff31552c238add"
+            },
+            {
+                "name": "toolchain/common",
+                "path": "toolchain/common",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "0bce8b062126242872e9f3fc66760d3f76773c49"
+            },
+            {
+                "name": "platform/external/toolchain-utils",
+                "path": "external/toolchain-utils",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "dd1ee45a84cb07337f9d5d0a6769d9b865c6e620"
+            },
+            {
+                "cloneDepth": "1",
+                "groups": [
+                    "pdk",
+                    "darwin"
+                ],
+                "name": "platform/prebuilts/gcc/darwin-x86/host/headers",
+                "path": "prebuilts/gcc/darwin-x86/host/headers",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "4ac4f7cc41cf3c9e36fc3d6cf37fd1cfa9587a68"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8",
+                "path": "prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "7e960e32d11a3bc75b1ae3654b3b93c8828e2bb4"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/gcc/linux-x86/host/x86_64-w64-mingw32-4.8",
+                "path": "prebuilts/gcc/linux-x86/host/x86_64-w64-mingw32-4.8",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "54c8410ade95e313e892745f14312f5e97c7bedc"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/cmake/darwin-x86",
+                "path": "prebuilts/cmake/darwin-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "7aea7e9880110799088cd1de509886871078306f"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/cmake/linux-x86",
+                "path": "prebuilts/cmake/linux-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "b29ed51838737f0c8d0c689c50147e9bc128a31e"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/build-tools",
+                "path": "prebuilts/build-tools",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "ccbf6ad6af4430b013ddf35285f532f0bf535be9"
+            },
+            {
+                "cloneDepth": "1",
+                "groups": [
+                    "darwin",
+                    "pdk",
+                    "tradefed"
+                ],
+                "name": "platform/prebuilts/go/darwin-x86",
+                "path": "prebuilts/go/darwin-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "41f6d6bc9055f7e821b114233579e8456130eef8"
+            },
+            {
+                "cloneDepth": "1",
+                "groups": [
+                    "linux",
+                    "pdk",
+                    "tradefed"
+                ],
+                "name": "platform/prebuilts/go/linux-x86",
+                "path": "prebuilts/go/linux-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "756ef2ad9a122c4b3cf359f80f92b3df6fc7bd4b"
+            },
+            {
+                "name": "platform/external/zstd",
+                "path": "external/zstd",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "1ae0b70c04bdc9c17729f459c981c9f852bb9fca"
+            },
+            {
+                "name": "platform/external/libedit",
+                "path": "external/libedit",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "892b8b381ae82ac3184900d989a516854d8b1197"
+            },
+            {
+                "name": "platform/external/swig",
+                "path": "external/swig",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "d0f0f90be16c2ac553b5fa08512045273135147a"
+            },
+            {
+                "name": "toolchain/xz",
+                "path": "toolchain/xz",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "47426872d1366c32538a8e9c8f559b03cb45b648"
+            },
+            {
+                "name": "platform/external/libxml2",
+                "path": "external/libxml2",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "cadf434ba9fcd9e3b3afbedea283a1eabf98872f"
+            },
+            {
+                "name": "platform/external/ncurses",
+                "path": "external/libncurses",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "34cc24447dc9e5700110580c784d9606f6cff5f0"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/python/linux-x86",
+                "path": "prebuilts/python/linux-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "fce2346610379fdcce9dc7423c0e9a04e1a43cbf"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/python/darwin-x86",
+                "path": "prebuilts/python/darwin-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "3400487f6a77cc05ee5d4799575372713ce63232"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/python/windows-x86",
+                "path": "prebuilts/python/windows-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "6cf03be338b41e403770c097746e777c5c9ed9cb"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/clang/host/darwin-x86",
+                "path": "prebuilts/clang/host/darwin-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "35d6c2ae2bcb2ce0b6c119846a06050fce21047f"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/clang/host/linux-x86",
+                "path": "prebuilts/clang/host/linux-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "cd125ea4cb12bee61fe4c72df738229e93315562"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "platform/prebuilts/clang/host/windows-x86",
+                "path": "prebuilts/clang/host/windows-x86",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "abe5198b74f2caab7a2ed688eaca145734ab657f"
+            },
+            {
+                "cloneDepth": "1",
+                "name": "toolchain/prebuilts/ndk/releases",
+                "path": "toolchain/prebuilts/ndk/releases",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "e98ef7e0275b506b8843f2d0d52f3256e46df4b5"
+            },
+            {
+                "name": "platform/tools/repohooks",
+                "path": "tools/repohooks",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "e22fc7f6ed4b6d67a8f1ab0c2437ecaf62e9c60b"
+            },
+            {
+                "name": "toolchain/prebuilts/sysroot/platform/riscv64-linux-android",
+                "path": "toolchain/prebuilts/sysroot/platform/riscv64-linux-android",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/",
+                    "name": "aosp",
+                    "review": "https://android.googlesource.com/"
+                },
+                "revision": "d19c6ae1817af6846099905de2a422eae1de5d11"
+            },
+            {
+                "name": "platform/manifest",
+                "path": "platform/manifest",
+                "remote": {
+                    "fetch": "https://android.googlesource.com/"
+                },
+                "revision": "f77e3fdd46dcd62221727ef3c3ceea210ed9d64d"
+            }
+        ],
+        "remotes": [
+            {
+                "fetch": "https://android.googlesource.com/",
+                "name": "aosp",
+                "review": "https://android.googlesource.com/"
+            }
+        ],
+        "repoHooks": {
+            "enabledList": "pre-upload",
+            "inProject": "platform/tools/repohooks"
+        },
+        "superproject": {
+            "name": "platform/superproject",
+            "remote": {
+                "fetch": "https://android.googlesource.com/",
+                "name": "aosp",
+                "review": "https://android.googlesource.com/"
+            },
+            "revision": "llvm-toolchain"
+        }
+    },
+    "platform": "linux",
+    "proof_build": false,
+    "repo-dict": {
+        "platform/bionic": "5530c8e302e12a2e2428e69c60c31b75bd1e41d2",
+        "platform/external/libedit": "892b8b381ae82ac3184900d989a516854d8b1197",
+        "platform/external/libxml2": "cadf434ba9fcd9e3b3afbedea283a1eabf98872f",
+        "platform/external/ncurses": "34cc24447dc9e5700110580c784d9606f6cff5f0",
+        "platform/external/swig": "d0f0f90be16c2ac553b5fa08512045273135147a",
+        "platform/external/toolchain-utils": "dd1ee45a84cb07337f9d5d0a6769d9b865c6e620",
+        "platform/external/zstd": "1ae0b70c04bdc9c17729f459c981c9f852bb9fca",
+        "platform/manifest": "f77e3fdd46dcd62221727ef3c3ceea210ed9d64d",
+        "platform/prebuilts/build-tools": "ccbf6ad6af4430b013ddf35285f532f0bf535be9",
+        "platform/prebuilts/clang/host/darwin-x86": "35d6c2ae2bcb2ce0b6c119846a06050fce21047f",
+        "platform/prebuilts/clang/host/linux-x86": "cd125ea4cb12bee61fe4c72df738229e93315562",
+        "platform/prebuilts/clang/host/windows-x86": "abe5198b74f2caab7a2ed688eaca145734ab657f",
+        "platform/prebuilts/cmake/darwin-x86": "7aea7e9880110799088cd1de509886871078306f",
+        "platform/prebuilts/cmake/linux-x86": "b29ed51838737f0c8d0c689c50147e9bc128a31e",
+        "platform/prebuilts/gcc/darwin-x86/host/headers": "4ac4f7cc41cf3c9e36fc3d6cf37fd1cfa9587a68",
+        "platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8": "7e960e32d11a3bc75b1ae3654b3b93c8828e2bb4",
+        "platform/prebuilts/gcc/linux-x86/host/x86_64-w64-mingw32-4.8": "54c8410ade95e313e892745f14312f5e97c7bedc",
+        "platform/prebuilts/go/darwin-x86": "41f6d6bc9055f7e821b114233579e8456130eef8",
+        "platform/prebuilts/go/linux-x86": "756ef2ad9a122c4b3cf359f80f92b3df6fc7bd4b",
+        "platform/prebuilts/python/darwin-x86": "3400487f6a77cc05ee5d4799575372713ce63232",
+        "platform/prebuilts/python/linux-x86": "fce2346610379fdcce9dc7423c0e9a04e1a43cbf",
+        "platform/prebuilts/python/windows-x86": "6cf03be338b41e403770c097746e777c5c9ed9cb",
+        "platform/tools/repohooks": "e22fc7f6ed4b6d67a8f1ab0c2437ecaf62e9c60b",
+        "toolchain/binutils": "c19795e958ed532462948fd14b1bdfd4f6e96e03",
+        "toolchain/common": "0bce8b062126242872e9f3fc66760d3f76773c49",
+        "toolchain/llvm-project": "97a699bf4812a18fb657c2779f5296a4ab2694d2",
+        "toolchain/llvm_android": "b252122cd2eb860912531f4352ff31552c238add",
+        "toolchain/prebuilts/ndk/releases": "e98ef7e0275b506b8843f2d0d52f3256e46df4b5",
+        "toolchain/prebuilts/sysroot/platform/riscv64-linux-android": "d19c6ae1817af6846099905de2a422eae1de5d11",
+        "toolchain/xz": "47426872d1366c32538a8e9c8f559b03cb45b648"
+    },
+    "repo-init-branch": "llvm-toolchain",
+    "repo-manifest": "platform/manifest",
+    "repo_manifest_file": "default.xml",
+    "reset_image_build": false,
+    "rollout": [],
+    "src_ctrl": "repo",
+    "sync_finish_time": 1720825479.753396,
+    "sync_start_time": 1720825176.750476,
+    "sync_succeed": 1,
+    "target": {
+        "apiary_target": "linux",
+        "dir_list": [
+            "manifest_12085363.xml",
+            "bolt-r530567.tar.xz",
+            "applied.prop",
+            "clang-12085363-linux-x86.tar.xz",
+            "pgo-r530567.tar.xz",
+            "build_times.txt",
+            "multiple.intoto.jsonl",
+            "repo.prop",
+            "logs/execute_build_result.textproto",
+            "logs/buildbot_trace.trace",
+            "logs/STARTED",
+            "logs/git_metrics.textproto",
+            "logs/SUCCEEDED",
+            "logs/git.log",
+            "logs/build_tee_error.log",
+            "logs/execute_build_config.textproto",
+            "logs/git_thread.log",
+            "logs/build.log",
+            "logs/resource_utilization/memory_usage.json",
+            "logs/resource_utilization/memory_usage.log",
+            "logs/resource_utilization/disk_usage.json",
+            "logs/resource_utilization/cpu_time.log",
+            "logs/resource_utilization/disk_usage.log",
+            "logs/resource_utilization/cpu_time.json",
+            "logs/resource_utilization/cpu_usage.log",
+            "logs/resource_utilization/cpu_usage.json",
+            "BUILD_INFO"
+        ],
+        "dist-dir": "/buildbot/dist_dirs/aosp-llvm-toolchain-linux-linux/12085363",
+        "name": "linux",
+        "rules": [
+            [
+                "LLVM_PGO_PROFILE=out/prebuilt_cached/artifacts/profiles/pgo*.tar.xz LLVM_BOLT_PROFILE=out/prebuilt_cached/artifacts/profiles/bolt*.tar.xz DIST_DIR=/buildbot/dist_dirs/aosp-llvm-toolchain-linux-linux/12085363 OUT_DIR=out prebuilts/python/linux-x86/bin/python3 toolchain/llvm_android/build.py --bootstrap-use=out/prebuilt_cached/artifacts/linux_bootstrap/stage1-install.tar.xz --lto --pgo --bolt --mlgo --create-tar --no-build=windows --build-name 12085363 --no-incremental",
+                "build.log",
+                true,
+                false
+            ],
+            [
+                "cp out/prebuilt_cached/artifacts/profiles/pgo*.tar.xz /buildbot/dist_dirs/aosp-llvm-toolchain-linux-linux/12085363",
+                "build.log",
+                true,
+                false
+            ],
+            [
+                "cp out/prebuilt_cached/artifacts/profiles/bolt*.tar.xz /buildbot/dist_dirs/aosp-llvm-toolchain-linux-linux/12085363",
+                "build.log",
+                true,
+                false
+            ]
+        ],
+        "storage_path": "/bigstore/android-build/builds/aosp-llvm-toolchain-linux-linux/12085363/026112f30a97edaeedc69d2d2576106c1b2a576f74ab8ff1cf7bf207e735712e",
+        "target_finish_time": 1720832228.423209,
+        "target_start_time": 1720825481.6506739,
+        "target_status": 1
+    },
+    "trident_usage": {
+        "external_disk_no_space": false,
+        "trident_used": false
+    },
+    "use_goma": false,
+    "worknode": {
+        "containerId": "L82400030005150440",
+        "creationTimeMillis": "1720825085815",
+        "currentAttempt": {
+            "attemptId": "VvWKnq2GgNAM5njR+Mh5kw==",
+            "progressMessages": [
+                {
+                    "displayMessage": "Build 12085363 for node L82400030005150440:N71600030080412297 has been inserted",
+                    "messageString": "Build 12085363 for node L82400030005150440:N71600030080412297 has been inserted",
+                    "timeMillis": "1720825088850"
+                }
+            ],
+            "startTimeMillis": "1720825086367"
+        },
+        "heartbeatTimeMillis": "43200000",
+        "id": "L82400030005150440:N71600030080412297",
+        "inputEdges": [
+            {
+                "neighborId": "L82400030005150440:N49000030080412291"
+            }
+        ],
+        "isFinal": false,
+        "lastUpdatedMillis": "1720825088894",
+        "nodeClass": "postsubmit",
+        "retryStatus": {
+            "maximumRetries": 4,
+            "retryCount": 0
+        },
+        "revision": "ia7GCmedE2F3E+WgETyEmw==",
+        "status": "scheduled",
+        "statusHistorys": [
+            {
+                "status": "created",
+                "timestampMillis": "1720825085815"
+            },
+            {
+                "status": "pending",
+                "timestampMillis": "1720825086013"
+            },
+            {
+                "status": "scheduled",
+                "timestampMillis": "1720825086367"
+            }
+        ],
+        "workExecutorType": "submittedBuild",
+        "workParameters": {
+            "submittedBuild": {
+                "branch": "aosp-llvm-toolchain",
+                "branchConfig": {
+                    "sloTier": "bestEffort"
+                },
+                "buildDependencies": [
+                    {
+                        "dependencyBuildId": "12081304",
+                        "dependencyInfo": {
+                            "artifactPrefixs": [
+                                "pgo",
+                                "bolt"
+                            ],
+                            "branch": "aosp-master-plus-llvm",
+                            "destDir": "artifacts/profiles",
+                            "fixedBuildId": "",
+                            "target": "Clang-BOLT"
+                        }
+                    },
+                    {
+                        "dependencyBuildId": "12081304",
+                        "dependencyInfo": {
+                            "artifactPrefixs": [
+                                "stage1-install"
+                            ],
+                            "branch": "aosp-master-plus-llvm",
+                            "destDir": "artifacts/linux_bootstrap",
+                            "fixedBuildId": "",
+                            "target": "linux_bootstrap"
+                        }
+                    }
+                ],
+                "buildId": "12085363",
+                "gerritPollerTimestamp": "1720825067488",
+                "manuallyTriggered": false,
+                "syncTimeoutSecond": 2700,
+                "target": {
+                    "buildCommands": [
+                        "LLVM_PGO_PROFILE=out/prebuilt_cached/artifacts/profiles/pgo*.tar.xz LLVM_BOLT_PROFILE=out/prebuilt_cached/artifacts/profiles/bolt*.tar.xz DIST_DIR=%dist_dir% OUT_DIR=out prebuilts/python/linux-x86/bin/python3 toolchain/llvm_android/build.py --bootstrap-use=out/prebuilt_cached/artifacts/linux_bootstrap/stage1-install.tar.xz --lto --pgo --bolt --mlgo --create-tar --no-build=windows --build-name %bid% --no-incremental",
+                        "cp out/prebuilt_cached/artifacts/profiles/pgo*.tar.xz %dist_dir%",
+                        "cp out/prebuilt_cached/artifacts/profiles/bolt*.tar.xz %dist_dir%"
+                    ],
+                    "buildPlatform": "linux",
+                    "disabled": false,
+                    "dockerInfo": {
+                        "dockerRepo": "us-docker.pkg.dev/google.com:android-llvm-kokoro/android-llvm/llvm-ubuntu",
+                        "tag": "prod"
+                    },
+                    "enableReleaseBuildChaining": false,
+                    "incrementalBuild": false,
+                    "launchcontrolName": "linux",
+                    "name": "linux",
+                    "platformVersion": "docker",
+                    "presubmitIncrementalBuild": false,
+                    "priority": "medium",
+                    "product": "linux",
+                    "provenanceInfo": {
+                        "bbcpDepotContextCl": 632022247,
+                        "bbcpFileApiPath": "/google_built/overlay/latest/busytown/google3/wireless/android/launchcontrol/config/branch_config.asciipb",
+                        "branchConfigPath": "google3/wireless/android/launchcontrol/config/branch_config.asciipb"
+                    },
+                    "rbeSupported": false,
+                    "releaseBranch": false,
+                    "target": "linux"
+                }
+            }
+        },
+        "workerId": "buildassembler_buildnotifier_workers"
+    }
+}
