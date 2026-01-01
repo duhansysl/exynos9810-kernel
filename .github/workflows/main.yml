@@ -28,7 +28,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/toolchain/clang-r522817
           
           # Download the specific Clang revision
-          curl -Lo clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r530567/clang-r530567.tar.gz
+          curl -Lo clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r522817/clang-r522817.tar.gz
           
           # Extract to the directory and cleanup
           tar -xzf clang.tar.gz -C $GITHUB_WORKSPACE/toolchain/clang-r522817
