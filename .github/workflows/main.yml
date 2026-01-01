@@ -1,0 +1,44 @@
+name: DS-ACK Kernel Build Test
+
+on:
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y zstd git gnupg flex bison build-essential zip curl \
+          zlib1g-dev libc6-dev-i386 x11proto-core-dev libx11-dev lib32z1-dev \
+          libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig \
+          python-dev-is-python3 bsdiff wget
+
+      - name: Set up Build Environment
+        run: |
+          # Create the "READY" file to skip the interactive first-time setup sudo prompt
+          touch buildtools
+          chmod +x apollo.sh
+
+      - name: Execute Build Script (Interactive Bypass)
+        run: |
+          # We use printf to simulate pressing keys in order:
+          # 8 -> Build All Combinations
+          # y -> Clean Build
+          # y -> Build Flashable ZIP
+          # The script handles Compiler/KSU/SELinux automatically within the '8' logic
+          printf "7\n3\n2\ny\ny\ny" | ./apollo.sh
+
+      - name: Upload Compiled Zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apollo-Kernel-Zips
+          path: Apollo/Product/*.zip
