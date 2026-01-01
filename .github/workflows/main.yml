@@ -24,15 +24,27 @@ jobs:
 
       - name: Download and Extract Clang Toolchain
         run: |
-          # Create the target directory path
+          # Create the toolchain directory matching the script's CR_TC path
           mkdir -p $GITHUB_WORKSPACE/toolchain/clang-r522817
           
-          # Download the specific Clang revision
-          curl -Lo clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r522817/clang-r522817.tar.gz
+          # Download the r522817 toolchain archive
+          echo "Downloading Clang r522817..."
+          curl -Lo clang.tar.zst https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r522817/clang-r522817.tar.gz
           
-          # Extract to the directory and cleanup
-          tar -xzf clang.tar.gz -C $GITHUB_WORKSPACE/toolchain/clang-r522817
-          rm clang.tar.gz
+          # Extract using unzstd as performed in apollo.sh
+          echo "Extracting toolchain..."
+          tar --use-compress-program=unzstd -xf clang.tar.zst -C $GITHUB_WORKSPACE/toolchain/clang-r522817
+          
+          # Verify binary existence and set permissions
+          if [ -f "$GITHUB_WORKSPACE/toolchain/clang-r522817/bin/ld.lld" ]; then
+            echo "Verification Success: ld.lld found."
+            chmod +x $GITHUB_WORKSPACE/toolchain/clang-r522817/bin/*
+          else
+            echo "ERROR: ld.lld not found in extracted directory!"
+            exit 1
+          fi
+          
+          rm clang.tar.zst
 
       - name: Set up Build Environment
         run: |
@@ -42,14 +54,17 @@ jobs:
 
       - name: Execute Build Script (Interactive Bypass)
         run: |
-          # We use printf to simulate pressing keys in order:
-          # 8 -> Build All Combinations
+          # Simulation sequence:
+          # 7 -> Build All/ZIP
+          # 3 -> Select Clang 18 (uses clang-r522817 folder)
+          # 2 -> Selinux Enforcing
+          # y -> Enable KernelSU
           # y -> Clean Build
           # y -> Build Flashable ZIP
-          # The script handles Compiler/KSU/SELinux automatically within the '8' logic
           printf "7\n3\n2\ny\ny\ny" | ./apollo.sh
 
       - name: Upload Compiled Zips
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Apollo-Kernel-Zips
