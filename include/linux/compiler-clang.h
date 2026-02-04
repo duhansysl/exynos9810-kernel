@@ -6,6 +6,11 @@
  * for Clang compiler
  */
 
+#ifdef __compiler_offsetof
+#undef __compiler_offsetof
+#endif
+#define __compiler_offsetof(a, b)	((size_t)&((a *)0)->b)
+
 #ifdef uninitialized_var
 #undef uninitialized_var
 #define uninitialized_var(x) x = *(&(x))

@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 9
 SUBLEVEL = 337
-EXTRAVERSION =
-NAME = Roaring Lionus
+EXTRAVERSION = ♡PhuNguyen
+NAME = New Line
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -545,14 +545,9 @@ ifneq ($(filter install,$(MAKECMDGOALS)),)
         endif
 endif
 
-KBUILD_CFLAGS   += -march=armv8-a+crypto+crc -mcpu=exynos-m3 -mtune=exynos-m3
-KBUILD_AFLAGS   += -march=armv8-a+crypto+crc -mcpu=exynos-m3 -mtune=exynos-m3
-KBUILD_LDFLAGS  += -mllvm -march=armv8-a+crypto+crc\
-        -mllvm -mcpu=exynos-m3 \
-
-KBUILD_CFLAGS  += -mfloat-abi=hard
-KBUILD_AFLAGS  += -mfloat-abi=hard
-KBUILD_LDFLAGS  += -mllvm -float-abi=hard
+KBUILD_CFLAGS   += -march=armv8-a+crypto+crc
+KBUILD_AFLAGS   += -march=armv8-a+crypto+crc
+KBUILD_LDFLAGS  += -mllvm -march=armv8-a+crypto+crc
 
 
 ifeq ($(cc-name),clang)
@@ -680,6 +675,7 @@ endif
 all: vmlinux
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
+KBUILD_CFLAGS	+= $(call cc-option,-gdwarf-4)
 KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
 CFLAGS_GCOV	:= -fprofile-arcs -ftest-coverage -fno-tree-loop-im $(call cc-disable-warning,maybe-uninitialized,)
 CFLAGS_KCOV	:= $(call cc-option,-fsanitize-coverage=trace-pc,)
@@ -1584,7 +1580,7 @@ MRPROPER_FILES += .config .config.old .version .old_version \
 #
 clean: rm-dirs  := $(CLEAN_DIRS)
 clean: rm-files := $(CLEAN_FILES)
-clean-dirs      := $(addprefix _clean_, . $(vmlinux-alldirs) Documentation samples)
+clean-dirs      := $(addprefix _clean_, . $(vmlinux-alldirs) samples)
 
 PHONY += $(clean-dirs) clean archclean vmlinuxclean
 $(clean-dirs):

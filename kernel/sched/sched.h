@@ -1578,6 +1578,18 @@ extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 
+/* Helper to convert rt_sched_entity to task_struct */
+#ifdef CONFIG_RT_GROUP_SCHED
+static inline struct task_struct *rt_task_of(struct sched_rt_entity *rt_se)
+{
+	return container_of(rt_se, struct task_struct, rt);
+}
+#else
+static inline struct task_struct *rt_task_of(struct sched_rt_entity *rt_se)
+{
+	return container_of(rt_se, struct task_struct, rt);
+}
+#endif
 
 #ifdef CONFIG_SMP
 

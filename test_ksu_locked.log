@@ -1,0 +1,129 @@
+arch/arm64/Makefile:31: ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum
+
+  WARNING: Symbol version dump ./Module.symvers
+           is missing; modules will have no dependencies and modversions.
+
+drivers/kernelsu/Kbuild:56: "KSU_GIT_VERSION not defined! It is better to make KernelSU-Next a git repository!"
+-- KernelSU-Next version fallback: 1
+drivers/kernelsu/Kbuild:67: "KSU_VERSION_TAG not defined! It is better to make KernelSU-Next a git submodule!"
+-- KernelSU-Next tag fallback: v0.0.1
+-- KernelSU-Next Manager signature size: 0x3e6
+-- KernelSU-Next Manager signature hash: 79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7
+  CC      drivers/kernelsu/ksu.o
+  CC      drivers/kernelsu/allowlist.o
+  CC      drivers/kernelsu/app_profile.o
+gcc: error: unrecognized command-line option ‘-mlittle-endian’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mlittle-endian’
+gcc: error: unrecognized command-line option ‘-mllvm’
+  CC      drivers/kernelsu/apk_sign.o
+gcc: error: unrecognized command-line option ‘-aggressive-ext-opt’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-aggressive-ext-opt’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-slp-vectorize-hor-store’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mlittle-endian’
+gcc: error: unrecognized command-line option ‘-mlittle-endian’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-adce-remove-loops’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-slp-vectorize-hor-store’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-aggressive-ext-opt’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-adce-remove-loops’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-aggressive-ext-opt’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-scalar-evolution-use-expensive-range-sharpening’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-slp-vectorize-hor-store’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-allow-unroll-and-jam’; did you mean ‘-floop-unroll-and-jam’?
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-scalar-evolution-use-expensive-range-sharpening’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-adce-remove-loops’
+gcc: error: unrecognized command-line option ‘--cuda-path=/dev/null’
+gcc: error: unrecognized command-line option ‘-mllvm’
+make[1]: *** [scripts/Makefile.build:337: drivers/kernelsu/allowlist.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-allow-unroll-and-jam’; did you mean ‘-floop-unroll-and-jam’?
+gcc: error: unrecognized command-line option ‘-slp-vectorize-hor-store’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-adce-remove-loops’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘--cuda-path=/dev/null’
+make[1]: *** [scripts/Makefile.build:337: drivers/kernelsu/ksu.o] Error 1
+gcc: error: unrecognized command-line option ‘-scalar-evolution-use-expensive-range-sharpening’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-scalar-evolution-use-expensive-range-sharpening’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-allow-unroll-and-jam’; did you mean ‘-floop-unroll-and-jam’?
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-allow-unroll-and-jam’; did you mean ‘-floop-unroll-and-jam’?
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘--cuda-path=/dev/null’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+make[1]: *** [scripts/Makefile.build:337: drivers/kernelsu/apk_sign.o] Error 1
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘-mllvm’
+gcc: error: unrecognized command-line option ‘--cuda-path=/dev/null’
+make[1]: *** [scripts/Makefile.build:337: drivers/kernelsu/app_profile.o] Error 1
+make: *** [Makefile:1789: _module_drivers/kernelsu] Error 2
