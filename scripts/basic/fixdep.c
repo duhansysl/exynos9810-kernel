@@ -274,9 +274,8 @@ static void do_config_file(const char *filename)
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
-		fprintf(stderr, "fixdep: error opening config file: ");
-		perror(filename);
-		exit(2);
+		fprintf(stderr, "fixdep: warning: error opening config file: %s\n", filename);
+		return;
 	}
 	if (fstat(fd, &st) < 0) {
 		fprintf(stderr, "fixdep: error fstat'ing config file: ");

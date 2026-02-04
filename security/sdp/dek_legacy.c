@@ -159,7 +159,7 @@ static int zero_out(char *buf, unsigned int len) {
 }
 
 /* Log */
-static void dek_add_to_log(int engine_id, char * buffer);
+void dek_add_to_log(int engine_id, char * buffer);
 
 
 static int dek_open_evt(struct inode *inode, struct file *file)
@@ -1107,7 +1107,7 @@ static ssize_t dek_read_log(struct file *file, char __user *buffer, size_t len, 
 	return len;
 }
 
-static void dek_add_to_log(int engine_id, char * buffer) {
+void dek_add_to_log(int engine_id, char * buffer) {
 	struct timespec ts;
 	struct log_struct *tmp = (struct log_struct*)kmalloc(sizeof(struct log_struct), GFP_KERNEL);
 

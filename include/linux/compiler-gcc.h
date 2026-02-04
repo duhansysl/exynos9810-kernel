@@ -185,8 +185,13 @@
 #endif
 
 #define __used			__attribute__((__used__))
+#ifdef __clang__
+#define __compiler_offsetof(a, b)				\
+	((size_t)&((a *)0)->b)
+#else
 #define __compiler_offsetof(a, b)					\
 	__builtin_offsetof(a, b)
+#endif
 
 #if GCC_VERSION >= 40100
 # define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
