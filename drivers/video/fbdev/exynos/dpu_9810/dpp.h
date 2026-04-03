@@ -225,7 +225,6 @@ struct dpp_device {
 	spinlock_t slock;
 	spinlock_t dma_slock;
 	struct mutex lock;
-	bool hold_rpm_on_boot;
 };
 
 struct dpp_params_info {
@@ -365,7 +364,6 @@ static inline void dpp_select_format(struct dpp_device *dpp,
 }
 
 void dpp_dump(struct dpp_device *dpp);
-void dpp_release_rpm_hold(u32 id);
 
 /* DPU DMA low-level APIs exposed to DPP driver */
 u32 dma_reg_get_irq_status(u32 id);
@@ -377,7 +375,6 @@ void dma_reg_set_ch_map(u32 id, u32 dpp_id, u32 to_pat);
 void dma_reg_set_test_en(u32 id,u32 en);
 
 /* DPP low-level APIs exposed to DPP driver */
-void dpp_reg_irq_enable(u32 id);
 void dpp_reg_init(u32 id);
 int dpp_reg_deinit(u32 id, bool reset);
 void dpp_reg_configure_params(u32 id, struct dpp_params_info *p);
