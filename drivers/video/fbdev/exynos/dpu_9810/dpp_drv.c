@@ -631,7 +631,7 @@ static int dpp_check_limitation(struct dpp_device *dpp, struct dpp_params_info *
 	}
 
 	/* HDR channel limitation */
-	if ((p->hdr != DPP_HDR_OFF) && (p->rot > DPP_ROT_180)) {
+	if ((p->hdr != DPP_HDR_OFF) && p->rot) {
 		dpp_err("Not support [HDR+ROTATION] at the same time in DPP%d\n",
 			dpp->id);
 		return -EINVAL;
@@ -691,24 +691,10 @@ static int dpp_set_config(struct dpp_device *dpp)
 	dpp_dbg("dpp%d configuration\n", dpp->id);
 
 	dpp->state = DPP_STATE_ON;
-	/* to prevent irq storm, irq enable is moved here */
-	dpp_reg_irq_enable(dpp->id);
 err:
 	mutex_unlock(&dpp->lock);
 	return ret;
 }
-
-void dpp_release_rpm_hold(u32 id)
-{
-	struct dpp_device *dpp = get_dpp_drvdata(id);
-
-	if (true == dpp->hold_rpm_on_boot) {
-		pm_runtime_put_sync(dpp->dev);
-		dpp->hold_rpm_on_boot = false;
-		dpp_info("released dpp,hold-rpm-on-boot\n");
-	}
-}
-EXPORT_SYMBOL(dpp_release_rpm_hold);
 
 static int dpp_stop(struct dpp_device *dpp, bool reset)
 {
@@ -945,14 +931,6 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 	dpp_info("dpp(%d) probe start..\n", dpp->id);
 
 	dpp->dev = dev;
-
-	if ((dpp->id == IDMA_G0) &&
-		(of_property_read_bool(dev->of_node, "dpp,hold-rpm-on-boot"))) {
-		dpp->hold_rpm_on_boot = true;
-		dpp_info("dpp,hold-rpm-on-boot\n");
-	} else {
-		dpp->hold_rpm_on_boot = false;
-	}
 }
 
 static int dpp_init_resources(struct dpp_device *dpp, struct platform_device *pdev)
@@ -1072,8 +1050,6 @@ static int dpp_probe(struct platform_device *pdev)
 	setup_timer(&dpp->d.op_timer, dpp_op_timer_handler, (unsigned long)dpp);
 
 	pm_runtime_enable(dev);
-	if (dpp->hold_rpm_on_boot == true)
-		pm_runtime_get_sync(dev);
 
 	dpp->state = DPP_STATE_OFF;
 	dpp_info("dpp%d is probed successfully\n", dpp->id);
@@ -1151,7 +1127,7 @@ static int dpp_register(void)
 	return platform_driver_register(&dpp_driver);
 }
 
-device_initcall(dpp_register);
+device_initcall_sync(dpp_register);
 
 MODULE_AUTHOR("Jaehoe Yang <jaehoe.yang@samsung.com>");
 MODULE_AUTHOR("Minho Kim <m8891.kim@samsung.com>");

@@ -5,8 +5,6 @@
 # Licensed under GPLv2
 #
 
-subdir-ccflags-$(CONFIG_DPU_2_0_FENCE)	+= -DCONFIG_EXYNOS_DPU20
-
 obj-$(CONFIG_EXYNOS_DPP) += dpp.o
 dpp-y := dpp_drv.o
 obj-$(CONFIG_EXYNOS_MIPI_DSIM) += dsim.o

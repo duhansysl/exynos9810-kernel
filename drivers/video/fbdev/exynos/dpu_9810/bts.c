@@ -234,7 +234,6 @@ void dpu_bts_calc_bw(struct decon_device *decon, struct decon_reg_data *regs)
 	struct bts_decon_info bts_info;
 	enum dpp_rotate rot;
 	int idx, i;
-	u32 used_cnt = 0;
 
 	if (!decon->bts.enabled)
 		return;
@@ -247,7 +246,6 @@ void dpu_bts_calc_bw(struct decon_device *decon, struct decon_reg_data *regs)
 		if (config[i].state == DECON_WIN_STATE_BUFFER) {
 			idx = config[i].idma_type;
 			bts_info.dpp[idx].used = true;
-			used_cnt++;
 		} else {
 			continue;
 		}
@@ -278,7 +276,6 @@ void dpu_bts_calc_bw(struct decon_device *decon, struct decon_reg_data *regs)
 	bts_info.lcd_h = decon->lcd_info->yres;
 	decon->bts.total_bw = bts_calc_bw(decon->bts.type, &bts_info);
 	memcpy(&decon->bts.bts_info, &bts_info, sizeof(struct bts_decon_info));
-	decon->bts.used_cnt = used_cnt;
 
 	for (i = 0; i < BTS_DPP_MAX; ++i) {
 		decon->bts.bw[i] = bts_info.dpp[i].bw;
@@ -298,7 +295,6 @@ void dpu_bts_calc_bw(struct decon_device *decon, struct decon_reg_data *regs)
 	DPU_DEBUG_BTS("%s -\n", __func__);
 }
 
-#define MIN_BW_FOR_MIF_676MHZ	(5679000)
 void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 		u32 is_after)
 {
@@ -315,22 +311,6 @@ void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 	/* update peak & read bandwidth per DPU port */
 	bw.peak = decon->bts.peak;
 	bw.read = decon->bts.total_bw;
-
-	if (decon->dt.psr_mode == DECON_VIDEO_MODE) {
-		/* To induce MIF to be set to 676Mhz to prevent underruns
-		 * when more than four layers are used
-		 * mif_freq = bw * 100 / BUS_WIDTH / MIF_UTIL(65%)
-		 * bw = mif_freq * MIF_UTIL * BUS_WIDTH / 100
-		 * bw = 546 * 65 * 16 / 100 = 5678400 KB
-		 * -> if BW > MIF_567MHz_BW, then MIF will be 676MHz.
-		 */
-		if ((decon->bts.total_bw < MIN_BW_FOR_MIF_676MHZ) &&
-				(decon->bts.used_cnt >= 4)) {
-			bw.read = MIN_BW_FOR_MIF_676MHZ;
-			DPU_DEBUG_BTS("\tused_cnt = %d\n", decon->bts.used_cnt);
-		}
-	}
-
 	DPU_DEBUG_BTS("\tpeak = %d, read = %d\n", bw.peak, bw.read);
 
 	if (bw.read == 0)

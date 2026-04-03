@@ -1974,6 +1974,7 @@ int decon_reg_stop(u32 id, u32 dsi_idx, struct decon_mode_info *psr)
 	int ret = 0;
 
 	if (psr->out_type == DECON_OUT_DP) {
+		displayport_reg_set_interrupt_mask(VIDEO_FIFO_UNDER_FLOW_MASK, 0);
 		ret = decon_reg_stop_inst(id, dsi_idx, psr);
 		if (ret < 0)
 			decon_err("%s, failed to DP instant_stop\n", __func__);

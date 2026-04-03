@@ -638,16 +638,13 @@ struct decon_reg_data {
 #endif
 };
 
-struct decon_win_config_extra {
-	int remained_frames;
-	u32 reserved[7];
-};
-
+#ifdef CONFIG_SUPPORT_DSU
 struct decon_win_config_data_old {
 	int	retire_fence;
 	int	fd_odma;
 	struct decon_win_config config[MAX_DECON_WIN + 1];
 };
+#endif
 
 struct decon_win_config_data {
 	int	retire_fence;
@@ -657,7 +654,6 @@ struct decon_win_config_data {
 #else
 	struct decon_win_config config[MAX_DECON_WIN + 1];
 #endif
-	struct decon_win_config_extra extra;
 };
 
 enum hwc_ver {
@@ -991,7 +987,6 @@ struct decon_update_regs {
 	struct task_struct *thread;
 	struct kthread_worker worker;
 	struct kthread_work work;
-	atomic_t remaining_frame;
 };
 
 struct decon_vsync {
@@ -1070,7 +1065,6 @@ struct decon_bts {
 	struct pm_qos_request int_qos;
 	struct pm_qos_request disp_qos;
 	u32 scen_updated;
-	u32 used_cnt;
 };
 
 /* cursor async */
@@ -1138,7 +1132,6 @@ struct decon_device {
 #ifdef CONFIG_LOGGING_BIGDATA_BUG
 	int eint_pend;
 #endif
-	int	update_regs_list_cnt;
 
 	u32 prev_protection_bitmask;
 	unsigned long prev_aclk_khz;
@@ -1656,8 +1649,10 @@ void decon_reg_set_dsu(u32 id, enum decon_dsi_mode dsi_mode, struct decon_param 
 /* IOCTL commands */
 #define S3CFB_SET_VSYNC_INT		_IOW('F', 206, __u32)
 #define S3CFB_DECON_SELF_REFRESH	_IOW('F', 207, __u32)
+#ifdef CONFIG_SUPPORT_DSU
 #define S3CFB_WIN_CONFIG_OLD		_IOW('F', 209, \
 						struct decon_win_config_data_old)
+#endif
 #define S3CFB_WIN_CONFIG		_IOW('F', 209, \
 						struct decon_win_config_data)
 #define EXYNOS_DISP_INFO		_IOW('F', 260, \

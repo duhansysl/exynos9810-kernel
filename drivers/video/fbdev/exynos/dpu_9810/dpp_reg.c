@@ -264,11 +264,6 @@ void dma_reg_set_irq_mask_all(u32 id, u32 en)
 	dma_write_mask(id, IDMA_IRQ, val, IDMA_ALL_IRQ_MASK);
 }
 
-void dma_reg_set_irq_disable(u32 id)
-{
-	dma_write_mask(id, IDMA_IRQ, 0, IDMA_IRQ_ENABLE);
-}
-
 void dma_reg_set_irq_enable(u32 id)
 {
 	dma_write_mask(id, IDMA_IRQ, ~0, IDMA_IRQ_ENABLE);
@@ -604,11 +599,6 @@ void dpp_reg_set_irq_mask_all(u32 id, u32 en)
 
 	val = en ? ~0 : 0;
 	dpp_write_mask(id, DPP_IRQ, val, DPP_ALL_IRQ_MASK);
-}
-
-void dpp_reg_set_irq_disable(u32 id)
-{
-	dpp_write_mask(id, DPP_IRQ, 0, DPP_IRQ_ENABLE);
 }
 
 void dpp_reg_set_irq_enable(u32 id)
@@ -1319,10 +1309,10 @@ int dpp_reg_wait_idle_status(int id, unsigned long timeout)
 
 void dpp_reg_init(u32 id)
 {
-	dma_reg_set_irq_mask_all(id, 1);
-	dpp_reg_set_irq_mask_all(id, 1);
-	dma_reg_set_irq_disable(id);
-	dpp_reg_set_irq_disable(id);
+	dma_reg_set_irq_mask_all(id, 0);
+	dpp_reg_set_irq_mask_all(id, 0);
+	dma_reg_set_irq_enable(id);
+	dpp_reg_set_irq_enable(id);
 
 	dma_reg_set_clock_gate_en_all(id, 0);
 	dpp_reg_set_clock_gate_en_all(id, 0);
@@ -1335,14 +1325,6 @@ void dpp_reg_init(u32 id)
 #if defined(CONFIG_EXYNOS_AFBC)
 	dma_reg_set_recovery_num(id, INIT_RCV_NUM);
 #endif
-}
-
-void dpp_reg_irq_enable(u32 id)
-{
-	dma_reg_set_irq_mask_all(id, 0);
-	dpp_reg_set_irq_mask_all(id, 0);
-	dma_reg_set_irq_enable(id);
-	dpp_reg_set_irq_enable(id);
 }
 
 int dpp_reg_deinit(u32 id, bool reset)
