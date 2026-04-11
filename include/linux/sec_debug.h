@@ -337,6 +337,7 @@ struct sec_debug_shared_info {
 	/* ksymbol information */
 	struct sec_debug_ksyms ksyms;
 
+#ifdef CONFIG_SEC_DEBUG
 	/* reset reason extra info for bigdata */
 	struct sec_debug_panic_extra_info sec_debug_extra_info;
 
@@ -345,6 +346,7 @@ struct sec_debug_shared_info {
 
 	/* reset reason extrf info for bigdata */
 	struct sec_debug_pmudbg_extra_info sec_debug_extra_info_pmudbg;
+#endif
 
 	/* last 1KB of kernel log */
 	char last_klog[SZ_1K];
