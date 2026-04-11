@@ -1638,7 +1638,9 @@ static void set_param(set_param_fn_t *fn)
 	fn[ITMON_ENABLE] = (set_param_fn_t)itmon_enable;
 #endif
 	fn[EXYNOS_SS_DUMPER_ONE] = (set_param_fn_t)exynos_ss_dumper_one;
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 	fn[WDT_SET_EMERGENCY_RESET] = (set_param_fn_t)s3c2410wdt_set_emergency_reset;
+#endif
 	fn[WAKE_LOCK_INIT] = (set_param_fn_t)ecd_wake_lock_init;
 	fn[WAKE_LOCK] = (set_param_fn_t)wake_lock;
 	fn[WAKE_UNLOCK] = (set_param_fn_t)wake_unlock;

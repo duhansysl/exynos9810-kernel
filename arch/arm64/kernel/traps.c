@@ -222,7 +222,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		/* skip until specified stack frame */
 		if (!skip) {
 			dump_backtrace_entry(where);
+			#ifdef CONFIG_EXYNOS_SNAPSHOT
 			exynos_ss_save_log(raw_smp_processor_id(), where);
+			#endif
 		} else if (frame.fp == regs->regs[29]) {
 			skip = 0;
 			/*
@@ -233,7 +235,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 			 * instead.
 			 */
 			dump_backtrace_entry(regs->pc);
+#ifdef CONFIG_SEC_DEBUG
 			exynos_ss_save_log(raw_smp_processor_id(), regs->pc);
+#endif
 		}
 		ret = unwind_frame(tsk, &frame);
 		if (ret < 0)
@@ -322,7 +326,9 @@ static void dump_backtrace_auto_summary(struct pt_regs *regs, struct task_struct
 #else
 			dump_backtrace_entry_auto_summary(where);
 #endif
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 			exynos_ss_save_log(raw_smp_processor_id(), where);
+#endif
 		} else if (frame.fp == regs->regs[29]) {
 			skip = 0;
 			/*
@@ -337,7 +343,9 @@ static void dump_backtrace_auto_summary(struct pt_regs *regs, struct task_struct
 #else
 			dump_backtrace_entry_auto_summary(regs->pc);
 #endif
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 			exynos_ss_save_log(raw_smp_processor_id(), regs->pc);
+#endif
 		}
 		ret = unwind_frame(tsk, &frame);
 		if (ret < 0)
@@ -411,8 +419,10 @@ static int __die(const char *str, int err, struct pt_regs *regs)
 
 		dump_instr(KERN_EMERG, regs);
 	}
-
+	
+#ifdef CONFIG_SEC_DEBUG
 	print_ppmpu_protection(regs);
+#endif
 
 	return ret;
 }
@@ -434,7 +444,9 @@ void die(const char *str, struct pt_regs *regs, int err)
 	console_verbose();
 	bust_spinlocks(1);
 #ifdef CONFIG_SEC_DUMP_SUMMARY
+#ifdef CONFIG_SEC_DEBUG
 	sec_debug_save_die_info(str, regs);
+#endif
 #endif
 	ret = __die(str, err, regs);
 

@@ -191,7 +191,7 @@ extern void exynos_ss_get_softlockup_info(unsigned int cpu, void *info);
 #define exynos_ss_clockevent(a, b, c)	do { } while (0)
 #define exynos_ss_cpuidle(a, b, c, d)	do { } while (0)
 #define exynos_ss_suspend(a, b, c)	do { } while (0)
-#define exynos_ss_regulator(a, b, c, d)	do { } while (0)
+#define exynos_ss_regulator(...) do { } while (0)
 #define exynos_ss_thermal(a, b, c, d)	do { } while (0)
 #define exynos_ss_irq(a, b, c, d)	do { } while (0)
 #define exynos_ss_irq_exit(a, b)	do { } while (0)
@@ -221,8 +221,8 @@ extern void exynos_ss_get_softlockup_info(unsigned int cpu, void *info);
 #define exynos_ss_post_reboot(a)	do { } while (0)
 #define exynos_ss_set_hardlockup(a)	do { } while (0)
 #define exynos_ss_get_hardlockup()	do { } while (0)
-#define exynos_ss_get_item_size(a)	do { } while (0)
-#define exynos_ss_get_item_paddr(a)	do { } while (0)
+#define exynos_ss_get_item_size(a)      (0)
+#define exynos_ss_get_item_paddr(a) (0)
 #define exynos_ss_check_crash_key(a, b)	do { } while (0)
 #define exynos_ss_dm(a, b, c, d, e)	do { } while (0)
 #define exynos_ss_panic_handler_safe(a)	do { } while (0)
@@ -234,11 +234,11 @@ extern void exynos_ss_get_softlockup_info(unsigned int cpu, void *info);
 #define exynos_ss_get_softlockup_info(a, b)	do { } while (0)
 #define s3c2410wdt_set_emergency_reset(a, b)	do { } while (0)
 
-static int exynos_ss_get_debug_level(void)
+static int __maybe_unused exynos_ss_get_debug_level(void)
 {
 	return 1;
 }
-static int exynos_ss_get_debug_level_reg(void)
+static int __maybe_unused exynos_ss_get_debug_level_reg(void)
 {
 	return 1;
 }

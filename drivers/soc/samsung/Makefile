@@ -29,7 +29,7 @@ obj-$(CONFIG_EXYNOS_REBOOT)	+= exynos-reboot.o
 #PM
 obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-powermode.o
 obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-pm.o
-obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-handler.o
+# obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-handler.o
 
 # USI_V2
 obj-$(CONFIG_USI_V2) += usi_v2.o
@@ -63,3 +63,6 @@ obj-$(CONFIG_EXYNOS_HDCP2)  += exynos-hdcp/
 
 # secmem
 obj-$(CONFIG_ARCH_EXYNOS)	+= secmem.o
+
+# Dummy file for disabling SEC_DEBUG 
+obj-y += sec_dummy.o

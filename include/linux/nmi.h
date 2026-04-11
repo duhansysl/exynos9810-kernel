@@ -108,7 +108,7 @@ unsigned long long get_ess_softlockup_thresh(void);
 extern void sl_softirq_entry(const char *, void *);
 extern void sl_softirq_exit(void);
 #else
-static inline void void sl_softirq_entry(const char *, void *) { }
+static inline void sl_softirq_entry(const char *, void *) { }
 static inline void sl_softirq_exit(void) { }
 #endif
 

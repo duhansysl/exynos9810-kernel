@@ -812,15 +812,23 @@ static irqreturn_t s3c64xx_serial_handle_irq(int irq, void *id)
 #endif
 
 	if (rd_regl(port, S3C64XX_UINTP) & S3C64XX_UINTM_RXD_MSK) {
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 		exynos_ss_uart(ourport, 1, ESS_FLAG_IN);
+#endif
 		ret = s3c24xx_serial_rx_chars(irq, id);
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 		exynos_ss_uart(ourport, 1, ESS_FLAG_OUT);
+#endif
 	}
 
 	if (rd_regl(port, S3C64XX_UINTP) & S3C64XX_UINTM_TXD_MSK) {
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 		exynos_ss_uart(ourport, 2, ESS_FLAG_IN);
+#endif
 		ret = s3c24xx_serial_tx_chars(irq, id);
+#ifdef CONFIG_EXYNOS_SNAPSHOT
 		exynos_ss_uart(ourport, 2, ESS_FLAG_OUT);
+#endif
 	}
 
 	return ret;

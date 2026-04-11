@@ -56,7 +56,9 @@ static inline int ecd_get_enable(void)
 }
 #endif
 #ifdef CONFIG_S3C2410_WATCHDOG
+#ifndef s3c2410wdt_set_emergency_reset
 extern int s3c2410wdt_set_emergency_reset(unsigned int timeout, int index);
+#endif
 #else
 static inline int s3c2410wdt_set_emergency_reset(unsigned int timeout, int index)
 {
