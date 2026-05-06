@@ -18,7 +18,7 @@
 # Main Dir
 CR_DIR=$(pwd)
 # Compiler Dir
-CR_TC=$HOME/compiler
+CR_TC=../compiler
 # Target ARCH
 CR_ARCH=arm64
 # Define proper arch and dir for dts files
@@ -34,9 +34,9 @@ CR_AIK=$CR_DIR/Apollo/A.I.K
 # Main Ramdisk Location
 CR_RAMDISK=$CR_DIR/Apollo/Ramdisk
 # Compiled image name and location (Image/zImage)
-CR_KERNEL=out/arch/$CR_ARCH/boot/Image
+CR_KERNEL=$CR_DIR/arch/$CR_ARCH/boot/Image
 # Compiled dtb by dtbtool
-CR_DTB=out/arch/$CR_ARCH/boot/dtb.img
+CR_DTB=$CR_DIR/arch/$CR_ARCH/boot/dtb.img
 # defconfig dir
 CR_DEFCONFIG=$CR_DIR/arch/$CR_ARCH/configs
 # Kernel Name and Version
@@ -201,7 +201,7 @@ export STRIP=$CR_CLANG/bin/llvm-strip
 export LLVM=1
 export KALLSYMS_EXTRA_PASS=1
 export ARCH=arm64 && export SUBARCH=arm64
-compile="make O=out ARCH=arm64 CC=clang"
+compile="make ARCH=arm64 CC=clang"
 CR_COMPILER_ARG="$CR_CLANG"
 }
 
