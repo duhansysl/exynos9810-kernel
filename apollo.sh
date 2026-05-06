@@ -550,6 +550,60 @@ echo "----------------------------------------------"
 exit 0;
 }
 
+# Automated GitHub Release Function
+BUILD_GITHUB_RELEASE(){
+echo "----------------------------------------------"
+echo " Initiating Automated GitHub Release Build "
+echo " This will compile 4 ZIPs (Enforcing/Permissive + KSU/No-KSU)"
+echo " Note: Performing 1 initial clean, then using dirty builds to save time."
+echo "----------------------------------------------"
+
+CR_MKZIP="y"
+CR_CLEAN="n"
+
+echo "=== [0/4] Initial Workspace Cleanup ==="
+rm -r -f $CR_DTB
+rm -r -f $CR_KERNEL
+rm -rf $CR_DTS/.*.tmp
+rm -rf $CR_DTS/.*.cmd
+rm -rf $CR_DTS/*.dtb
+rm -rf $CR_DIR/.config
+rm -rf $CR_DIR/.version
+rm -rf out/
+rm -rf $CR_OUTZIP
+echo " Cleanup done. Starting fast incremental builds..."
+echo "----------------------------------------------"
+
+# 1. Enforcing, No KSU
+echo "=== [1/4] Building Enforcing - No KSU ==="
+CR_SELINUX=2
+CR_KSU="n"
+BUILD_ALL
+
+# 2. Enforcing, KSU
+echo "=== [2/4] Building Enforcing - KernelSU ==="
+CR_SELINUX=2
+CR_KSU="y"
+BUILD_ALL
+
+# 3. Permissive, No KSU
+echo "=== [3/4] Building Permissive - No KSU ==="
+CR_SELINUX=1
+CR_KSU="n"
+BUILD_ALL
+
+# 4. Permissive, KSU
+echo "=== [4/4] Building Permissive - KernelSU ==="
+CR_SELINUX=1
+CR_KSU="y"
+BUILD_ALL
+
+echo "----------------------------------------------"
+echo " GitHub Release Builds Completed Successfully! "
+echo " Check $CR_PRODUCT directory for your 4 new ZIP files."
+echo "----------------------------------------------"
+exit 0;
+}
 
 # Pack All Images into ZIP
 PACK_KERNEL_ZIP() {
@@ -648,15 +702,31 @@ echo "$CR_NAME $CR_VERSION Build Script $CR_DATE"
 if [ "$1" = "-d" ]; then
 BUILD_DEBUG
 fi
-echo " "
-echo " "
-echo "1) starlte" "   2) star2lte" "   3) crownlte"
-echo "4) starltekor" "5) star2ltekor" "6) crownltekor"
-echo  " "
-echo "7) Build All/ZIP"               "8) Abort"
+echo ""
+echo ""
+echo "1) starlte"
+echo "2) star2lte"
+echo "3) crownlte"
+echo "4) starltekor"
+echo "5) star2ltekor"
+echo "6) crownltekor"
+echo  ""
+echo "7) Build ZIP for all devices"
+echo ""
+echo "8) Build GitHub Release ZIPs (4 ZIPs)"
+echo ""
+echo "9) Abort"
 echo "----------------------------------------------"
-read -p "Please select your build target (1-8) > " CR_TARGET
+read -p "Please select your build target (1-9) > " CR_TARGET
 echo "----------------------------------------------"
+
+if [ "$CR_TARGET" = "9" ]; then
+echo "Build Aborted"
+exit
+fi
+
+# If GitHub Release is selected, bypass the manual inputs and jump straight to compiler selection
+if [ "$CR_TARGET" = "8" ]; then
 echo " "
 echo "1) Google Clang 12 (LLVM +LTO)"
 echo "2) Google Clang 14 (LLVM +LTO)"
@@ -667,7 +737,23 @@ echo "6) Neutron Clang 19 (^)"
 echo "7) Neutron Clang 20 (BETA)"
 echo "8) Other (Apollo/toolchain/clang-custom)"
 echo " "
-read -p "Please select your compiler (1-7) > " CR_COMPILER
+read -p "Please select your compiler (1-8) > " CR_COMPILER
+echo " "
+BUILD_GITHUB_RELEASE
+exit
+fi
+
+echo " "
+echo "1) Google Clang 12 (LLVM +LTO)"
+echo "2) Google Clang 14 (LLVM +LTO)"
+echo "3) Google Clang 18 (LLVM +LTO PGO Bolt MLGO Polly)"
+echo "4) Google Clang 20 (LLVM +LTO PGO Bolt MLGO Polly)"
+echo "5) Neutron Clang 18 (^)"
+echo "6) Neutron Clang 19 (^)"
+echo "7) Neutron Clang 20 (BETA)"
+echo "8) Other (Apollo/toolchain/clang-custom)"
+echo " "
+read -p "Please select your compiler (1-8) > " CR_COMPILER
 echo " "
 echo "1) SELinux Permissive "  "2) SELinux Enforcing"
 echo " "
@@ -675,21 +761,16 @@ read -p "Please select your SElinux mode (1-2) > " CR_SELINUX
 echo " "
 read -p "Enable KernelSU? (y/n) > " CR_KSU
 echo " "
-if [ "$CR_TARGET" = "8" ]; then
-echo "Build Aborted"
-exit
-fi
-echo " "
 read -p "Clean Builds? (y/n) > " CR_CLEAN
 echo " "
 
 # Validate options
-if ! [[ "$CR_TARGET" =~ ^[1-8]$ ]]; then
+if ! [[ "$CR_TARGET" =~ ^[1-9]$ ]]; then
     CR_TARGET=$DEFAULT_TARGET
     echo " No target selected, defaulting to star2ltekor"
 fi
 
-if ! [[ "$CR_COMPILER" =~ ^[1-7]$ ]]; then
+if ! [[ "$CR_COMPILER" =~ ^[1-8]$ ]]; then
     CR_COMPILER=$DEFAULT_COMPILER
 fi
 
