@@ -50,6 +50,8 @@ CR_PLATFORM=13.0.0
 # Current Date
 CR_DATE=$(date +%d.%m.%Y)
 # General init
+export KSU_MANUAL_HOOK=y
+export CONFIG_KSU_MANUAL_HOOK=y
 export ANDROID_MAJOR_VERSION=$CR_ANDROID
 export PLATFORM_VERSION=$CR_PLATFORM
 export $CR_ARCH
