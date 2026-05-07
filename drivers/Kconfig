@@ -248,6 +248,4 @@ source "drivers/security/samsung/tzic/Kconfig"
 
 source "drivers/kernelsu/Kconfig"
 
-source "drivers/extremerom/Kconfig"
-
 endmenu

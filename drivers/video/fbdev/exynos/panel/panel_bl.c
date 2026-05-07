@@ -20,8 +20,6 @@
 #endif
 #include "panel_drv.h"
 
-#include <linux/extremerom/brightness.h>
-
 #ifdef DEBUG_PAC
 static void print_tbl(int *tbl, int sz)
 {
@@ -769,10 +767,6 @@ static int panel_set_brightness(struct backlight_device *bd)
 	int id, brightness = bd->props.brightness;
 	struct panel_bl_device *panel_bl = bl_get_data(bd);
 	struct panel_device *panel = to_panel_device(panel_bl);
-
-#ifdef CONFIG_ONEUI7_WORKAROUND
-	brightness = get_fixed_brightness(brightness);
-#endif
 
 	mutex_lock(&panel_bl->lock);
 	mutex_lock(&panel->op_lock);
