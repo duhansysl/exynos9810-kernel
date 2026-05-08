@@ -199,7 +199,7 @@ static void kbase_gpuprops_calculate_props(base_gpu_props * const gpu_props, str
 	kbase_gpuprops_update_core_props_gpu_id(gpu_props);
 	gpu_props->core_props.log2_program_counter_size = KBASE_GPU_PC_SIZE_LOG2;
 #if KERNEL_VERSION(5, 0, 0) > LINUX_VERSION_CODE
-	gpu_props->core_props.gpu_available_memory_size = totalram_pages << PAGE_SHIFT;
+	gpu_props->core_props.gpu_available_memory_size = totalram_pages() << PAGE_SHIFT;
 #else
 	gpu_props->core_props.gpu_available_memory_size =
 		totalram_pages() << PAGE_SHIFT;
