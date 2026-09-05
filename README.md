@@ -1,36 +1,40 @@
 # Duhan Kernel
-> This project is a fork of the Linux Kernel specifically targeting the Exynos hardware platform, the processor behind the Samsung Galaxy S9+ (star2lte), and others. 
+This project is a fork of the Linux Kernel specifically targeting the Exynos-9810 series SoC.
+The E9810 SoC is the processor found in the following Samsung Galaxy Devices: S9, S9+, Note 9, and Note 10 Lite.
 
 
 # Linux kernel release 4.x
-> http://kernel.org
+http://kernel.org
 
 These are the release notes for Linux version 4.  Read them carefully, as they tell you what this is all about, explain how to install the kernel, and what to do if something goes wrong.
 
-## WHAT IS LINUX?
+## What is Linux?
 Linux is a clone of the operating system Unix, written from scratch by Linus Torvalds with assistance from a loosely-knit team of hackers across the Net. It aims towards POSIX and Single UNIX Specification compliance.  
 
 It has all the features you would expect in a modern fully-fledged Unix, including true multitasking, virtual memory, shared libraries, demand loading, shared copy-on-write executables, proper memory management, and multistack networking including IPv4 and IPv6.  
 
 It is distributed under the GNU General Public License - see the accompanying COPYING file for more details.
 
-## ON WHAT HARDWARE DOES IT RUN?
+## On what hardware does it run?
 Although originally developed first for 32-bit x86-based PCs (386 or higher), today Linux also runs on (at least) the Compaq Alpha AXP, Sun SPARC and UltraSPARC, Motorola 68000, PowerPC, PowerPC64, ARM, Hitachi SuperH, Cell, IBM S/390, MIPS, HP PA-RISC, Intel IA-64, DEC VAX, AMD x86-64, AXIS CRIS, Xtensa, Tilera TILE, AVR32, ARC and Renesas M32R architectures.
   
 Linux is easily portable to most general-purpose 32- or 64-bit architectures as long as they have a paged memory management unit (PMMU) and a port of the GNU C compiler (gcc) (part of The GNU Compiler Collection, GCC). Linux has also been ported to a number of architectures without a PMMU, although functionality is then obviously somewhat limited. Linux has also been ported to itself. You can now run the kernel as a userspace application - this is called UserMode Linux(UML).
 
-## DOCUMENTATION:
-There is a lot of documentation available both in electronic form on the Internet and in books, both Linux-specific and pertaining to general UNIX questions. 
-  
-I'd recommend looking into the documentation subdirectories on any Linux FTP site for the LDP(Linux Documentation Project) books. This README is not meant to be documentation on the system: there are much better sources available.
-  
-There are various README files in the Documentation/ subdirectory: these typically contain kernel-specific installation notes for some drivers for example. 
-  
+
+# Documentation
+There is a lot of documentation available both in electronic form on the Internet and in books, both Linux-specific and pertaining to general UNIX questions. I'd recommend looking into the documentation subdirectories on any Linux FTP site for the LDP(Linux Documentation Project) books. This README is not meant to be documentation on the system, there are much better sources available.
+
+## Documentation/
+There are various README files in the Documentation/ subdirectory: these typically contain kernel-specific installation notes for some drivers for example.
+
+## Documentation/00-INDEX
 See Documentation/00-INDEX for a list of what is contained in each file. Please read the Changes file, as it contains information about the problems, which may result by upgrading your kernel.
 
+## Documentation/DocBook/
 The Documentation/DocBook/ subdirectory contains several guides for kernel developers and users.  These guides can be rendered in a number of formats:  PostScript (.ps), PDF, HTML, & man-pages, among others. After installation, "make psdocs", "make pdfdocs", "make htmldocs", or "make mandocs" will render the documentation in the requested format.
 
-## INSTALLING the kernel source:
+
+# INSTALLING the kernel source:
 If you install the full sources, put the kernel tarball in a directory where you have permissions (e.g. your home directory) and unpack it:
 
 ```sh
@@ -40,7 +44,6 @@ If you install the full sources, put the kernel tarball in a directory where you
 Do NOT use the /usr/src/linux area! This area has a (usually incomplete) set of kernel headers that are used by the library header files. They should match the library, and not get messed up by whatever the kernel-du-jour happens to be.
 
 ## UPGRADING 
-%% Adding incremental and clean sections %%
 
 You can also upgrade between 4.x releases by patching. Patches are distributed in the xz format. To install by patching, get all the newer patch files, enter the top level directory of the kernel source (linux-4.X) and execute:
 
@@ -68,7 +71,6 @@ Make sure you have no stale .o files and dependencies lying around:
 cd linux
 make mrproper
 ```
-
 You should now have the sources correctly installed.
 
 ## SOFTWARE REQUIREMENTS
@@ -94,54 +96,25 @@ modules_install install
 > Note: If the 'O=output/dir' option is used, then it must be used for *all* invocations of make.
 
 ## CONFIGURING the kernel:
-
 Do not skip this step even if you are only upgrading one minor version. New configuration options are added in each release, and odd problems will turn up if the configuration files are not set up as expected. If you want to carry your existing configuration to a new version with minimal work, use `make oldconfig`, which will only ask you for the answers to new questions.
 
 Alternative configuration commands are:
-  `make config`      Plain text interface.
-  `make menuconfig`  Text based color menus, radiolists & dialogs.
-
-  `make nconfig`  
-  Text based color menus.
-  
-  `make xconfig`
-  Qt based configuration tool.
-  
-  `make gconfig`  
-  GTK+ based configuration tool.
-  
-  `make oldconfig` 
-  Default all questions based on the contents of your existing ./.config file and asking about new config symbols.
-  
-  `make silentoldconfig` 
-  Like above, but avoids cluttering the screen with questions already answered. Additionally updates the dependencies.
-
-  `make olddefconfig`  
-  Like above, but sets new symbols to their default values without prompting.
-  
-  `make defconfig`  
-  Create a ./.config file by using the default symbol values from either arch/$ARCH/defconfig or arch/$ARCH/configs/${PLATFORM}_defconfig, depending on the architecture.
-
-  `make ${PLATFORM}_defconfig`
-  Create a ./.config file by using the default symbol values from arch/$ARCH/configs/${PLATFORM}_defconfig.
-
-  `make help` 
-  Get a list of all available platforms of your architecture.
-
-  `make allyesconfig`
-  Create a ./.config file by setting symbol values to 'y' as much as possible.
-
-  `make allmodconfig`
-  Create a ./.config file by setting symbol values to 'm' as much as possible.
-
-  `make allnoconfig`  
-  Create a ./.config file by setting symbol values to 'n' as much as possible.
-
-  `make randconfig`
-  Create a ./.config file by setting symbol values to random values.
-
-  `make localmodconfig`
-  Create a config based on current config and loaded modules (lsmod). Disables any module option that is not needed for the loaded modules.
+  `make config`          Plain text interface.
+  `make menuconfig`      Text based color menus, radiolists & dialogs.
+  `make nconfig`         Enhanced text based color menus.
+  `make xconfig`         Qt based configuration tool.
+  `make gconfig`         GTK+ based configuration tool.
+  `make oldconfig`       Default all questions based on the contents of your existing ./.config file and asking about new config symbols.
+  `make silentoldconfig` Like above, but avoids cluttering the screen with questions already answered. Additionally updates the dependencies.
+  `make olddefconfig`    Like above, but sets new symbols to their default values without prompting.
+  `make help`            Get a list of all available platforms of your architecture.
+  `make allyesconfig`    Create a ./.config file by setting symbol values to 'y' as much as possible.
+  `make allmodconfig`    Create a ./.config file by setting symbol values to 'm' as much as possible.
+  `make allnoconfig`     Create a ./.config file by setting symbol values to 'n' as much as possible.
+  `make randconfig`      Create a ./.config file by setting symbol values to random values.
+  `make localmodconfig`  Create a config based on current config and loaded modules (lsmod). Disables any module option that is not needed for the loaded modules.
+  `make defconfig`       Create a ./.config file by using the default symbol values from either arch/$ARCH/defconfig or arch/$ARCH/configs/${PLATFORM}_defconfig, depending on the architecture.
+  `make ${PLATFORM}_defconfig`  Create a ./.config file by using the default symbol values from arch/$ARCH/configs/${PLATFORM}_defconfig.
 
 To create a localmodconfig for another machine, store the lsmod of that machine into a file and pass it in as a LSMOD parameter.
 
