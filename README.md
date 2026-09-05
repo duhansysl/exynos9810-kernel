@@ -1,4 +1,4 @@
-# Duhan Kernel
+# Duhan Kernel 4.9.337
 This project is a fork of the Linux Kernel specifically targeting the Exynos-9810 series SoC.
 The E9810 SoC is the processor found in the following Samsung Galaxy Devices: S9, S9+, Note 9, and Note 10 Lite.
 
@@ -24,7 +24,6 @@ Linux is easily portable to most general-purpose 32- or 64-bit architectures as 
 # Documentation
 There is a lot of documentation available both in electronic form on the Internet and in books, both Linux-specific and pertaining to general UNIX questions. I'd recommend looking into the documentation subdirectories on any Linux FTP site for the LDP(Linux Documentation Project) books. This README is not meant to be documentation on the system, there are much better sources available.
 
-## Documentation/
 There are various README files in the Documentation/ subdirectory: these typically contain kernel-specific installation notes for some drivers for example.
 
 ## Documentation/00-INDEX
@@ -34,7 +33,7 @@ See Documentation/00-INDEX for a list of what is contained in each file. Please 
 The Documentation/DocBook/ subdirectory contains several guides for kernel developers and users.  These guides can be rendered in a number of formats:  PostScript (.ps), PDF, HTML, & man-pages, among others. After installation, "make psdocs", "make pdfdocs", "make htmldocs", or "make mandocs" will render the documentation in the requested format.
 
 
-# INSTALLING the kernel source:
+# Installing the kernel source:
 If you install the full sources, put the kernel tarball in a directory where you have permissions (e.g. your home directory) and unpack it:
 
 ```sh
@@ -43,7 +42,7 @@ If you install the full sources, put the kernel tarball in a directory where you
 
 Do NOT use the /usr/src/linux area! This area has a (usually incomplete) set of kernel headers that are used by the library header files. They should match the library, and not get messed up by whatever the kernel-du-jour happens to be.
 
-## UPGRADING 
+## Upgrading 
 
 You can also upgrade between 4.x releases by patching. Patches are distributed in the xz format. To install by patching, get all the newer patch files, enter the top level directory of the kernel source (linux-4.X) and execute:
 
@@ -61,61 +60,63 @@ patch -R) _before_ applying the 4.0.3 patch.
 Alternatively, the script patch-kernel can be used to automate this process. It determines the current kernel version and applies any patches found.
 
 ```sh
-linux/scripts/patch-kernel linux
+linux/scripts/patch-kernel linux  
 ```
 The first argument in the command above is the location of the kernel source. Patches are applied from the current directory, but an alternative directory can be specified as the second argument.
 
 Make sure you have no stale .o files and dependencies lying around:
 
 ```sh
-cd linux
-make mrproper
+cd linux  
+make mrproper  
 ```
 You should now have the sources correctly installed.
 
 ## SOFTWARE REQUIREMENTS
+Compiling and running the 4.x kernels requires up-to-date versions of various software packages.  Consult Documentation/Changes for the minimum version numbers required and how to get updates for these packages. Beware that using excessively old versions of these packages can cause indirect errors that are very difficult to track down, so don't assume that you can just update packages when obvious problems arise during build or operation.  
 
-Compiling and running the 4.x kernels requires up-to-date versions of various software packages.  Consult Documentation/Changes for the minimum version numbers required and how to get updates for these packages. Beware that using excessively old versions of these packages can cause indirect errors that are very difficult to track down, so don't assume that you can just update packages when obvious problems arise during build or operation.
+## Build directory for the kernel:
 
-## BUILD directory for the kernel:
-
-When compiling the kernel, all output files will per default be stored together with the kernel source code. Using the option `make O=output/dir` allows you to specify an alternate place for the output files (including .config).
-
-Example:
-     kernel source code: /usr/src/linux-4.X
-     build directory:    /home/name/build/kernel
-
-To configure and build the kernel, use:
+When compiling the kernel, all output files will per default be stored together with the kernel source code. Using the option `make O=output/dir` allows you to specify an alternate place for the output files (including .config).  
+  
+Example:  
+     kernel source code: /usr/src/linux-4.X  
+     build directory:    /home/name/build/kernel  
+  
+To configure and build the kernel, use:  
 ```sh
-cd /usr/src/linux-4.X
-make O=/home/name/build/kernel menuconfig
-make O=/home/name/build/kernel
-sudo make O=/home/name/build/kernel
-modules_install install
-```
+cd /usr/src/linux-4.X  
+make O=/home/name/build/kernel menuconfig  
+make O=/home/name/build/kernel  
+sudo make O=/home/name/build/kernel  
+modules_install install  
+```  
 > Note: If the 'O=output/dir' option is used, then it must be used for *all* invocations of make.
 
-## CONFIGURING the kernel:
-Do not skip this step even if you are only upgrading one minor version. New configuration options are added in each release, and odd problems will turn up if the configuration files are not set up as expected. If you want to carry your existing configuration to a new version with minimal work, use `make oldconfig`, which will only ask you for the answers to new questions.
-
+## Configuring the kernel:
+Do not skip this step even if you are only upgrading one minor version. New configuration options are added in each release, and odd problems will turn up if the configuration files are not set up as expected. If you want to carry your existing configuration to a new version with minimal work, use `make oldconfig`, which will only ask you for the answers to new questions.  
+  
+### Make Commands
 Alternative configuration commands are:
-  `make config`          Plain text interface.
-  `make menuconfig`      Text based color menus, radiolists & dialogs.
-  `make nconfig`         Enhanced text based color menus.
-  `make xconfig`         Qt based configuration tool.
-  `make gconfig`         GTK+ based configuration tool.
-  `make oldconfig`       Default all questions based on the contents of your existing ./.config file and asking about new config symbols.
-  `make silentoldconfig` Like above, but avoids cluttering the screen with questions already answered. Additionally updates the dependencies.
-  `make olddefconfig`    Like above, but sets new symbols to their default values without prompting.
-  `make help`            Get a list of all available platforms of your architecture.
-  `make allyesconfig`    Create a ./.config file by setting symbol values to 'y' as much as possible.
-  `make allmodconfig`    Create a ./.config file by setting symbol values to 'm' as much as possible.
-  `make allnoconfig`     Create a ./.config file by setting symbol values to 'n' as much as possible.
-  `make randconfig`      Create a ./.config file by setting symbol values to random values.
-  `make localmodconfig`  Create a config based on current config and loaded modules (lsmod). Disables any module option that is not needed for the loaded modules.
-  `make defconfig`       Create a ./.config file by using the default symbol values from either arch/$ARCH/defconfig or arch/$ARCH/configs/${PLATFORM}_defconfig, depending on the architecture.
-  `make ${PLATFORM}_defconfig`  Create a ./.config file by using the default symbol values from arch/$ARCH/configs/${PLATFORM}_defconfig.
-
+| subcommand | Description |
+|-|:-|
+`help`                    | Get a list of all available platforms of your architecture.  
+`config`                  | Plain text interface.  
+`menuconfig`              | Text based color menus, radiolists & dialogs.  
+`nconfig`                 | Enhanced text based color menus.  
+`xconfig`                 | Qt based configuration tool.  
+`gconfig`                 | GTK+ based configuration tool.  
+`olddefconfig`            | Like above, but sets new symbols to their default values without prompting.  
+`allyesconfig`            | Create a ./.config file by setting symbol values to 'y' as much as possible.  
+`allmodconfig`            | Create a ./.config file by setting symbol values to 'm' as much as possible.  
+`allnoconfig`             | Create a ./.config file by setting symbol values to 'n' as much as possible.  
+`randconfig`              | Create a ./.config file by setting symbol values to random values.  
+`oldconfig`               | Default all questions based on the contents of your existing ./.config file and asking about new config symbols.  
+`silentoldconfig`         | Like above, but avoids cluttering the screen with questions already answered. Additionally updates the dependencies.  
+`localmodconfig`          | Create a config based on current config and loaded modules (lsmod). Disables any module option that is not needed for the loaded modules.  
+`defconfig`               | Create a ./.config file by using the default symbol values from either `arch/$ARCH/defconfig` or `arch/$ARCH/configs/${PLATFORM}_defconfig`, depending on the architecture.  
+`${PLATFORM}_defconfig`   | Create a ./.config file by using the default symbol values from `arch/$ARCH/configs/${PLATFORM}_defconfig`.  
+  
 To create a localmodconfig for another machine, store the lsmod of that machine into a file and pass it in as a LSMOD parameter.
 
 ```sh
@@ -123,22 +124,19 @@ target$ lsmod > /tmp/mylsmod
 target$ scp /tmp/mylsmod host:/tmp
 ```
 
-`host$ make LSMOD=/tmp/mylsmod localmodconfig`
-The above also works when cross compiling.
+`host$ make LSMOD=/tmp/mylsmod localmodconfig` Also works when cross compiling.  
+`make localyesconfig` is similar to localmodconfig, except it will convert all module options to built in (=y) options.  
 
-  `make localyesconfig`
-  Similar to localmodconfig, except it will convert all module options to built in (=y) options.
+You can find more information on using the Linux kernel config tools in Documentation/kbuild/kconfig.txt.  
 
-You can find more information on using the Linux kernel config tools in Documentation/kbuild/kconfig.txt.
-
-### NOTES on "make config":
+### Note on `make config`:
  - Having unnecessary drivers will make the kernel bigger, and can under some circumstances lead to problems: probing for a nonexistent controller card may confuse your other controllers
 
  - A kernel with math-emulation compiled in will still use the coprocessor if one is present: the math emulation will just never get used in that case. The kernel will be slightly larger, but will work on different machines regardless of whether they have a math coprocessor or not.
 
  - The "kernel hacking" configuration details usually result in a bigger or slower kernel (or both), and can even make the kernel less stable by configuring some routines to actively try to break bad code to find kernel problems (kmalloc()). Thus you should probably answer 'n' to the questions for "development", "experimental", or "debugging" features.
 
-## COMPILING the kernel:
+## Compiling the kernel:
 Make sure you have at least gcc 3.2 available. For more information, refer to Documentation/ Changes.
 
 Please note that you can still run a.out user programs with this kernel.
@@ -173,7 +171,7 @@ If you ever need to change the default root device, video mode, ramdisk size, et
 Reboot with the new kernel and enjoy.
 
 
-# IF SOMETHING GOES WRONG:
+# If something goes wrong:
 If you have problems that seem to be due to kernel bugs, please check the file MAINTAINERS to see if there is a particular person associated with the part of the kernel that you are having trouble with. If there isn't anyone listed there, then the second best thing is to mail them to me (torvalds@linux-foundation.org), and possibly to any other relevant mailing-list or to the newsgroup.
 
 In all bug-reports, *please* tell what kernel you are talking about, how to duplicate the problem, and what your setup is (use your common sense).  If the problem is new, tell me so, and if the problem is old, please try to tell me when you first noticed it.
