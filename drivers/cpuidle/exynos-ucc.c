@@ -9,6 +9,8 @@
  */
 
 #include <linux/cpumask.h>
+#include <linux/kernel.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/exynos-ucc.h>
@@ -151,6 +153,45 @@ void ucc_remove_request(struct ucc_req *req)
 	spin_unlock_irqrestore(&ucc_lock, flags);
 }
 
+/* Userspace owns one request; releasing it preserves in-kernel clients. */
+static struct ucc_req userspace_ucc_req = { .name = "userspace" };
+static DEFINE_MUTEX(userspace_ucc_lock);
+static bool userspace_ucc_requested;
+
+static ssize_t cstate_control_show(struct kobject *kobj,
+                struct kobj_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+			READ_ONCE(userspace_ucc_requested));
+}
+
+static ssize_t cstate_control_store(struct kobject *kobj,
+                struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int value;
+
+	if (kstrtoint(buf, 10, &value) || value < 0 || value > 1)
+		return -EINVAL;
+	if (!ucc_initialized || !ucc_config_count)
+		return -ENODEV;
+
+	mutex_lock(&userspace_ucc_lock);
+	if (value != userspace_ucc_requested) {
+		/* Configuration zero is the existing 9810 UCC boost level. */
+		if (value)
+			ucc_add_request(&userspace_ucc_req, 0);
+		else
+			ucc_remove_request(&userspace_ucc_req);
+		WRITE_ONCE(userspace_ucc_requested, !!value);
+	}
+	mutex_unlock(&userspace_ucc_lock);
+
+	return count;
+}
+
+static struct kobj_attribute cstate_control =
+__ATTR(cstate_control, 0644, cstate_control_show, cstate_control_store);
+
 static ssize_t show_ucc_requests(struct kobject *kobj,
 				struct kobj_attribute *attr, char *buf)
 {
@@ -175,6 +216,8 @@ void __init init_exynos_ucc(void)
 
 	dn = of_find_node_by_name(NULL, "cpuidle-ucc");
 	ucc_config_count = of_get_child_count(dn);
+	if (!ucc_config_count)
+		return;
 
 	ucc_configs = kcalloc(ucc_config_count,
 				sizeof(struct ucc_config), GFP_KERNEL);
@@ -194,9 +237,12 @@ void __init init_exynos_ucc(void)
 		i++;
 	}
 	if (sysfs_create_file(power_kobj, &ucc_requests.attr))
-		pr_err("failed to create cstate_control node\n");
+		pr_err("failed to create ucc_requests node\n");
 
 	cpumask_setall(&cur_cstate);
 	ucc_initialized = true;
 	ib_ucc_initialized = true;
+
+	if (sysfs_create_file(power_kobj, &cstate_control.attr))
+		pr_err("failed to create cstate_control node\n");
 }
