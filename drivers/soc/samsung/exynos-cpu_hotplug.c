@@ -422,6 +422,41 @@ __ATTR(type##_online_cpu, 0644,					\
 attr_online_cpu(min);
 attr_online_cpu(max);
 
+/* Exynos9810: CPUs 0..3 are LITTLE; CPUs 4..7 are BIG. */
+static struct pm_qos_request hyper_big_min_request;
+static DEFINE_MUTEX(hyper_big_min_lock);
+static int hyper_big_min;
+
+static ssize_t show_big_min_online_cpu(struct kobject *kobj,
+                struct kobj_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", READ_ONCE(hyper_big_min));
+}
+
+static ssize_t store_big_min_online_cpu(struct kobject *kobj,
+                struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int value, total;
+
+	if (kstrtoint(buf, 10, &value) || value < 0 || value > 4)
+		return -EINVAL;
+	if (nr_cpu_ids != 8)
+		return -ENODEV;
+
+	/* A zero request releases only this client, preserving other QoS limits. */
+	total = value ? 4 + value : PM_QOS_CPU_ONLINE_MIN_DEFAULT_VALUE;
+	mutex_lock(&hyper_big_min_lock);
+	pm_qos_update_request(&hyper_big_min_request, total);
+	WRITE_ONCE(hyper_big_min, value);
+	mutex_unlock(&hyper_big_min_lock);
+
+	return count;
+}
+
+static struct kobj_attribute big_min_online_cpu =
+__ATTR(big_min_online_cpu, 0644,
+       show_big_min_online_cpu, store_big_min_online_cpu);
+
 /*
  * User can control the cpu hotplug operation as below:
  *
@@ -644,6 +679,7 @@ __ATTR(profiler, 0644, show_cpu_hotplug_profiler, store_cpu_hotplug_profiler);
 
 static struct attribute *cpu_hotplug_attrs[] = {
 	&min_online_cpu.attr,
+	&big_min_online_cpu.attr,
 	&max_online_cpu.attr,
 	&cpu_hotplug_enabled.attr,
 	&cpu_hotplug_profiler.attr,
@@ -709,6 +745,8 @@ static void __init cpu_hotplug_pm_qos_init(void)
 				PM_QOS_CPU_ONLINE_MIN, default_min);
 
 	/* Add PM QoS for sysfs node */
+	pm_qos_add_request(&hyper_big_min_request,
+		PM_QOS_CPU_ONLINE_MIN, PM_QOS_CPU_ONLINE_MIN_DEFAULT_VALUE);
 	pm_qos_add_request(&user_min_cpu_hotplug_request,
 		PM_QOS_CPU_ONLINE_MIN, PM_QOS_CPU_ONLINE_MIN_DEFAULT_VALUE);
 	pm_qos_add_request(&user_max_cpu_hotplug_request,
