@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config DUHANROM_BRIGHTNESS
+	bool "DuhanROM brightness workaround framework"
+	default y
+	help
+	  Framework for DuhanROM specific hardware and userspace fixups.
