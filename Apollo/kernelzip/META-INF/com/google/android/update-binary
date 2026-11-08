@@ -82,6 +82,28 @@ if echo $device | grep '[GN]96[05][FN]'; then
     ./imgtool unpack old-boot.img
     rm -rf kernel && cp /tmp/floyd/kernel kernel
     rm -rf extra && cp /tmp/floyd/extra extra
+
+    # Check OneUI version from build.prop (OneUI 7+ uses AIDL brightness scale)
+    oneui_ver=""
+    for prop in /system/build.prop /system/system/build.prop /system_root/system/build.prop; do
+        if [ -f "$prop" ]; then
+            val=$(grep -E "^ro.build.version.oneui=" "$prop" 2>/dev/null | head -n 1 | cut -d '=' -f 2)
+            if [ -n "$val" ]; then
+                oneui_ver="$val"
+                break
+            fi
+        fi
+    done
+
+    oneui_major=$(echo "$oneui_ver" | cut -c 1)
+    if [ -n "$oneui_major" ] && [ "$oneui_major" -ge 7 ] 2>/dev/null; then
+        ui_print "- OneUI $oneui_major+ detected ($oneui_ver): AIDL brightness mode"
+        sed -i 's/cmdline=/cmdline=aidl_brightness=1 /' header 2>/dev/null || true
+    elif [ -n "$oneui_major" ]; then
+        ui_print "- OneUI $oneui_major detected ($oneui_ver): Legacy brightness mode"
+        sed -i 's/cmdline=/cmdline=aidl_brightness=0 /' header 2>/dev/null || true
+    fi
+
     ./imgtool repack -n old-boot.img
     cp new-boot.img /tmp/floyd/boot.img
     dd if=/tmp/floyd/boot.img of=$boot bs=4096
