@@ -243,7 +243,14 @@ BUILD_IMAGE_NAME()
 BUILD_OPTIONS()
 {
 	# KSU Version
-	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
+	if [ -d "KernelSU-Next/.git" ] || [ -f "KernelSU-Next/.git" ]; then
+		KSU_GIT_COUNT=$(git -C KernelSU-Next rev-list --count HEAD 2>/dev/null)
+		KSU_GIT_TAG=$(git -C KernelSU-Next describe --tags --abbrev=0 2>/dev/null)
+		KSU_OFFSET=$(grep -oP '(?<=expr 30000 \+ \$\(KSU_GIT_VERSION\) \+ )[0-9]+' drivers/kernelsu/Kbuild 2>/dev/null || echo 119)
+		if [ -n "$KSU_GIT_COUNT" ]; then
+			KSU_VERSION=$((30000 + KSU_GIT_COUNT + ${KSU_OFFSET:-119}))
+		fi
+	fi
 	echo "----------------------------------------------"
 	echo " Apollo Kernel Build Options "
 	echo " "
@@ -262,7 +269,7 @@ BUILD_OPTIONS()
 	fi
 	if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
 		if [ -n "$KSU_VERSION" ]; then
-		echo " KernelSU	- Version: $KSU_VERSION"
+		echo " KernelSU	- Version: $KSU_VERSION ($KSU_GIT_TAG)"
 		else
 		echo " KernelSU	- Enabled"
 		fi
@@ -327,7 +334,14 @@ BUILD_GENERATE_CONFIG()
 BUILD_OUT()
 {
 # KSU Version
-	KSU_VERSION=$( [ -f "drivers/kernelsu/Makefile" ] && grep -oP '(?<=-DKSU_VERSION=)[0-9]+' drivers/kernelsu/Makefile )
+	if [ -d "KernelSU-Next/.git" ] || [ -f "KernelSU-Next/.git" ]; then
+		KSU_GIT_COUNT=$(git -C KernelSU-Next rev-list --count HEAD 2>/dev/null)
+		KSU_GIT_TAG=$(git -C KernelSU-Next describe --tags --abbrev=0 2>/dev/null)
+		KSU_OFFSET=$(grep -oP '(?<=expr 30000 \+ \$\(KSU_GIT_VERSION\) \+ )[0-9]+' drivers/kernelsu/Kbuild 2>/dev/null || echo 119)
+		if [ -n "$KSU_GIT_COUNT" ]; then
+			KSU_VERSION=$((30000 + KSU_GIT_COUNT + ${KSU_OFFSET:-119}))
+		fi
+	fi
   echo "----------------------------------------------"
   echo " Kernel		- $CR_IMAGE_NAME"
   echo " Device		- $CR_VARIANT"
@@ -342,7 +356,15 @@ BUILD_OUT()
 	else
 		echo " SELinux	- Enforcing"
 	fi
-  echo " KernelSU	- Version: $KSU_VERSION"
+  if [[ "$CR_KSU" =~ ^[yY]$ ]]; then
+    if [ -n "$KSU_VERSION" ]; then
+      echo " KernelSU	- Version: $KSU_VERSION ($KSU_GIT_TAG)"
+    else
+      echo " KernelSU	- Enabled"
+    fi
+  else
+    echo " KernelSU	- Disabled"
+  fi
   echo "----------------------------------------------"
   echo "$CR_VARIANT kernel build finished."
   echo "Compiled DTB Size = $sizdT Kb"
