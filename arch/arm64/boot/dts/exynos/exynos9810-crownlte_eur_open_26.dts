@@ -6706,6 +6706,7 @@
 			wacom,use_virtual_softkey;
 			wacom,support_aop_mode = [31 00];
 			wacom,use_garage;
+			wacom,spen_garage_pos = "0";
 			wacom,support_dex_mode;
 			wacom,dex_rate = <0xa>;
 			wacom,table_swap_for_dex_station;
