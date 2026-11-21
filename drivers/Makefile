@@ -240,7 +240,3 @@ obj-y				+= kperfmon/
 obj-y  += security/samsung/tzic/
 
 obj-$(CONFIG_KSU) += kernelsu/
-
-# DuhanROM code
-obj-$(CONFIG_DUHANROM_BRIGHTNESS) += duhanrom/
-
